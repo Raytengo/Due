@@ -275,13 +275,237 @@
       flex: 1;
       height: 100vh;
       overflow: hidden;
-      padding: 28px 40px 16px;
+      padding: 20px 40px 16px;
       display: flex;
       flex-direction: column;
     }
 
-    #week-section    { flex-shrink: 0; }
-    #courses-section { flex: 1; min-height: 0; overflow: hidden; }
+    /* ── Page Tabs ── */
+    .page-tabs {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 18px;
+      flex-shrink: 0;
+    }
+
+    .page-tab {
+      font-family: 'DM Mono', monospace;
+      font-size: 12px;
+      padding: 8px 18px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--surface);
+      color: var(--dark);
+      cursor: pointer;
+      transition: all 0.15s;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .page-tab:hover {
+      border-color: var(--orange);
+    }
+
+    .page-tab.active {
+      background: var(--dark);
+      color: var(--bg);
+      border-color: var(--dark);
+    }
+
+    #main-section {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+
+    #main-section::-webkit-scrollbar { display: none; }
+
+    /* ── Week Page ── */
+    .week-panel {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px 28px;
+      background: var(--surface);
+    }
+
+    .week-content {
+      display: flex;
+      gap: 32px;
+      align-items: flex-start;
+    }
+
+    .week-left {
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .week-pie {
+      width: 140px;
+      height: 140px;
+      border-radius: 50%;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+
+    .week-legend {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .week-legend-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .week-legend-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .week-legend-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 12px;
+      color: var(--dark);
+    }
+
+    .week-right {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    .week-right-expanded {
+      overflow-y: auto;
+      max-height: calc(100vh - 240px);
+    }
+
+    .week-group {
+      padding: 14px 0;
+    }
+
+    .week-group:first-child {
+      padding-top: 0;
+    }
+
+    .week-group:last-child {
+      padding-bottom: 0;
+    }
+
+    .week-group-title {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 12px;
+      font-weight: 400;
+    }
+
+    .week-group-title.color-urgent { color: var(--orange); }
+    .week-group-title.color-soon { color: var(--warm); }
+    .week-group-title.color-later { color: var(--blue); }
+
+    .week-divider {
+      height: 1px;
+      background: var(--border);
+      margin: 0;
+    }
+
+    .week-group-empty {
+      color: var(--mid);
+      font-size: 13px;
+      padding: 4px 0;
+    }
+
+    .week-toggle-btn {
+      margin-top: 16px;
+      padding: 10px 20px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      width: 100%;
+      text-align: center;
+      font-family: 'DM Mono', monospace;
+      font-size: 12px;
+      color: var(--dark);
+      cursor: pointer;
+      transition: all 0.15s;
+      letter-spacing: 0.02em;
+    }
+
+    .week-toggle-btn:hover {
+      background: var(--surface);
+      border-color: var(--orange);
+      color: var(--orange);
+    }
+
+    .week-remaining {
+      margin-top: 16px;
+      padding: 12px 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      text-align: center;
+      font-family: 'DM Mono', monospace;
+      font-size: 12px;
+      color: var(--muted);
+      letter-spacing: 0.02em;
+    }
+
+    .week-task-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+
+    .week-task-card {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px 14px;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      transition: border-color 0.12s;
+    }
+
+    .week-task-card:hover {
+      border-color: var(--orange);
+    }
+
+    .week-task-course {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      color: var(--mid);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .week-task-title {
+      font-size: 14px;
+      color: var(--dark);
+      line-height: 1.3;
+    }
+
+    .week-task-due {
+      font-family: 'DM Mono', monospace;
+      font-size: 12px;
+      margin-top: 2px;
+    }
+
+    /* ── Courses Grid ── */
+    .courses-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+    }
 
     /* ── Section Label ── */
     .section-label {
@@ -291,61 +515,6 @@
       letter-spacing: 0.1em;
       color: var(--mid);
       margin-bottom: 14px;
-    }
-
-    /* ── This-Week Panel ── */
-    .week-panel {
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 14px 24px;
-      margin-bottom: 16px;
-      background: var(--surface);
-    }
-
-    .week-panel .section-label {
-      margin-bottom: 10px;
-    }
-
-    .week-item {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      padding: 7px 0;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .week-item:last-child { border-bottom: none; }
-
-    .week-item-left {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-
-    .week-item-title {
-      font-size: 15px;
-      color: var(--dark);
-    }
-
-    .week-item-course {
-      font-family: 'DM Mono', monospace;
-      font-size: 11px;
-      color: var(--mid);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-
-    .week-item-due {
-      font-family: 'DM Mono', monospace;
-      font-size: 13px;
-      white-space: nowrap;
-      margin-left: 24px;
-    }
-
-    .week-empty {
-      color: var(--mid);
-      font-size: 14px;
-      padding: 8px 0;
     }
 
     /* ── Course Cards ── */
@@ -507,6 +676,16 @@
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+    }
+
+    .assignment-title-link {
+      cursor: pointer;
+      transition: color 0.15s;
+    }
+
+    .assignment-title-link:hover {
+      color: var(--orange);
+      text-decoration: underline;
     }
 
     .assignment-group {
@@ -979,14 +1158,6 @@
     .btn-reanalyze:hover { border-color: var(--orange); color: var(--orange); }
 
     /* ── Card Grid ── */
-    .card-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      grid-auto-rows: calc((100% - 12px) / 2);
-      gap: 12px;
-      height: 100%;
-    }
-
     .course-card-grid {
       border: 1px solid var(--border);
       border-radius: 8px;
@@ -1002,7 +1173,7 @@
       cursor: pointer;
       transition: background 0.12s;
       user-select: none;
-      height: 96px;
+      height: 95px;
       flex-shrink: 0;
       overflow: hidden;
     }
@@ -1015,12 +1186,12 @@
       align-items: flex-start;
       justify-content: space-between;
       gap: 8px;
-      margin-bottom: 6px;
+      margin-bottom: 8px;
     }
 
     .card-code {
       font-family: 'DM Mono', monospace;
-      font-size: 10px;
+      font-size: 11px;
       text-transform: uppercase;
       letter-spacing: 0.06em;
       color: var(--muted);
@@ -1029,7 +1200,7 @@
     .card-badge-urgent {
       font-family: 'DM Mono', monospace;
       font-size: 10px;
-      padding: 2px 8px;
+      padding: 3px 9px;
       border-radius: 10px;
       background: rgba(217, 119, 87, 0.1);
       border: 1px solid var(--orange);
@@ -1040,7 +1211,7 @@
 
     .card-name {
       font-family: 'Source Serif 4', Georgia, serif;
-      font-size: 16px;
+      font-size: 17px;
       font-weight: 400;
       color: var(--dark);
       line-height: 1.35;
@@ -1059,26 +1230,32 @@
 
     .card-bottom {
       border-top: 1px solid var(--border);
-      padding: 4px 20px 8px;
+      padding: 8px 20px 12px;
       background: var(--bg);
       flex: 1;
       display: flex;
       flex-direction: column;
+      min-height: 0;
+    }
+
+    .card-rows-container {
+      flex: 1;
+      min-height: 0;
     }
 
     .card-row {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 8px;
-      padding: 8px 0;
+      gap: 12px;
+      padding: 10px 0;
       border-bottom: 1px solid var(--border);
     }
 
     .card-row:last-of-type { border-bottom: none; }
 
     .card-row-title {
-      font-size: 13px;
+      font-size: 14px;
       color: var(--dark);
       white-space: nowrap;
       overflow: hidden;
@@ -1088,16 +1265,16 @@
 
     .card-row-due {
       font-family: 'DM Mono', monospace;
-      font-size: 11px;
+      font-size: 12px;
       white-space: nowrap;
       flex-shrink: 0;
     }
 
     .card-empty {
       font-family: 'DM Mono', monospace;
-      font-size: 11px;
+      font-size: 12px;
       color: var(--mid);
-      padding: 12px 0;
+      padding: 16px 0;
       text-align: center;
     }
 
@@ -1106,8 +1283,8 @@
       align-items: center;
       justify-content: flex-end;
       gap: 8px;
-      padding-top: 8px;
-      margin-top: auto;
+      padding-top: 10px;
+      flex-shrink: 0;
     }
 
     .card-pager-btn {
@@ -1228,8 +1405,12 @@
 
     <!-- ── Main Content ── -->
     <main class="main-content" id="main-content">
-      <div id="week-section"></div>
-      <div id="courses-section"></div>
+      <div class="page-tabs" id="page-tabs">
+        <button class="page-tab active" data-page="week">學期待辦</button>
+        <button class="page-tab" data-page="courses">課程</button>
+      </div>
+      <div id="main-section"></div>
+      <div id="course-detail-container" style="display: none;"></div>
     </main>
 
   </div>

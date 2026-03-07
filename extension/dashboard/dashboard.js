@@ -28,7 +28,7 @@ function formatDue(dueAt) {
   const diffDays = Math.ceil(diffMs / 86400000);
 
   const dateStr = d.toLocaleDateString('zh-TW', {
-    month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+    month: 'short', day: 'numeric',
   });
 
   if (diffMs < 0) return `${dateStr}（已過期）`;
@@ -49,6 +49,8 @@ function formatLastSync(iso) {
 }
 
 function isExam(assignment) {
+  if (assignment.is_quiz_assignment) return true;
+  if ((assignment.submission_types || []).includes('online_quiz')) return true;
   const title = (assignment.name || '').toLowerCase();
   return (
     title.includes('exam') || title.includes('quiz') ||
@@ -120,6 +122,8 @@ let showSubmitted = false;
 // ── View 狀態 ──
 let currentView = 'grid';      // 'grid' | 'course'
 let currentCourseId = null;
+let currentPage = 'week';      // 'week' | 'courses'
+let weekExpanded = false;      // 学期待办是否展开
 const cardPages = {};           // { [courseId]: pageIndex }
 
 // ── 套用篩選到作業列表 ──
@@ -152,7 +156,9 @@ function render(data) {
   renderNav(courses, assignments);
 
   if (currentView === 'course') {
-    document.getElementById('week-section').style.display = 'none';
+    document.getElementById('page-tabs').style.display = 'none';
+    document.getElementById('main-section').style.display = 'none';
+    document.getElementById('course-detail-container').style.display = '';
     const course = courses.find((c) => c.id === currentCourseId);
     if (course) {
       renderCourseDetailSection(course, assignments[course.id] || [], assignmentGroups[course.id] || [], scores);
@@ -160,9 +166,15 @@ function render(data) {
       showGridView();
     }
   } else {
-    document.getElementById('week-section').style.display = '';
-    renderWeekSection(courses, assignments);
-    renderCardGrid(courses, assignments, assignmentGroups);
+    document.getElementById('page-tabs').style.display = '';
+    document.getElementById('main-section').style.display = '';
+    document.getElementById('course-detail-container').style.display = 'none';
+    updateTabs();
+    if (currentPage === 'week') {
+      renderWeekSection(courses, assignments);
+    } else {
+      renderCardGrid(courses, assignments, assignmentGroups);
+    }
   }
 }
 
@@ -213,11 +225,22 @@ function renderNav(courses, assignments) {
   });
 }
 
+// ── 頁面切換 ──
+function updateTabs() {
+  document.querySelectorAll('.page-tab').forEach((tab) => {
+    tab.classList.toggle('active', tab.dataset.page === currentPage);
+  });
+}
+
+function switchPage(page) {
+  currentPage = page;
+  loadData();
+}
+
 // ── 本週待辦 ──
 function renderWeekSection(courses, assignments) {
-  const el = document.getElementById('week-section');
+  const el = document.getElementById('main-section');
   const now = Date.now();
-  const weekMs = 7 * 86400000;
 
   const items = [];
   for (const course of courses) {
@@ -225,7 +248,8 @@ function renderWeekSection(courses, assignments) {
     for (const a of asgns) {
       if (!a.due_at) continue;
       const diff = new Date(a.due_at) - now;
-      if (diff >= 0 && diff <= weekMs) {
+      // 只顯示未到期的作業
+      if (diff >= 0) {
         items.push({ ...a, _course: course });
       }
     }
@@ -234,29 +258,154 @@ function renderWeekSection(courses, assignments) {
   const filtered = applyFilters(items);
   filtered.sort((a, b) => new Date(a.due_at) - new Date(b.due_at));
 
-  const uClass = (a) => urgencyClass(a.due_at, isExam(a));
+  // 分成三組：7天內 / 8-30天 / 30天以上
+  const urgent = [];   // 7天內
+  const soon = [];     // 8-30天
+  const later = [];    // 30天以上
 
-  const rows = filtered.length
-    ? filtered.map((a) => `
-        <div class="week-item">
-          <div class="week-item-left">
-            <div class="week-item-title">${esc(a.name)}</div>
-            <div class="week-item-course">${esc(a._course.course_code || a._course.name)}</div>
-          </div>
-          <div class="week-item-due ${uClass(a)}">${formatDue(a.due_at)}</div>
-        </div>`).join('')
-    : '<div class="week-empty">本週沒有待繳作業</div>';
+  for (const a of filtered) {
+    const diff = new Date(a.due_at) - now;
+    const days = diff / 86400000;
+    if (days <= 7) urgent.push(a);
+    else if (days <= 30) soon.push(a);
+    else later.push(a);
+  }
+
+  // 截斷邏輯（只在未展開時應用）
+  let displayUrgent = urgent;
+  let displaySoon = soon;
+  let displayLater = later;
+  let hasMore = false;
+
+  if (!weekExpanded) {
+    const MAX_DISPLAY = 8;
+    const totalTasks = urgent.length + soon.length + later.length;
+
+    if (totalTasks > MAX_DISPLAY) {
+      hasMore = true;
+      let count = 0;
+
+      // 優先顯示 7天內
+      if (urgent.length <= MAX_DISPLAY) {
+        displayUrgent = urgent;
+        count = urgent.length;
+      } else {
+        displayUrgent = urgent.slice(0, MAX_DISPLAY);
+        displaySoon = [];
+        displayLater = [];
+      }
+
+      // 如果還有空間，顯示 8-30天
+      if (count < MAX_DISPLAY && soon.length > 0) {
+        const availableSpace = MAX_DISPLAY - count;
+        if (soon.length <= availableSpace) {
+          displaySoon = soon;
+          count += soon.length;
+        } else {
+          displaySoon = soon.slice(0, availableSpace);
+          displayLater = [];
+        }
+      }
+
+      // 如果還有空間，顯示 30天以上
+      if (count < MAX_DISPLAY && later.length > 0) {
+        const availableSpace = MAX_DISPLAY - count;
+        if (later.length <= availableSpace) {
+          displayLater = later;
+        } else {
+          displayLater = later.slice(0, availableSpace);
+        }
+      }
+    }
+  }
+
+  const total = urgent.length + soon.length + later.length;
+  const urgentPct = total > 0 ? (urgent.length / total) * 100 : 0;
+  const soonPct = total > 0 ? (soon.length / total) * 100 : 0;
+  const laterPct = total > 0 ? (later.length / total) * 100 : 0;
+
+  const pieStyle = total > 0
+    ? `background: conic-gradient(
+        var(--orange) 0% ${urgentPct}%,
+        var(--warm) ${urgentPct}% ${urgentPct + soonPct}%,
+        var(--blue) ${urgentPct + soonPct}% 100%
+      );`
+    : 'background: var(--border);';
+
+  const renderGroup = (title, list, colorClass, isLast) => {
+    if (list.length === 0) {
+      return '';
+    }
+    const cards = list.map((a) => {
+      const uClass = urgencyClass(a.due_at, isExam(a));
+      return `
+        <div class="week-task-card">
+          <div class="week-task-course">${esc(a._course.course_code || a._course.name)}</div>
+          <div class="week-task-title">${esc(a.name)}</div>
+          <div class="week-task-due ${uClass}">${formatDue(a.due_at)}</div>
+        </div>`;
+    }).join('');
+    return `
+      <div class="week-group">
+        <div class="week-group-title ${colorClass}">${title} (${list.length})</div>
+        <div class="week-task-grid">
+          ${cards}
+        </div>
+      </div>
+      ${!isLast ? '<div class="week-divider"></div>' : ''}`;
+  };
+
+  const groupsHTML = [
+    renderGroup('7天內', displayUrgent, 'color-urgent', false),
+    renderGroup('8-30天', displaySoon, 'color-soon', false),
+    renderGroup('30天以上', displayLater, 'color-later', true)
+  ].filter(h => h).join('');
+
+  const toggleButtonHTML = hasMore
+    ? `<button class="week-toggle-btn" onclick="toggleWeekExpand()">顯示更多</button>`
+    : (weekExpanded && total > 0
+      ? `<button class="week-toggle-btn" onclick="toggleWeekExpand()">收起</button>`
+      : '');
+
+  const rightClass = weekExpanded ? 'week-right week-right-expanded' : 'week-right';
 
   el.innerHTML = `
     <div class="week-panel">
-      <div class="section-label">本週待辦（7 天內）</div>
-      ${rows}
+      <div class="week-content">
+        <div class="week-left">
+          <div class="week-pie" style="${pieStyle}"></div>
+          <div class="week-legend">
+            <div class="week-legend-item">
+              <span class="week-legend-dot" style="background: var(--orange);"></span>
+              <span class="week-legend-label">7天內 (${urgent.length})</span>
+            </div>
+            <div class="week-legend-item">
+              <span class="week-legend-dot" style="background: var(--warm);"></span>
+              <span class="week-legend-label">8-30天 (${soon.length})</span>
+            </div>
+            <div class="week-legend-item">
+              <span class="week-legend-dot" style="background: var(--blue);"></span>
+              <span class="week-legend-label">30天+ (${later.length})</span>
+            </div>
+          </div>
+        </div>
+        <div class="${rightClass}">
+          ${groupsHTML || '<div class="week-group-empty">無待辦事項</div>'}
+          ${toggleButtonHTML}
+        </div>
+      </div>
     </div>`;
+}
+
+// ── 切換學期待辦展開狀態 ──
+function toggleWeekExpand() {
+  weekExpanded = !weekExpanded;
+  loadData();
 }
 
 // ── 卡片格 ──
 function renderCardGrid(courses, assignments, assignmentGroups) {
-  const el = document.getElementById('courses-section');
+  const el = document.getElementById('main-section');
 
   if (!courses.length) {
     el.innerHTML = `
@@ -276,7 +425,7 @@ function renderCardGrid(courses, assignments, assignmentGroups) {
     return nextDue(a.id) - nextDue(b.id);
   });
 
-  el.innerHTML = `<div class="card-grid">
+  el.innerHTML = `<div class="courses-grid">
     ${sorted.map((c) => renderCourseCardGrid(c, assignments[c.id] || [], assignmentGroups[c.id] || [])).join('')}
   </div>`;
 
@@ -332,7 +481,7 @@ function renderCourseCardGrid(course, asgns, groups) {
 
 // ── 卡片下半部分（作業列表 + 分頁） ──
 function renderCardBottom(courseId, sorted, pageIdx) {
-  const pageSize = 3;
+  const pageSize = 4;
   const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const page = Math.min(pageIdx, totalPages - 1);
   const visible = sorted.slice(page * pageSize, (page + 1) * pageSize);
@@ -355,7 +504,7 @@ function renderCardBottom(courseId, sorted, pageIdx) {
       <button class="card-pager-btn" data-course-id="${courseId}" data-dir="1"${page >= totalPages - 1 ? ' disabled' : ''}>›</button>
     </div>` : '';
 
-  return `<div class="card-bottom">${rows}${pager}</div>`;
+  return `<div class="card-bottom"><div class="card-rows-container">${rows}</div>${pager}</div>`;
 }
 
 // ── 分頁切換（局部重繪） ──
@@ -368,7 +517,8 @@ function updateCardPage(courseId, dir) {
     return new Date(a.due_at) - new Date(b.due_at);
   });
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / 3));
+  const pageSize = 2;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const current = cardPages[courseId] || 0;
   const next = Math.max(0, Math.min(totalPages - 1, current + dir));
   if (next === current) return;
@@ -403,7 +553,7 @@ function showGridView() {
 
 // ── 課程詳細視圖 ──
 function renderCourseDetailSection(course, asgns, groups, scores) {
-  const el = document.getElementById('courses-section');
+  const el = document.getElementById('course-detail-container');
 
   const filtered = applyFilters(asgns).sort((a, b) => {
     if (!a.due_at && !b.due_at) return 0;
@@ -444,6 +594,16 @@ function renderCourseDetailSection(course, asgns, groups, scores) {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       openAnalysisPanel(parseInt(btn.dataset.assignmentId, 10), parseInt(btn.dataset.courseId, 10));
+    });
+  });
+
+  el.querySelectorAll('.assignment-title-link').forEach((title) => {
+    title.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const assignmentId = title.dataset.assignmentId;
+      const courseId = title.dataset.courseId;
+      const url = `https://hkust-gz.instructure.com/courses/${courseId}/assignments/${assignmentId}`;
+      window.open(url, '_blank');
     });
   });
 
@@ -642,7 +802,7 @@ function renderAssignmentRow(a, groups, courseId) {
   return `
     <div class="assignment-item${submitted ? ' submitted' : ''}">
       <div class="assignment-left">
-        <div class="assignment-title">${esc(a.name)}</div>
+        <div class="assignment-title assignment-title-link" data-assignment-id="${a.id}" data-course-id="${courseId}">${esc(a.name)}</div>
         ${groupName ? `<div class="assignment-group">${esc(groupName)}</div>` : ''}
       </div>
       <div class="assignment-right">
@@ -862,6 +1022,13 @@ document.querySelectorAll('.pill').forEach((btn) => {
     btn.classList.add('active');
     currentFilter = btn.dataset.filter;
     loadData();
+  });
+});
+
+// ── 頁面切換 ──
+document.querySelectorAll('.page-tab').forEach((tab) => {
+  tab.addEventListener('click', () => {
+    switchPage(tab.dataset.page);
   });
 });
 
