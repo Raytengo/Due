@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Canvas Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400&family=DM+Sans:wght@300;400&family=Source+Serif+4:wght@400&display=swap"
+    rel="stylesheet"
+  />
+  <style>
+    :root {
+      --bg:      #faf9f5;
+      --surface: #f2f0e8;
+      --dark:    #141413;
+      --mid:     #9a9890;
+      --muted:   #7c7a72;
+      --border:  #dedad0;
+      --orange:  #d97757;
+      --blue:    #6a9bcc;
+      --green:   #788c5d;
+      --warm:    #b09050;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      width: 280px;
+      background: var(--bg);
+      color: var(--dark);
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 300;
+      padding: 20px;
+    }
+
+    h1 {
+      font-family: 'Source Serif 4', Georgia, serif;
+      font-weight: 400;
+      font-size: 18px;
+      margin-bottom: 4px;
+    }
+
+    .subtitle {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--mid);
+      margin-bottom: 16px;
+    }
+
+    .divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 14px 0;
+    }
+
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .stat-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+    }
+
+    .stat-value {
+      font-family: 'DM Mono', monospace;
+      font-size: 13px;
+      color: var(--dark);
+    }
+
+    .stat-value.urgent {
+      color: var(--orange);
+    }
+
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 9px 14px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--surface);
+      color: var(--dark);
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 300;
+      font-size: 13px;
+      cursor: pointer;
+      text-align: center;
+      transition: border-color 0.15s, background 0.15s;
+      margin-bottom: 8px;
+      text-decoration: none;
+    }
+
+    .btn:hover {
+      border-color: var(--orange);
+      background: var(--bg);
+    }
+
+    .btn.primary {
+      background: var(--dark);
+      color: var(--bg);
+      border-color: var(--dark);
+    }
+
+    .btn.primary:hover {
+      background: #2a2a27;
+      border-color: #2a2a27;
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .sync-status {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      color: var(--mid);
+      text-align: center;
+      margin-top: 4px;
+    }
+
+    .sync-status.syncing {
+      color: var(--orange);
+    }
+
+    .sync-status.done {
+      color: var(--green);
+    }
+  </style>
+</head>
+<body>
+  <h1>Canvas Dashboard</h1>
+  <div class="subtitle">HKUST(GZ) · Canvas LMS</div>
+
+  <div class="stat-row">
+    <span class="stat-label">上次同步</span>
+    <span class="stat-value" id="last-sync">—</span>
+  </div>
+  <div class="stat-row">
+    <span class="stat-label">課程數量</span>
+    <span class="stat-value" id="course-count">—</span>
+  </div>
+  <div class="stat-row">
+    <span class="stat-label">今日到期</span>
+    <span class="stat-value urgent" id="due-today">—</span>
+  </div>
+
+  <hr class="divider" />
+
+  <button class="btn primary" id="sync-btn">手動同步</button>
+  <div class="sync-status" id="sync-status"></div>
+
+  <hr class="divider" />
+
+  <button class="btn" id="dashboard-btn">開啟 Dashboard</button>
+  <button class="btn" id="settings-btn">設定 API 金鑰</button>
+
+  <script src="popup.js"></script>
+</body>
+</html>

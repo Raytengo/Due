@@ -1,0 +1,1254 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Canvas Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;1,300&family=DM+Sans:wght@300;400&family=Source+Serif+4:ital,wght@0,400;1,400&display=swap"
+    rel="stylesheet"
+  />
+  <style>
+    :root {
+      --bg:      #faf9f5;
+      --surface: #f2f0e8;
+      --dark:    #141413;
+      --mid:     #9a9890;
+      --muted:   #7c7a72;
+      --border:  #dedad0;
+      --orange:  #d97757;
+      --blue:    #6a9bcc;
+      --green:   #788c5d;
+      --warm:    #b09050;
+      --purple:  #a86070;
+    }
+
+    html[data-theme="dark"] {
+      --bg:      #1e1d1b;
+      --surface: #141312;
+      --dark:    #eeebe4;
+      --mid:     #5c5a56;
+      --muted:   #8e8c88;
+      --border:  #272522;
+    }
+
+    html[data-theme="dark"] .course-header:hover { background: #1c1b19; }
+    html[data-theme="dark"] .nav-course-item:hover { background: #1a1917; }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--dark);
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 400;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    /* ── Two-column layout ── */
+    .layout {
+      display: flex;
+      height: 100vh;
+    }
+
+    /* ── Left Sidebar ── */
+    .sidebar {
+      width: 300px;
+      flex-shrink: 0;
+      height: 100vh;
+      overflow-y: auto;
+      border-right: 1px solid var(--border);
+      background: var(--surface);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sidebar-inner {
+      padding: 32px 24px 28px;
+      display: flex;
+      flex-direction: column;
+      min-height: 100%;
+    }
+
+    /* Brand */
+    .sidebar-brand {
+      margin-bottom: 28px;
+    }
+
+    .sidebar-brand h1 {
+      font-family: 'Source Serif 4', Georgia, serif;
+      font-weight: 400;
+      font-size: 36px;
+      letter-spacing: -0.02em;
+      line-height: 1.1;
+      margin-bottom: 6px;
+    }
+
+    .sidebar-brand .meta {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--mid);
+      line-height: 1.5;
+    }
+
+    /* Sidebar section */
+    .sidebar-section {
+      margin-bottom: 24px;
+    }
+
+    .sidebar-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--mid);
+      margin-bottom: 10px;
+    }
+
+    /* Filter Pills */
+    .filter-bar {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .hide-done-label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      cursor: pointer;
+      margin-top: 10px;
+      user-select: none;
+    }
+
+    .hide-done-label input[type="checkbox"] {
+      width: 13px;
+      height: 13px;
+      accent-color: var(--orange);
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .pill {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 4px 11px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.12s;
+    }
+
+    .pill.active,
+    .pill:hover {
+      border-color: var(--orange);
+      color: var(--orange);
+    }
+
+    /* Course Nav */
+    .course-nav {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .nav-course-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 7px 10px;
+      border-radius: 5px;
+      text-decoration: none;
+      color: var(--dark);
+      font-size: 13px;
+      gap: 8px;
+      cursor: pointer;
+      border: none;
+      background: transparent;
+      width: 100%;
+      text-align: left;
+      transition: background 0.12s;
+    }
+
+    .nav-course-item:hover {
+      background: var(--bg);
+    }
+
+    .nav-course-name {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 13px;
+    }
+
+    .nav-course-badge {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      padding: 2px 7px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--muted);
+      flex-shrink: 0;
+      line-height: 1.6;
+    }
+
+    .nav-course-badge.urgent {
+      background: rgba(217, 119, 87, 0.08);
+      border-color: var(--orange);
+      color: var(--orange);
+    }
+
+    /* Sidebar footer */
+    .sidebar-footer {
+      margin-top: auto;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+    }
+
+    .footer-row {
+      display: flex;
+      gap: 8px;
+      align-items: stretch;
+    }
+
+    .btn-sync {
+      flex: 1;
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 8px 14px;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      background: var(--bg);
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.12s;
+      text-align: center;
+    }
+
+    .btn-sync:hover {
+      border-color: var(--orange);
+      color: var(--orange);
+    }
+
+    .btn-theme-toggle {
+      width: 34px;
+      flex-shrink: 0;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      background: var(--bg);
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.12s;
+    }
+
+    .btn-theme-toggle:hover {
+      border-color: var(--orange);
+      color: var(--orange);
+    }
+
+    /* ── Main Content ── */
+    .main-content {
+      flex: 1;
+      height: 100vh;
+      overflow: hidden;
+      padding: 28px 40px 16px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #week-section    { flex-shrink: 0; }
+    #courses-section { flex: 1; min-height: 0; overflow: hidden; }
+
+    /* ── Section Label ── */
+    .section-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--mid);
+      margin-bottom: 14px;
+    }
+
+    /* ── This-Week Panel ── */
+    .week-panel {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 24px;
+      margin-bottom: 16px;
+      background: var(--surface);
+    }
+
+    .week-panel .section-label {
+      margin-bottom: 10px;
+    }
+
+    .week-item {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      padding: 7px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .week-item:last-child { border-bottom: none; }
+
+    .week-item-left {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .week-item-title {
+      font-size: 15px;
+      color: var(--dark);
+    }
+
+    .week-item-course {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      color: var(--mid);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .week-item-due {
+      font-family: 'DM Mono', monospace;
+      font-size: 13px;
+      white-space: nowrap;
+      margin-left: 24px;
+    }
+
+    .week-empty {
+      color: var(--mid);
+      font-size: 14px;
+      padding: 8px 0;
+    }
+
+    /* ── Course Cards ── */
+    .courses-section .section-label { margin-bottom: 16px; }
+
+    .course-card {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 12px;
+      overflow: hidden;
+      scroll-margin-top: 24px;
+    }
+
+    .course-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 24px;
+      cursor: pointer;
+      background: var(--surface);
+      transition: background 0.12s;
+      user-select: none;
+    }
+
+    .course-header:hover { background: #ede9df; }
+
+    .course-header-left {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .course-name {
+      font-family: 'Source Serif 4', Georgia, serif;
+      font-size: 20px;
+      font-weight: 400;
+    }
+
+    .course-code {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--mid);
+    }
+
+    .course-header-right {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .course-badge {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .course-badge.urgent { color: var(--orange); }
+
+    .chevron {
+      font-size: 12px;
+      color: var(--mid);
+      transition: transform 0.2s;
+    }
+
+    .course-card.open .chevron { transform: rotate(180deg); }
+
+    /* ── Course Body ── */
+    .course-body {
+      display: none;
+      padding: 0 24px 24px;
+      border-top: 1px solid var(--border);
+      background: var(--bg);
+    }
+
+    .course-card.open .course-body { display: block; }
+
+    /* Weight Bar */
+    .weight-section {
+      padding: 18px 0 14px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 18px;
+    }
+
+    .weight-title {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--mid);
+      margin-bottom: 10px;
+    }
+
+    .weight-bar-container {
+      display: flex;
+      height: 8px;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 10px;
+      gap: 2px;
+    }
+
+    .weight-bar-segment {
+      height: 100%;
+      border-radius: 2px;
+      transition: flex 0.3s;
+    }
+
+    .weight-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 24px;
+      margin-top: 8px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      color: var(--muted);
+    }
+
+    .legend-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    /* Assignment List */
+    .assignment-item {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      line-height: 1.8;
+    }
+
+    .assignment-item:last-child { border-bottom: none; }
+
+    .assignment-item.submitted { opacity: 0.45; }
+
+    .assignment-left {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .assignment-title {
+      font-size: 15px;
+      color: var(--dark);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .assignment-group {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      color: var(--mid);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .assignment-right {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 4px;
+      margin-left: 20px;
+      flex-shrink: 0;
+    }
+
+    .due-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .submitted-badge {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      color: var(--green);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .exam-grade {
+      font-family: 'DM Mono', monospace;
+      font-size: 12px;
+      color: var(--orange);
+      letter-spacing: 0.02em;
+    }
+
+    /* Assignment Description (accordion) */
+    .assignment-desc {
+      display: none;
+      padding: 12px 0 8px;
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.7;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .assignment-desc.open { display: block; }
+
+    .assignment-desc-inner {
+      max-height: 240px;
+      overflow-y: auto;
+    }
+
+    .assignment-desc-inner * { max-width: 100%; }
+
+    /* ── Colours by urgency ── */
+    .due-urgent  { color: var(--orange); }
+    .due-soon    { color: var(--warm); }
+    .due-later   { color: var(--blue); }
+    .due-past    { color: var(--mid); opacity: 0.4; }
+    .due-exam    { color: var(--purple); }
+    .due-none    { color: var(--mid); }
+
+    /* ── Loading / Empty state ── */
+    .state-msg {
+      text-align: center;
+      padding: 80px 20px;
+      color: var(--mid);
+    }
+
+    .state-msg .big {
+      font-family: 'Source Serif 4', Georgia, serif;
+      font-size: 24px;
+      margin-bottom: 10px;
+    }
+
+    .state-msg .small {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    /* ── Grade Calculator ── */
+    .grade-calc {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      margin: 18px 0;
+      overflow: hidden;
+    }
+
+    .grade-calc-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px;
+      background: var(--surface);
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .grade-calc-title {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--mid);
+    }
+
+    .grade-calc-final-display {
+      font-family: 'DM Mono', monospace;
+      font-size: 13px;
+      color: var(--orange);
+    }
+
+    .grade-calc-body {
+      display: none;
+      padding: 14px 16px;
+    }
+
+    .grade-calc.open .grade-calc-body { display: block; }
+
+    .grade-calc-group {
+      margin-bottom: 16px;
+    }
+
+    .grade-calc-group:last-child { margin-bottom: 0; }
+
+    .grade-calc-group-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+
+    .grade-calc-group-name {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+    }
+
+    .grade-calc-group-score {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      color: var(--orange);
+    }
+
+    .grade-calc-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 5px 0;
+      gap: 8px;
+    }
+
+    .grade-calc-asgn-name {
+      font-size: 13px;
+      color: var(--dark);
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .grade-calc-pts {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+
+    .grade-calc-pts input {
+      width: 64px;
+      padding: 4px 8px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: var(--bg);
+      color: var(--dark);
+      font-family: 'DM Mono', monospace;
+      font-size: 12px;
+      text-align: right;
+      outline: none;
+      transition: border-color 0.12s;
+    }
+
+    .grade-calc-pts input:focus { border-color: var(--orange); }
+
+    .grade-calc-possible {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      color: var(--mid);
+      min-width: 44px;
+    }
+
+    /* ── Analysis button ── */
+    .btn-analyze {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 3px 9px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: transparent;
+      color: var(--mid);
+      cursor: pointer;
+      transition: all 0.12s;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .btn-analyze:hover {
+      border-color: var(--blue);
+      color: var(--blue);
+    }
+
+    /* ── Analysis Side Panel ── */
+    .analysis-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(20, 20, 19, 0.25);
+      z-index: 100;
+    }
+
+    .analysis-backdrop.open { display: block; }
+
+    .analysis-panel {
+      position: fixed;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: 440px;
+      background: var(--bg);
+      border-left: 1px solid var(--border);
+      z-index: 101;
+      transform: translateX(100%);
+      transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .analysis-panel.open { transform: translateX(0); }
+
+    .analysis-panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 22px 26px 18px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .analysis-panel-title {
+      font-family: 'Source Serif 4', Georgia, serif;
+      font-size: 18px;
+      font-weight: 400;
+    }
+
+    .analysis-panel-subtitle {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--mid);
+      margin-top: 3px;
+    }
+
+    .analysis-panel-close {
+      width: 30px;
+      height: 30px;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      background: transparent;
+      color: var(--mid);
+      cursor: pointer;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.12s;
+      flex-shrink: 0;
+    }
+
+    .analysis-panel-close:hover {
+      border-color: var(--orange);
+      color: var(--orange);
+    }
+
+    .analysis-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 22px 26px 36px;
+    }
+
+    .analysis-section {
+      margin-bottom: 26px;
+    }
+
+    .analysis-section-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--mid);
+      margin-bottom: 10px;
+    }
+
+    .analysis-summary {
+      font-size: 13px;
+      color: var(--dark);
+      line-height: 1.75;
+    }
+
+    .analysis-list {
+      list-style: none;
+      padding: 0;
+    }
+
+    .analysis-list li {
+      font-size: 13px;
+      color: var(--dark);
+      padding: 6px 0;
+      border-bottom: 1px solid var(--border);
+      line-height: 1.65;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .analysis-list li:last-child { border-bottom: none; }
+
+    .analysis-list li::before {
+      content: '·';
+      color: var(--mid);
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .milestone-item {
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      margin-bottom: 8px;
+      background: var(--surface);
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .milestone-item.checked { opacity: 0.5; }
+
+    .milestone-check {
+      width: 16px;
+      height: 16px;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      background: var(--bg);
+      cursor: pointer;
+      flex-shrink: 0;
+      margin-top: 3px;
+      appearance: none;
+      -webkit-appearance: none;
+      position: relative;
+      transition: all 0.12s;
+    }
+
+    .milestone-check:checked {
+      background: var(--green);
+      border-color: var(--green);
+    }
+
+    .milestone-check:checked::after {
+      content: '✓';
+      position: absolute;
+      color: white;
+      font-size: 10px;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    .milestone-info { flex: 1; min-width: 0; }
+
+    .milestone-title {
+      font-size: 13px;
+      color: var(--dark);
+      font-weight: 400;
+      margin-bottom: 3px;
+    }
+
+    .milestone-desc {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .milestone-date {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      color: var(--mid);
+      margin-top: 5px;
+    }
+
+    .analysis-hours {
+      font-family: 'DM Mono', monospace;
+      font-size: 22px;
+      color: var(--orange);
+    }
+
+    .analysis-loading {
+      text-align: center;
+      padding: 48px 0;
+      color: var(--mid);
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .analysis-error {
+      padding: 18px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.65;
+    }
+
+    .analysis-error a {
+      color: var(--orange);
+      text-decoration: none;
+    }
+
+    .analysis-error a:hover { text-decoration: underline; }
+
+    .analysis-cached-note {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      color: var(--mid);
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+
+    .btn-reanalyze {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 4px 10px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: transparent;
+      color: var(--mid);
+      cursor: pointer;
+      transition: all 0.12s;
+    }
+
+    .btn-reanalyze:hover { border-color: var(--orange); color: var(--orange); }
+
+    /* ── Card Grid ── */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-auto-rows: calc((100% - 12px) / 2);
+      gap: 12px;
+      height: 100%;
+    }
+
+    .course-card-grid {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .card-top {
+      padding: 14px 20px 12px;
+      cursor: pointer;
+      transition: background 0.12s;
+      user-select: none;
+      height: 96px;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+
+    .card-top:hover { background: var(--bg); }
+    html[data-theme="dark"] .card-top:hover { background: #1c1b19; }
+
+    .card-top-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .card-code {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+    }
+
+    .card-badge-urgent {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      background: rgba(217, 119, 87, 0.1);
+      border: 1px solid var(--orange);
+      color: var(--orange);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .card-name {
+      font-family: 'Source Serif 4', Georgia, serif;
+      font-size: 16px;
+      font-weight: 400;
+      color: var(--dark);
+      line-height: 1.35;
+      overflow: hidden;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+
+    .card-meta {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      color: var(--mid);
+      margin-top: 6px;
+    }
+
+    .card-bottom {
+      border-top: 1px solid var(--border);
+      padding: 4px 20px 8px;
+      background: var(--bg);
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .card-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .card-row:last-of-type { border-bottom: none; }
+
+    .card-row-title {
+      font-size: 13px;
+      color: var(--dark);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex: 1;
+    }
+
+    .card-row-due {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .card-empty {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      color: var(--mid);
+      padding: 12px 0;
+      text-align: center;
+    }
+
+    .card-pager {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      padding-top: 8px;
+      margin-top: auto;
+    }
+
+    .card-pager-btn {
+      font-family: 'DM Mono', monospace;
+      font-size: 12px;
+      width: 26px;
+      height: 22px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: var(--surface);
+      color: var(--muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.1s;
+    }
+
+    .card-pager-btn:hover:not(:disabled) { border-color: var(--orange); color: var(--orange); }
+    .card-pager-btn:disabled { opacity: 0.3; cursor: default; }
+
+    .card-pager-info {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      color: var(--mid);
+    }
+
+    /* ── Course Detail View ── */
+    .detail-back {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      border: none;
+      background: none;
+      color: var(--muted);
+      cursor: pointer;
+      padding: 0;
+      margin-bottom: 28px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: color 0.12s;
+    }
+
+    .detail-back:hover { color: var(--orange); }
+
+    .detail-hero {
+      margin-bottom: 24px;
+    }
+
+    .detail-hero-code {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .detail-hero-name {
+      font-family: 'Source Serif 4', Georgia, serif;
+      font-size: 28px;
+      font-weight: 400;
+      color: var(--dark);
+      line-height: 1.2;
+    }
+
+    .detail-assignments-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      margin: 24px 0 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+
+    <!-- ── Left Sidebar ── -->
+    <aside class="sidebar">
+      <div class="sidebar-inner">
+
+        <div class="sidebar-brand">
+          <h1>Canvas<br>Dashboard</h1>
+          <div class="meta" id="header-meta">載入中...</div>
+        </div>
+
+        <div class="sidebar-section">
+          <div class="sidebar-label">篩選</div>
+          <div class="filter-bar">
+            <button class="pill active" data-filter="assignment">作業</button>
+            <button class="pill" data-filter="exam">考試</button>
+            <button class="pill" data-filter="all">全部</button>
+          </div>
+          <label class="hide-done-label">
+            <input type="checkbox" id="hide-done-cb">
+            查看已繳交
+          </label>
+        </div>
+
+        <div class="sidebar-section" style="flex:1;min-height:0;">
+          <div class="sidebar-label">課程</div>
+          <nav class="course-nav" id="course-nav"></nav>
+        </div>
+
+        <div class="sidebar-footer">
+          <div class="footer-row">
+            <button class="btn-sync" id="sync-btn">同步</button>
+            <button class="btn-theme-toggle" id="theme-toggle" title="切換深色模式">☾</button>
+          </div>
+        </div>
+
+      </div>
+    </aside>
+
+    <!-- ── Main Content ── -->
+    <main class="main-content" id="main-content">
+      <div id="week-section"></div>
+      <div id="courses-section"></div>
+    </main>
+
+  </div>
+
+  <!-- Analysis side panel -->
+  <div class="analysis-backdrop" id="analysis-backdrop"></div>
+  <div class="analysis-panel" id="analysis-panel">
+    <div class="analysis-panel-header">
+      <div>
+        <div class="analysis-panel-title">作業分析</div>
+        <div class="analysis-panel-subtitle" id="analysis-panel-subtitle">Claude AI</div>
+      </div>
+      <button class="analysis-panel-close" id="analysis-close">✕</button>
+    </div>
+    <div class="analysis-content" id="analysis-content">
+      <div class="analysis-loading">載入中...</div>
+    </div>
+  </div>
+
+  <script src="dashboard.js"></script>
+</body>
+</html>
