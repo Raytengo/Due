@@ -669,7 +669,7 @@ async function fetchFiles(courseId) {
     );
   } catch (err) {
     if (err.message.includes('403') || err.message.includes('401')) return [];
-    console.warn(`[Canvas Dashboard] 課程 ${courseId} 檔案拉取失敗:`, err.message);
+    console.warn(`[Due] 課程 ${courseId} 檔案拉取失敗:`, err.message);
     return [];
   }
 }
@@ -681,7 +681,7 @@ async function fetchAnnouncements(courseId) {
     );
   } catch (err) {
     if (err.message.includes('403') || err.message.includes('401')) return [];
-    console.warn(`[Canvas Dashboard] 課程 ${courseId} 公告拉取失敗:`, err.message);
+    console.warn(`[Due] 課程 ${courseId} 公告拉取失敗:`, err.message);
     return [];
   }
 }
@@ -728,7 +728,7 @@ async function fetchSchoolName(courses = []) {
 
 // ── Sync ──
 async function syncAll() {
-  console.log('[Canvas Dashboard] 開始同步...');
+  console.log('[Due] 開始同步...');
 
   let courses;
   let schoolName = 'Canvas';
@@ -736,7 +736,7 @@ async function syncAll() {
     courses = await fetchCourses();
     schoolName = await fetchSchoolName(courses);
   } catch (err) {
-    console.error('[Canvas Dashboard] 拉取課程失敗:', err);
+    console.error('[Due] 拉取課程失敗:', err);
     return;
   }
 
@@ -761,7 +761,7 @@ async function syncAll() {
         files[course.id] = courseFiles;
         announcements[course.id] = courseAnnouncements;
       } catch (err) {
-        console.error(`[Canvas Dashboard] 課程 ${course.id} 同步失敗:`, err);
+        console.error(`[Due] 課程 ${course.id} 同步失敗:`, err);
         assignments[course.id] = [];
         assignmentGroups[course.id] = [];
         files[course.id] = [];
@@ -780,5 +780,5 @@ async function syncAll() {
     announcements,
   });
 
-  console.log(`[Canvas Dashboard] 同步完成，共 ${courses.length} 門課程`);
+  console.log(`[Due] 同步完成，共 ${courses.length} 門課程`);
 }

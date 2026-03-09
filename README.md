@@ -1,8 +1,8 @@
-# Canvas Dashboard
+# Due
 
 A Chrome extension for HKUST(GZ) students that pulls course data from Canvas LMS and displays all assignments, deadlines, grade weights, and AI-powered analysis in a clean dashboard — so you always know what to do, how to do it, and when it's due.
 
-<img src="icon_design.png" width="180" alt="Canvas Dashboard icon" />
+<img src="icon_design.png" width="180" alt="Due icon" />
 
 ---
 
@@ -36,7 +36,8 @@ HKUST(GZ) does not allow students to generate Personal Access Tokens for the Can
 2. Open Chrome and go to `chrome://extensions`
 3. Enable **Developer mode** (top right)
 4. Click **Load unpacked** and select the `extension/` folder
-5. Log in to canvas — the extension will sync automatically on your next visit
+<<<<<<< HEAD
+5. Log in to Canvas — the extension will sync automatically on your next visit
 6. Click the extension icon → **Open Dashboard**
 
 ---
@@ -44,7 +45,7 @@ HKUST(GZ) does not allow students to generate Personal Access Tokens for the Can
 ## Project structure
 
 ```
-canvas-dashboard/
+due/
 ├── extension/
 │   ├── manifest.json          # Manifest V3 config
 │   ├── background.js          # Service worker — Canvas API sync, AI analysis & storage
