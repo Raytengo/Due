@@ -686,13 +686,55 @@ async function fetchAnnouncements(courseId) {
   }
 }
 
+function isGenericSchoolName(name) {
+  if (!name) return true;
+  const n = String(name).trim().toLowerCase();
+  return n === 'canvas' || n === 'instructure';
+}
+
+function inferSchoolNameFromHost() {
+  try {
+    const host = new URL(BASE_URL).host; // hkust-gz.instructure.com
+    const sub = host.split('.')[0] || '';
+    if (!sub) return 'Canvas';
+    // hkust-gz -> HKUST(GZ)
+    const parts = sub.split('-').filter(Boolean).map((p) => p.toUpperCase());
+    if (parts.length >= 2) return `${parts[0]}(${parts.slice(1).join('-')})`;
+    return parts[0];
+  } catch (_) {
+    return 'Canvas';
+  }
+}
+
+async function fetchSchoolName(courses = []) {
+  // 1) Try account self first.
+  try {
+    const account = await fetchJSON(`${BASE_URL}/api/v1/accounts/self`);
+    if (account && account.name && !isGenericSchoolName(account.name)) return account.name;
+  } catch (_) {}
+
+  // 2) Try course account_id(s), pick first non-generic account name.
+  const accountIds = [...new Set((courses || []).map((c) => c.account_id).filter(Boolean))];
+  for (const accountId of accountIds) {
+    try {
+      const account = await fetchJSON(`${BASE_URL}/api/v1/accounts/${accountId}`);
+      if (account && account.name && !isGenericSchoolName(account.name)) return account.name;
+    } catch (_) {}
+  }
+
+  // 3) Fallback from hostname.
+  return inferSchoolNameFromHost();
+}
+
 // ── Sync ──
 async function syncAll() {
   console.log('[Canvas Dashboard] 開始同步...');
 
   let courses;
+  let schoolName = 'Canvas';
   try {
     courses = await fetchCourses();
+    schoolName = await fetchSchoolName(courses);
   } catch (err) {
     console.error('[Canvas Dashboard] 拉取課程失敗:', err);
     return;
@@ -730,6 +772,7 @@ async function syncAll() {
 
   await chrome.storage.local.set({
     lastSync: new Date().toISOString(),
+    schoolName,
     courses,
     assignments,
     assignmentGroups,

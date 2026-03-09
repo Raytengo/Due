@@ -147,8 +147,9 @@ GET /api/v1/courses/:id/discussion_topics?only_announcements=true&per_page=50
 ### background.js
 
 - 監聽 `webNavigation.onCompleted` — 使用者造訪 Canvas 時自動觸發同步
-- 響應訊息：`SYNC`、`GET_STATUS`、`FETCH_PDF`、`ANALYZE_ASSIGNMENT`、`GET_ANALYSIS`
+- 響應訊息：`SYNC`、`GET_STATUS`、`FETCH_PDF`、`ANALYZE_ASSIGNMENT`、`GET_ANALYSIS`、`ANALYZE_SYLLABUS`
 - `syncAll()`：並行拉取所有課程的作業、評分分組、PDF 檔案、公告
+- `fetchSchoolName()`：自動偵測學校名稱（優先 Canvas API → hostname 解析）
 - `handleAnalyze()`：AI 分析流程
   1. 拉取完整作業資訊（含 PDF 附件）
   2. 從作業描述 HTML 中解析 Canvas file ID
@@ -156,6 +157,12 @@ GET /api/v1/courses/:id/discussion_topics?only_announcements=true&per_page=50
   4. 讓 AI 從公告中選出相關內容（最多 30 個）
   5. 組裝 prompt 呼叫 AI，回傳 JSON：`{ summary, requirements, milestones, tips, estimatedHours }`
   6. 快取分析結果到 `chrome.storage.local`
+- `handleSyllabusAnalyze()`：Syllabus 評分比重分析流程
+  1. 先從 API `syllabus_body` 抓取 HTML；若無則 fetch 實際 Syllabus 網頁
+  2. 用 `/\/files\/(\d+)/g` 正則從 HTML 提取所有 file ID，逐一嘗試下載 PDF
+  3. 若 Syllabus 無 PDF，改用關鍵字比對課程檔案清單，再讓 AI 選取（temperature: 0）
+  4. 回傳 JSON：`{ found, components: [{ name, weight }], notes }`
+  5. 快取到 `chrome.storage.local.syllabusAnalysis`
 
 **支援的 AI 後端：**
 
@@ -163,13 +170,19 @@ GET /api/v1/courses/:id/discussion_topics?only_announcements=true&per_page=50
 |------|----------|----------------|
 | Gemini（預設） | 可設定（預設 `gemini-2.0-flash-lite`） | 同模型 |
 | Claude | `claude-opus-4-6` | `claude-haiku-4-5` |
+| OpenAI | 可設定 | 同模型 |
+| DeepSeek | 可設定 | 同模型 |
+| Qwen (通義千問) | 可設定 | 同模型 |
+| Moonshot (Kimi) | 可設定 | 同模型 |
+| Zhipu (智譜) | 可設定 | 同模型 |
+| MiniMax | 可設定 | 同模型 |
 
 ### popup.html / popup.js
 
-- 顯示上次同步時間、課程數量、今日到期作業數
-- 手動同步按鈕
-- 開啟 Dashboard 按鈕
-- 設定 API 金鑰按鈕（Gemini / Claude）
+- 7 天待辦快速預覽：顯示所有 7 天內到期的未繳作業清單
+- 每筆任務顯示：緊急程度色點、作業名稱、**課程名稱**（支援自訂名稱）、剩餘時間
+- 支援 UI 語言（跟隨 Dashboard 設定）
+- 開啟 Dashboard 按鈕；顯示上次同步時間
 
 ### Dashboard（index.html + dashboard.js）
 
@@ -183,29 +196,43 @@ sidebar（300px）+ main-content（flex:1）
 │  作業/考試/全部  │  #course-detail-container（課程詳情）
 │  查看已繳交     │
 │  課程導航列     │  + 右側 analysis-panel（440px 滑入）
-│  同步/深色模式  │
+│  同步/設定      │
 ```
 
 **學期待辦頁（Week）：**
 - 左側：conic-gradient 環形圓餅圖（orange/warm/blue 分別代表≤7d/8–30d/30+d 的作業數量比例）
 - 右側：2 欄 task cards，依緊急程度分三時間區塊顯示
+- 點擊任意 task card → View Transitions API morph 展開對應課程詳情
 
 **課程頁（Courses）：**
 - 3 欄課程卡片 grid，依最近截止日期排序
-- 每張卡片顯示：課程代碼、名稱、緊急件數 badge、最多 3 筆作業（含分頁）
+- 每張卡片顯示：課程代碼、**課程名稱**、緊急件數 badge、最多 3 筆作業（含分頁）
 - 課程卡片點擊 → View Transitions API morph 動畫展開為詳情頁
 
 **課程詳情頁（Course Detail）：**
-- 上半：課程代碼、名稱、緊急 badge（鏡像卡片頂部結構）
-- 左下：評分比重圓餅圖 + 圖例
+- 上半：課程代碼、名稱（含鉛筆圖示可 inline 重命名）、緊急 badge
+- 左下：評分比重圓餅圖 + 圖例；若 Canvas 無分組資料則顯示 Syllabus 分析結果
+- Syllabus 分析按鈕：AI 自動分析評分比重，結果快取
 - 右下：成績計算器（accordion）+ 作業清單
   - 成績計算器：輸入分數即時計算加權總分
   - 作業列表：點擊行展開描述，點擊作業名稱文字開新分頁跳轉 Canvas
   - 作業列：AI 分析按鈕 → 滑入右側分析面板
 
+**課程自訂名稱：**
+- 課程詳情頁的課程名稱旁有鉛筆圖示（hover 顯示）
+- 點擊鉛筆 → inline 輸入框，Enter 儲存、Escape 取消
+- 自訂名稱儲存在 `chrome.storage.local.courseNames`，不影響 Canvas API 資料
+- 自訂名稱同步顯示於：sidebar 導航、週待辦卡片、課程 grid 卡片、popup
+
 **分析面板：**
 - 顯示 AI 生成的作業摘要、預計時數、需求清單、里程碑 checklist（可勾選並持久化）、建議貼士
 - 可重新分析；分析結果快取在 storage 中
+
+**多語言支援（i18n）：**
+- 支援：繁體中文（預設）、简体中文、English
+- `I18N` 物件涵蓋 70+ 個 key，透過 `tr(key)` 函式取值
+- 語言偏好儲存在 `chrome.storage.local.uiLanguage`
+- 切換語言後，`formatDue()`、`formatLastSync()` 等函式也會隨語言調整顯示格式
 
 **全域篩選邏輯（`applyFilters`）：**
 - 永遠排除 attendance/簽到類作業（自動偵測關鍵字）
@@ -216,6 +243,35 @@ sidebar（300px）+ main-content（flex:1）
 - 學期待辦 ↔ 課程：水平 slide（`.page-slider` translateX，470ms）
 - 課程卡片 ↔ 詳情：View Transitions API morph（0.28s，命名元素：`course-shell`、`course-code`、`course-name`、`course-badge`、`course-meta`）
 - Sidebar 在 morph 期間靜止（`view-transition-name: sidebar`，`animation: none`）
+- **注意**：若課程名稱 `div.detail-name` 內有 inline 元素（如鉛筆按鈕），需確保按鈕為 `position: absolute`（不影響 layout box），否則 View Transition 捕捉到不同高度會產生動畫跳動
+
+---
+
+## 資料儲存
+
+用 `chrome.storage.local` 存所有資料，格式如下：
+
+```json
+{
+  "lastSync": "2026-03-06T10:00:00Z",
+  "courses": [...],
+  "assignments": { "courseId": [...] },
+  "assignmentGroups": { "courseId": [...] },
+  "files": { "courseId": [...] },
+  "announcements": { "courseId": [...] },
+  "scores": { "assignmentId": 85.5 },
+  "analysis": { "assignmentId": { "timestamp": "...", "model": "...", "result": {...} } },
+  "syllabusAnalysis": { "courseId": { "found": true, "components": [...], "source": "syllabus_page_pdf" } },
+  "milestoneChecks": { "assignmentId_0": true },
+  "courseNames": { "courseId": "自訂名稱" },
+  "darkMode": false,
+  "uiLanguage": "zh-TW",
+  "aiModel": "gemini",
+  "geminiApiKey": "...",
+  "geminiModel": "gemini-2.0-flash-lite",
+  "claudeApiKey": "..."
+}
+```
 
 ---
 
@@ -229,6 +285,9 @@ sidebar（300px）+ main-content（flex:1）
 6. `_currentData` 是全域快取；頁面切換時用 `_currentData` 同步渲染，不要再呼叫 `loadData()`（避免空白閃爍）
 7. AI 分析若沒有 API Key 會回傳 `NO_API_KEY`，dashboard 會顯示設定連結
 8. PDF 超過 10MB 會被跳過不上傳給 AI
+9. Syllabus PDF 下載優先用 `/courses/:id/files/:id/download?download_frd=1`（帶 cookie），若 404 則 fallback 到 `/api/v1/files/:id` 取最新 signed URL
+10. `courseNames` 只影響顯示層，Canvas API 呼叫仍使用原始 `course.id`，不受自訂名稱影響
+11. `field-sizing: content`（Chrome 123+）用於 inline 重命名輸入框自動縮放
 
 ---
 

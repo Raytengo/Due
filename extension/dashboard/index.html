@@ -25,16 +25,16 @@
     }
 
     html[data-theme="dark"] {
-      --bg:      #1e1d1b;
-      --surface: #141312;
-      --dark:    #eeebe4;
-      --mid:     #5c5a56;
-      --muted:   #8e8c88;
-      --border:  #272522;
+      --bg:      #121316;
+      --surface: #1b1d22;
+      --dark:    #eceff4;
+      --mid:     #9aa3b2;
+      --muted:   #7f8897;
+      --border:  #343843;
     }
 
-    html[data-theme="dark"] .course-header:hover { background: #1c1b19; }
-    html[data-theme="dark"] .nav-course-item:hover { background: #1a1917; }
+    html[data-theme="dark"] .course-header:hover { background: #23262d; }
+    html[data-theme="dark"] .nav-course-item:hover { background: #23262d; }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -61,6 +61,7 @@
       flex-shrink: 0;
       height: 100vh;
       overflow-y: auto;
+      overflow-x: hidden;
       border-right: 1px solid var(--border);
       background: var(--surface);
       display: flex;
@@ -196,7 +197,9 @@
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
-      font-size: 13px;
+      font-family: 'Source Serif 4', Georgia, serif;
+      font-size: 14px;
+      font-weight: 400;
     }
 
     .nav-course-badge {
@@ -299,7 +302,7 @@
       position: absolute;
       right: 0;
       bottom: calc(100% + 10px);
-      min-width: 176px;
+      min-width: 236px;
       border: 1px solid var(--border);
       border-radius: 10px;
       background: var(--bg);
@@ -307,6 +310,7 @@
       padding: 6px;
       display: none;
       z-index: 10;
+      overflow: visible;
     }
 
     .settings-menu::after {
@@ -357,6 +361,46 @@
     }
 
     .settings-menu-item:hover {
+      background: var(--surface);
+      color: var(--orange);
+    }
+
+    .settings-submenu {
+      position: fixed;
+      min-width: 130px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg);
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.14);
+      padding: 5px;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      z-index: 9999;
+      transition: opacity 0.16s ease, visibility 0.16s ease;
+    }
+
+    .settings-submenu.submenu-visible {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
+
+    .settings-submenu button {
+      width: 100%;
+      border: none;
+      background: transparent;
+      color: var(--dark);
+      text-align: left;
+      padding: 7px 8px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-family: 'DM Sans', sans-serif;
+      cursor: pointer;
+      transition: background 0.12s, color 0.12s;
+    }
+
+    .settings-submenu button:hover {
       background: var(--surface);
       color: var(--orange);
     }
@@ -1263,10 +1307,20 @@
       transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
     }
 
+    html[data-theme="dark"] .course-card-grid {
+      background: #23262d;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
+    }
+
     .course-card-grid:hover {
       border-color: var(--orange);
       box-shadow: 0 2px 8px rgba(0,0,0,0.08);
       transform: translateY(-2px);
+    }
+
+    html[data-theme="dark"] .course-card-grid:hover {
+      background: #2a2e37;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.34);
     }
 
     .card-top {
@@ -1433,9 +1487,14 @@
       box-shadow: 0 2px 12px rgba(0,0,0,0.06);
     }
 
+    html[data-theme="dark"] .course-detail-view {
+      background: #23262d;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.34);
+    }
+
     .detail-back {
       font-family: 'DM Mono', monospace;
-      font-size: 11px;
+      font-size: 13px;
       text-transform: uppercase;
       letter-spacing: 0.06em;
       border: none;
@@ -1481,6 +1540,40 @@
       font-weight: 400;
       color: var(--dark);
       line-height: 1.25;
+      position: relative;
+    }
+
+    .btn-rename-course {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex;
+      align-items: center;
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--mid);
+      padding: 2px 4px;
+      border-radius: 4px;
+      opacity: 0;
+      transition: opacity 0.15s, color 0.15s;
+    }
+    .detail-name:hover .btn-rename-course { opacity: 1; }
+    .btn-rename-course:hover { color: var(--dark); }
+
+    .course-rename-input {
+      font-family: 'Source Serif 4', Georgia, serif;
+      font-size: 26px;
+      font-weight: 400;
+      color: var(--dark);
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid var(--orange);
+      outline: none;
+      line-height: 1.25;
+      field-sizing: content;
+      min-width: 4ch;
+      padding: 0;
     }
 
     .detail-meta {
@@ -1772,20 +1865,20 @@
         </div>
 
         <div class="sidebar-section">
-          <div class="sidebar-label">篩選</div>
+          <div class="sidebar-label" id="label-filter">篩選</div>
           <div class="filter-bar">
-            <button class="pill active" data-filter="assignment">作業</button>
-            <button class="pill" data-filter="exam">考試</button>
-            <button class="pill" data-filter="all">全部</button>
+            <button class="pill active" data-filter="assignment" id="filter-assignment">作業</button>
+            <button class="pill" data-filter="exam" id="filter-exam">考試</button>
+            <button class="pill" data-filter="all" id="filter-all">全部</button>
           </div>
           <label class="hide-done-label">
             <input type="checkbox" id="hide-done-cb">
-            查看已繳交
+            <span id="label-hide-done">查看已繳交</span>
           </label>
         </div>
 
         <div class="sidebar-section" style="flex:1;min-height:0;">
-          <div class="sidebar-label">課程</div>
+          <div class="sidebar-label" id="label-courses">課程</div>
           <nav class="course-nav" id="course-nav"></nav>
         </div>
 
@@ -1797,7 +1890,14 @@
               <div class="settings-menu" id="settings-menu">
                 <div class="settings-menu-title">Quick Actions</div>
                 <div class="settings-menu-divider"></div>
-                <button class="settings-menu-item" id="menu-theme-toggle">切換深色模式 <span>↗</span></button>
+                <button class="settings-menu-item" id="menu-theme-toggle">切換深色模式</button>
+                <div class="settings-menu-item has-submenu" id="menu-language-label">語言
+                  <div class="settings-submenu">
+                    <button id="menu-language-zh-tw">繁體中文</button>
+                    <button id="menu-language-zh-cn">简体中文</button>
+                    <button id="menu-language-en">English</button>
+                  </div>
+                </div>
                 <button class="settings-menu-item" id="menu-open-api-settings">API 設定 <span>↗</span></button>
               </div>
             </div>
@@ -1810,8 +1910,8 @@
     <!-- ── Main Content ── -->
     <main class="main-content" id="main-content">
       <div class="page-tabs" id="page-tabs">
-        <button class="page-tab active" data-page="week">學期待辦</button>
-        <button class="page-tab" data-page="courses">課程</button>
+        <button class="page-tab active" data-page="week" id="tab-week">學期待辦</button>
+        <button class="page-tab" data-page="courses" id="tab-courses">課程</button>
       </div>
       <div id="main-section"></div>
       <div id="course-detail-container" style="display: none;"></div>

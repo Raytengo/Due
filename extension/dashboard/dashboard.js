@@ -4,6 +4,365 @@ const GROUP_COLORS = [
   '#a86070', '#7a9ba8', '#b08060', '#6a7c5d',
 ];
 
+let _uiLanguage = 'zh-TW';
+const I18N = {
+  'zh-TW': {
+    filter: '篩選',
+    assignment: '作業',
+    exam: '考試',
+    all: '全部',
+    hideSubmitted: '查看已繳交',
+    courses: '課程',
+    sync: '同步',
+    syncing: '同步中...',
+    tabWeek: '學期待辦',
+    tabCourses: '課程',
+    themeDark: '切換深色模式',
+    themeLight: '切換淺色模式',
+    languageLabel: '語言',
+    langZhTw: '繁體中文',
+    langZhCn: '简体中文',
+    langEn: 'English',
+    apiSettings: 'API 設定',
+    // formatDue
+    noDueDate: '無截止日期',
+    overdue: '已過期',
+    today: '今天',
+    tomorrow: '明天',
+    daysLater: '天後',
+    // formatLastSync
+    neverSynced: '尚未同步',
+    justSynced: '剛才同步',
+    minutesAgo: '分鐘前同步',
+    hoursAgo: '小時前同步',
+    daysAgo: '天前同步',
+    // header meta
+    courseCountSuffix: '門課程',
+    // empty states
+    noData: '尚無資料',
+    noDataHint: '請先前往 Canvas 頁面或點擊同步',
+    noDataHintSync: '請先登入 Canvas 並點擊同步',
+    noDataMeta: '尚無資料，請先前往 Canvas 頁面',
+    // badges
+    pendingItems: '件待繳',
+    urgentItems: '件緊急',
+    // back button
+    back: '← 返回',
+    // list labels
+    listAssignment: '作業清單',
+    listExam: '考試清單',
+    listAll: '項目清單',
+    // empty item labels
+    noPendingAssignment: '無待繳作業',
+    noPendingExam: '無待繳考試',
+    noPendingAll: '無待辦項目',
+    noAssignment: '無作業',
+    noExam: '無考試',
+    noAll: '無項目',
+    // weight pie
+    noGradeInfo: '沒有評分資訊',
+    // syllabus
+    analyzeWeight: '分析權重',
+    updateWeight: '更新權重',
+    weightNotFound: '未找到評分資訊',
+    coursePdf: '課程 PDF',
+    aiSelectedPdf: 'AI 選取 PDF',
+    // grade calculator
+    gradeCalcTitle: '成績計算器',
+    // assignment row
+    noDesc: '（無描述）',
+    submittedBadge: '已繳',
+    analyzeBtn: 'AI 分析',
+    // analysis panel
+    analyzing: '正在分析中...',
+    reanalyzing: '正在重新分析...',
+    analyzingShort: '分析中',
+    commError: '通訊失敗，請重試',
+    noModelIdMsg: '尚未設定模型 ID',
+    noApiKeyMsg: '尚未設定 AI API 金鑰',
+    settingsPage: '設定頁面',
+    pleaseGoTo: '請先前往',
+    andConfigure: '選擇模型並輸入 API 金鑰',
+    reanalyze: '重新分析',
+    summaryLabel: '摘要',
+    estimatedHoursLabel: '預估作業時間',
+    requirementsLabel: '作業要求',
+    milestonesLabel: '里程碑規劃',
+    tipsLabel: '建議',
+    daysBeforeDuePrefix: '截止前 ',
+    daysBeforeDueSuffix: ' 天',
+    // analysis errors
+    noApiKeyShort: '請先設定 API 金鑰',
+    noModelIdShort: '請先設定模型 ID',
+    analysisError: '分析失敗，請稍後再試',
+    retry: '重試',
+    // week section
+    within7Days: '7天內',
+    within30Days: '8-30天',
+    beyond30Days: '30天以上',
+    beyond30DaysShort: '30天+',
+    noTasks: '無待辦事項',
+    analysisTitle: '作業分析',
+  },
+  'zh-CN': {
+    filter: '筛选',
+    assignment: '作业',
+    exam: '考试',
+    all: '全部',
+    hideSubmitted: '查看已提交',
+    courses: '课程',
+    sync: '同步',
+    syncing: '同步中...',
+    tabWeek: '学期待办',
+    tabCourses: '课程',
+    themeDark: '切换深色模式',
+    themeLight: '切换浅色模式',
+    languageLabel: '语言',
+    langZhTw: '繁體中文',
+    langZhCn: '简体中文',
+    langEn: 'English',
+    apiSettings: 'API 设置',
+    noDueDate: '无截止日期',
+    overdue: '已过期',
+    today: '今天',
+    tomorrow: '明天',
+    daysLater: '天后',
+    neverSynced: '尚未同步',
+    justSynced: '刚才同步',
+    minutesAgo: '分钟前同步',
+    hoursAgo: '小时前同步',
+    daysAgo: '天前同步',
+    courseCountSuffix: '门课程',
+    noData: '尚无资料',
+    noDataHint: '请先前往 Canvas 页面或点击同步',
+    noDataHintSync: '请先登录 Canvas 并点击同步',
+    noDataMeta: '尚无资料，请先前往 Canvas 页面',
+    pendingItems: '件待交',
+    urgentItems: '件紧急',
+    back: '← 返回',
+    listAssignment: '作业清单',
+    listExam: '考试清单',
+    listAll: '项目清单',
+    noPendingAssignment: '无待交作业',
+    noPendingExam: '无待考考试',
+    noPendingAll: '无待办项目',
+    noAssignment: '无作业',
+    noExam: '无考试',
+    noAll: '无项目',
+    noGradeInfo: '没有评分信息',
+    analyzeWeight: '分析权重',
+    updateWeight: '更新权重',
+    weightNotFound: '未找到评分信息',
+    coursePdf: '课程 PDF',
+    aiSelectedPdf: 'AI 选取 PDF',
+    gradeCalcTitle: '成绩计算器',
+    noDesc: '（无描述）',
+    submittedBadge: '已交',
+    analyzeBtn: 'AI 分析',
+    analyzing: '正在分析中...',
+    reanalyzing: '正在重新分析...',
+    analyzingShort: '分析中',
+    commError: '通信失败，请重试',
+    noModelIdMsg: '尚未设置模型 ID',
+    noApiKeyMsg: '尚未设置 AI API 密钥',
+    settingsPage: '设置页面',
+    pleaseGoTo: '请先前往',
+    andConfigure: '选择模型并输入 API 密钥',
+    reanalyze: '重新分析',
+    summaryLabel: '摘要',
+    estimatedHoursLabel: '预估作业时间',
+    requirementsLabel: '作业要求',
+    milestonesLabel: '里程碑规划',
+    tipsLabel: '建议',
+    daysBeforeDuePrefix: '截止前 ',
+    daysBeforeDueSuffix: ' 天',
+    noApiKeyShort: '请先设置 API 密钥',
+    noModelIdShort: '请先设置模型 ID',
+    analysisError: '分析失败，请稍后再试',
+    retry: '重试',
+    within7Days: '7天内',
+    within30Days: '8-30天',
+    beyond30Days: '30天以上',
+    beyond30DaysShort: '30天+',
+    noTasks: '无待办事项',
+    analysisTitle: '作业分析',
+  },
+  en: {
+    filter: 'Filter',
+    assignment: 'Assignments',
+    exam: 'Exams',
+    all: 'All',
+    hideSubmitted: 'Show Submitted',
+    courses: 'Courses',
+    sync: 'Sync',
+    syncing: 'Syncing...',
+    tabWeek: 'This Week',
+    tabCourses: 'Courses',
+    themeDark: 'Switch To Dark',
+    themeLight: 'Switch To Light',
+    languageLabel: 'Language',
+    langZhTw: 'Traditional Chinese',
+    langZhCn: 'Simplified Chinese',
+    langEn: 'English',
+    apiSettings: 'API Settings',
+    noDueDate: 'No due date',
+    overdue: 'Overdue',
+    today: 'Today',
+    tomorrow: 'Tomorrow',
+    daysLater: 'days left',
+    neverSynced: 'Never synced',
+    justSynced: 'Just synced',
+    minutesAgo: 'min ago',
+    hoursAgo: 'hr ago',
+    daysAgo: 'd ago',
+    courseCountSuffix: 'courses',
+    noData: 'No data',
+    noDataHint: 'Visit Canvas or click Sync first',
+    noDataHintSync: 'Log into Canvas and click Sync',
+    noDataMeta: 'No data — visit Canvas first',
+    pendingItems: ' pending',
+    urgentItems: ' urgent',
+    back: '← Back',
+    listAssignment: 'Assignments',
+    listExam: 'Exams',
+    listAll: 'All Items',
+    noPendingAssignment: 'No pending assignments',
+    noPendingExam: 'No upcoming exams',
+    noPendingAll: 'No items',
+    noAssignment: 'No assignments',
+    noExam: 'No exams',
+    noAll: 'No items',
+    noGradeInfo: 'No grade info',
+    analyzeWeight: 'Analyze Grades',
+    updateWeight: 'Update',
+    weightNotFound: 'Grade info not found',
+    coursePdf: 'Course PDF',
+    aiSelectedPdf: 'AI-selected PDF',
+    gradeCalcTitle: 'Grade Calculator',
+    noDesc: '(No description)',
+    submittedBadge: 'Done',
+    analyzeBtn: 'AI Analyze',
+    analyzing: 'Analyzing...',
+    reanalyzing: 'Re-analyzing...',
+    analyzingShort: 'Analyzing',
+    commError: 'Connection error, try again',
+    noModelIdMsg: 'Model ID not configured',
+    noApiKeyMsg: 'AI API key not set',
+    settingsPage: 'Settings',
+    pleaseGoTo: 'Go to',
+    andConfigure: 'to select a model and enter your API key',
+    reanalyze: 'Re-analyze',
+    summaryLabel: 'Summary',
+    estimatedHoursLabel: 'Est. Time',
+    requirementsLabel: 'Requirements',
+    milestonesLabel: 'Milestones',
+    tipsLabel: 'Tips',
+    daysBeforeDuePrefix: '',
+    daysBeforeDueSuffix: ' days before due',
+    noApiKeyShort: 'Please configure API key',
+    noModelIdShort: 'Please configure model ID',
+    analysisError: 'Analysis failed, try again',
+    retry: 'Retry',
+    within7Days: 'Due ≤ 7d',
+    within30Days: '8-30 days',
+    beyond30Days: 'Later (30d+)',
+    beyond30DaysShort: '30 d+',
+    noTasks: 'No pending tasks',
+    analysisTitle: 'Assignment Analysis',
+  },
+};
+
+function tr(key) {
+  return (I18N[_uiLanguage] && I18N[_uiLanguage][key]) || I18N['zh-TW'][key] || key;
+}
+
+function applyUILanguage() {
+  const setText = (id, key) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = tr(key);
+  };
+  setText('label-filter', 'filter');
+  setText('filter-assignment', 'assignment');
+  setText('filter-exam', 'exam');
+  setText('filter-all', 'all');
+  setText('label-hide-done', 'hideSubmitted');
+  setText('label-courses', 'courses');
+  setText('sync-btn', 'sync');
+  setText('tab-week', 'tabWeek');
+  setText('tab-courses', 'tabCourses');
+  const apiSettingsBtn = document.getElementById('menu-open-api-settings');
+  if (apiSettingsBtn) apiSettingsBtn.innerHTML = `${tr('apiSettings')} <span>↗</span>`;
+  setText('analysis-panel-title', 'analysisTitle');
+  const menuLanguageLabel = document.getElementById('menu-language-label');
+  if (menuLanguageLabel) {
+    menuLanguageLabel.innerHTML = `${tr('languageLabel')}
+      <div class="settings-submenu">
+        <button id="menu-language-zh-tw">${tr('langZhTw')}</button>
+        <button id="menu-language-zh-cn">${tr('langZhCn')}</button>
+        <button id="menu-language-en">${tr('langEn')}</button>
+      </div>`;
+    bindLanguageMenuActions();
+  }
+}
+
+function bindLanguageMenuActions() {
+  const menuLanguageLabel = document.getElementById('menu-language-label');
+  const menuLanguageSubmenu = menuLanguageLabel
+    ? menuLanguageLabel.querySelector('.settings-submenu')
+    : null;
+  const menuLanguageZhTw = document.getElementById('menu-language-zh-tw');
+  const menuLanguageZhCn = document.getElementById('menu-language-zh-cn');
+  const menuLanguageEn = document.getElementById('menu-language-en');
+  let closeTimer = null;
+
+  // Move submenu to <body> so position:fixed is in the true root stacking context,
+  // unaffected by any ancestor's transform/opacity/will-change stacking context
+  if (menuLanguageSubmenu && menuLanguageSubmenu.parentElement !== document.body) {
+    document.body.appendChild(menuLanguageSubmenu);
+  }
+
+  const openSubmenu = () => {
+    if (!menuLanguageLabel || !menuLanguageSubmenu) return;
+    if (closeTimer) { clearTimeout(closeTimer); closeTimer = null; }
+    const rect = menuLanguageLabel.getBoundingClientRect();
+    const midY = rect.top + rect.height / 2;
+    const submenuH = menuLanguageSubmenu.offsetHeight;
+    menuLanguageSubmenu.style.top = `${midY - submenuH / 2}px`;
+    menuLanguageSubmenu.style.left = `${rect.right + 8}px`;
+    menuLanguageSubmenu.classList.add('submenu-visible');
+  };
+
+  const closeSubmenuLater = () => {
+    if (!menuLanguageSubmenu) return;
+    if (closeTimer) clearTimeout(closeTimer);
+    closeTimer = setTimeout(() => {
+      menuLanguageSubmenu.classList.remove('submenu-visible');
+    }, 180);
+  };
+
+  const setLang = (lang) => {
+    _uiLanguage = lang;
+    chrome.storage.local.set({ uiLanguage: lang });
+    applyUILanguage();
+    updateThemeMenuLabel();
+    loadData();
+    if (settingsMenu) settingsMenu.classList.remove('open');
+    if (settingsMenuBtn) settingsMenuBtn.classList.remove('open');
+  };
+
+  if (menuLanguageZhTw) menuLanguageZhTw.onclick = () => setLang('zh-TW');
+  if (menuLanguageZhCn) menuLanguageZhCn.onclick = () => setLang('zh-CN');
+  if (menuLanguageEn) menuLanguageEn.onclick = () => setLang('en');
+  if (menuLanguageLabel) {
+    menuLanguageLabel.onmouseenter = openSubmenu;
+    menuLanguageLabel.onmouseleave = closeSubmenuLater;
+  }
+  if (menuLanguageSubmenu) {
+    menuLanguageSubmenu.onmouseenter = openSubmenu;
+    menuLanguageSubmenu.onmouseleave = closeSubmenuLater;
+  }
+}
+
 // ── 全域資料快取（供事件處理器使用） ──
 let _currentData = {};
 
@@ -21,31 +380,30 @@ function urgencyClass(dueAt, isExamFlag, submitted = false) {
 }
 
 function formatDue(dueAt) {
-  if (!dueAt) return '無截止日期';
+  if (!dueAt) return tr('noDueDate');
   const d = new Date(dueAt);
   const now = new Date();
   const diffMs = d - now;
   const diffDays = Math.ceil(diffMs / 86400000);
 
-  const dateStr = d.toLocaleDateString('zh-TW', {
-    month: 'short', day: 'numeric',
-  });
+  const locale = _uiLanguage === 'en' ? 'en-US' : 'zh-TW';
+  const dateStr = d.toLocaleDateString(locale, { month: 'short', day: 'numeric' });
 
-  if (diffMs < 0) return `${dateStr}（已過期）`;
-  if (diffDays === 0) return `${dateStr}（今天）`;
-  if (diffDays === 1) return `${dateStr}（明天）`;
-  return `${dateStr}（${diffDays} 天後）`;
+  if (diffMs < 0) return `${dateStr}（${tr('overdue')}）`;
+  if (diffDays === 0) return `${dateStr}（${tr('today')}）`;
+  if (diffDays === 1) return `${dateStr}（${tr('tomorrow')}）`;
+  return `${dateStr}（${diffDays} ${tr('daysLater')}）`;
 }
 
 function formatLastSync(iso) {
-  if (!iso) return '尚未同步';
+  if (!iso) return tr('neverSynced');
   const diff = Date.now() - new Date(iso).getTime();
   const m = Math.floor(diff / 60000);
-  if (m < 1) return '剛才同步';
-  if (m < 60) return `${m} 分鐘前同步`;
+  if (m < 1) return tr('justSynced');
+  if (m < 60) return `${m} ${tr('minutesAgo')}`;
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h} 小時前同步`;
-  return `${Math.floor(h / 24)} 天前同步`;
+  if (h < 24) return `${h} ${tr('hoursAgo')}`;
+  return `${Math.floor(h / 24)} ${tr('daysAgo')}`;
 }
 
 function isExam(assignment) {
@@ -126,9 +484,27 @@ let currentPage = 'week';      // 'week' | 'courses'
 const cardPages = {};           // { [courseId]: pageIndex }
 
 function currentItemLabel() {
-  if (currentFilter === 'exam') return '考試';
-  if (currentFilter === 'all') return '項目';
-  return '作業';
+  if (currentFilter === 'exam') return tr('exam');
+  if (currentFilter === 'all') return tr('all');
+  return tr('assignment');
+}
+
+function currentListLabel() {
+  if (currentFilter === 'exam') return tr('listExam');
+  if (currentFilter === 'all') return tr('listAll');
+  return tr('listAssignment');
+}
+
+function cardEmptyLabel() {
+  if (currentFilter === 'exam') return tr('noPendingExam');
+  if (currentFilter === 'all') return tr('noPendingAll');
+  return tr('noPendingAssignment');
+}
+
+function noItemsLabel() {
+  if (currentFilter === 'exam') return tr('noExam');
+  if (currentFilter === 'all') return tr('noAll');
+  return tr('noAssignment');
 }
 
 // ── 套用篩選到作業列表 ──
@@ -150,13 +526,20 @@ function applyFilters(asgns) {
   return result;
 }
 
+// ── 課程顯示名稱（支援自訂） ──
+function getCourseName(course) {
+  if (!course) return '';
+  const custom = (_currentData.courseNames || {})[course.id];
+  return custom || course.name || '';
+}
+
 // ── 主要渲染 ──
 function render(data) {
   _currentData = data;
-  const { lastSync, courses = [], assignments = {}, assignmentGroups = {}, scores = {} } = data;
+  const { lastSync, schoolName = 'Canvas', courses = [], assignments = {}, assignmentGroups = {}, scores = {} } = data;
 
   document.getElementById('header-meta').textContent =
-    `HKUST(GZ) · ${courses.length} 門課程 · ${formatLastSync(lastSync)}`;
+    `${schoolName} · ${courses.length} ${tr('courseCountSuffix')} · ${formatLastSync(lastSync)}`;
 
   renderNav(courses, assignments);
 
@@ -221,7 +604,7 @@ function renderNav(courses, assignments) {
 
     return `
       <button class="nav-course-item" data-target-course="${c.id}">
-        <span class="nav-course-name">${esc(c.name)}</span>
+        <span class="nav-course-name">${esc(getCourseName(c))}</span>
         <span class="${badgeClass}">${badgeText}</span>
       </button>`;
   }).join('');
@@ -361,7 +744,7 @@ function renderWeekSection(courses, assignments) {
       const uClass = urgencyClass(a.due_at, isExam(a));
       return `
         <div class="week-task-card" data-course-id="${a._course.id}">
-          <div class="week-task-course">${esc(a._course.course_code || a._course.name)}</div>
+          <div class="week-task-course">${esc(getCourseName(a._course))}</div>
           <div class="week-task-title">${esc(a.name)}</div>
           <div class="week-task-due ${uClass}">${formatDue(a.due_at)}</div>
         </div>`;
@@ -377,9 +760,9 @@ function renderWeekSection(courses, assignments) {
   };
 
   const groupsHTML = [
-    renderGroup('7天內', urgent, 'color-urgent', false),
-    renderGroup('8-30天', soon, 'color-soon', false),
-    renderGroup('30天以上', later, 'color-later', true)
+    renderGroup(tr('within7Days'), urgent, 'color-urgent', false),
+    renderGroup(tr('within30Days'), soon, 'color-soon', false),
+    renderGroup(tr('beyond30Days'), later, 'color-later', true)
   ].filter(h => h).join('');
 
   el.innerHTML = `
@@ -390,20 +773,20 @@ function renderWeekSection(courses, assignments) {
           <div class="week-legend">
             <div class="week-legend-item">
               <span class="week-legend-dot" style="background: var(--orange);"></span>
-              <span class="week-legend-label">7天內 (${urgent.length})</span>
+              <span class="week-legend-label">${tr('within7Days')} (${urgent.length})</span>
             </div>
             <div class="week-legend-item">
               <span class="week-legend-dot" style="background: var(--warm);"></span>
-              <span class="week-legend-label">8-30天 (${soon.length})</span>
+              <span class="week-legend-label">${tr('within30Days')} (${soon.length})</span>
             </div>
             <div class="week-legend-item">
               <span class="week-legend-dot" style="background: var(--blue);"></span>
-              <span class="week-legend-label">30天+ (${later.length})</span>
+              <span class="week-legend-label">${tr('beyond30DaysShort')} (${later.length})</span>
             </div>
           </div>
         </div>
         <div class="week-right">
-          ${groupsHTML || '<div class="week-group-empty">無待辦事項</div>'}
+          ${groupsHTML || `<div class="week-group-empty">${tr('noTasks')}</div>`}
         </div>
       </div>
     </div>`;
@@ -425,8 +808,8 @@ function renderCardGrid(courses, assignments, assignmentGroups) {
   if (!courses.length) {
     el.innerHTML = `
       <div class="state-msg">
-        <div class="big">尚無資料</div>
-        <div class="small">請先前往 Canvas 頁面或點擊同步</div>
+        <div class="big">${tr('noData')}</div>
+        <div class="small">${tr('noDataHint')}</div>
       </div>`;
     return;
   }
@@ -480,7 +863,7 @@ function renderCourseCardGrid(course, asgns, groups) {
 
   const pendingCount = filtered.length;
   const metaParts = [];
-  if (pendingCount) metaParts.push(`${pendingCount} 件待繳`);
+  if (pendingCount) metaParts.push(`${pendingCount}${tr('pendingItems')}`);
 
   const pageIdx = cardPages[course.id] || 0;
   const bottomHtml = renderCardBottom(course.id, filtered, pageIdx);
@@ -490,9 +873,9 @@ function renderCourseCardGrid(course, asgns, groups) {
       <div class="card-top" data-course-id="${course.id}">
         <div class="card-top-row">
           <div class="card-code">${esc(course.course_code || '')}</div>
-          ${urgentCount ? `<div class="card-badge-urgent">${urgentCount} 件緊急</div>` : ''}
+          ${urgentCount ? `<div class="card-badge-urgent">${urgentCount}${tr('urgentItems')}</div>` : ''}
         </div>
-        <div class="card-name">${esc(course.name)}</div>
+        <div class="card-name">${esc(getCourseName(course))}</div>
         ${metaParts.length ? `<div class="card-meta">${metaParts.join(' · ')}</div>` : ''}
       </div>
       ${bottomHtml}
@@ -506,7 +889,6 @@ function renderCardBottom(courseId, sorted, pageIdx) {
   const page = Math.min(pageIdx, totalPages - 1);
   const visible = sorted.slice(page * pageSize, (page + 1) * pageSize);
 
-  const itemLabel = currentItemLabel();
   const rows = visible.length
     ? visible.map((a) => {
         const uClass = urgencyClass(a.due_at, isExam(a), isSubmitted(a));
@@ -516,7 +898,7 @@ function renderCardBottom(courseId, sorted, pageIdx) {
             <div class="card-row-due ${uClass}">${formatDue(a.due_at)}</div>
           </div>`;
       }).join('')
-    : `<div class="card-empty">無待繳${itemLabel}</div>`;
+    : `<div class="card-empty">${cardEmptyLabel()}</div>`;
 
   const pager = totalPages > 1 ? `
     <div class="card-pager">
@@ -684,6 +1066,74 @@ function showGridView() {
   });
 }
 
+// ── 課程重命名（inline edit）──
+function startCourseRename(courseId) {
+  const textSpan = document.querySelector('.detail-name .detail-name-text');
+  const renameBtn = document.querySelector('.btn-rename-course');
+  if (!textSpan) return;
+
+  const course = (_currentData.courses || []).find((c) => c.id === courseId);
+  const currentName = (_currentData.courseNames || {})[courseId] || (course ? course.name : '');
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'course-rename-input';
+  input.value = currentName;
+  if (renameBtn) renameBtn.style.visibility = 'hidden';
+  textSpan.replaceWith(input);
+  input.focus();
+  input.select();
+
+  const restore = (displayName) => {
+    const span = document.createElement('span');
+    span.className = 'detail-name-text';
+    span.textContent = displayName;
+    input.replaceWith(span);
+    if (renameBtn) renameBtn.style.visibility = '';
+  };
+
+  let committed = false;
+  const commit = () => {
+    if (committed) return;
+    committed = true;
+    const newName = input.value.trim();
+    const displayName = newName || (course ? course.name : '');
+    restore(displayName);
+
+    if (!_currentData.courseNames) _currentData.courseNames = {};
+    if (newName && course && newName !== course.name) {
+      _currentData.courseNames[courseId] = newName;
+    } else {
+      delete _currentData.courseNames[courseId];
+    }
+
+    chrome.storage.local.get(['courseNames'], (data) => {
+      const names = data.courseNames || {};
+      if (newName && course && newName !== course.name) {
+        names[courseId] = newName;
+      } else {
+        delete names[courseId];
+      }
+      chrome.storage.local.set({ courseNames: names });
+    });
+
+    const { courses = [], assignments = {} } = _currentData;
+    renderNav(courses, assignments);
+  };
+
+  const cancel = () => {
+    if (committed) return;
+    committed = true;
+    restore(currentName);
+  };
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') commit();
+    if (e.key === 'Escape') cancel();
+  });
+  input.addEventListener('blur', commit);
+}
+
 // ── 課程詳細視圖 ──
 function renderCourseDetailSection(course, asgns, groups, scores) {
   const el = document.getElementById('course-detail-container');
@@ -702,26 +1152,28 @@ function renderCourseDetailSection(course, asgns, groups, scores) {
   }).length;
 
   const pendingCount = filtered.length;
-  const detailMeta = `${pendingCount} 件待繳`;
+  const detailMeta = `${pendingCount}${tr('pendingItems')}`;
   const detailUrgentBadge = urgentCount
-    ? `<div class="card-badge-urgent">${urgentCount} 件緊急</div>`
-    : '<div class="card-badge-urgent is-placeholder" aria-hidden="true">0 件緊急</div>';
+    ? `<div class="card-badge-urgent">${urgentCount}${tr('urgentItems')}</div>`
+    : `<div class="card-badge-urgent is-placeholder" aria-hidden="true">0${tr('urgentItems')}</div>`;
 
   const syllabusData = (_currentData.syllabusAnalysis || {})[course.id] || null;
   const weightPieHtml = renderWeightPie(groups, syllabusData);
   const gradeCalcHtml = renderGradeCalculator(course, asgns, groups, scores);
   const assignmentRows = filtered.map((a) => renderAssignmentRow(a, groups, course.id)).join('');
-  const itemLabel = currentItemLabel();
 
   el.innerHTML = `
-    <button class="detail-back" id="detail-back-btn">← 返回</button>
+    <button class="detail-back" id="detail-back-btn">${tr('back')}</button>
     <div class="course-detail-view">
       <div class="detail-card-top">
         <div class="detail-top-row">
           <div class="detail-code">${esc(course.course_code || '')}</div>
           ${detailUrgentBadge}
         </div>
-        <div class="detail-name">${esc(course.name)}</div>
+        <div class="detail-name">
+          <span class="detail-name-text">${esc(getCourseName(course))}</span>
+          <button class="btn-rename-course" data-course-id="${course.id}" title="重命名"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg></button>
+        </div>
         <div class="detail-meta">${detailMeta}</div>
       </div>
       <div class="detail-card-bottom">
@@ -731,11 +1183,19 @@ function renderCourseDetailSection(course, asgns, groups, scores) {
         </div>
         <div class="detail-right-panel">
           ${gradeCalcHtml}
-          <div class="detail-assignments-label">${itemLabel}清單</div>
-          ${assignmentRows || `<div style="padding:12px 0;color:var(--mid);font-size:13px;">無${itemLabel}</div>`}
+          <div class="detail-assignments-label">${currentListLabel()}</div>
+          ${assignmentRows || `<div style="padding:12px 0;color:var(--mid);font-size:13px;">${noItemsLabel()}</div>`}
         </div>
       </div>
     </div>`;
+
+  // Position rename button right after the text (can't do this in CSS alone since
+  // the button is position:absolute but the block width != text width)
+  const textSpan = el.querySelector('.detail-name-text');
+  const renameBtn = el.querySelector('.btn-rename-course');
+  if (textSpan && renameBtn) {
+    renameBtn.style.left = `${textSpan.offsetLeft + textSpan.offsetWidth + 8}px`;
+  }
 
   document.getElementById('detail-back-btn').addEventListener('click', showGridView);
 
@@ -746,6 +1206,10 @@ function renderCourseDetailSection(course, asgns, groups, scores) {
         desc.classList.toggle('open');
       }
     });
+  });
+
+  el.querySelectorAll('.btn-rename-course').forEach((btn) => {
+    btn.addEventListener('click', () => startCourseRename(parseInt(btn.dataset.courseId, 10)));
   });
 
   el.querySelectorAll('.btn-analyze').forEach((btn) => {
@@ -782,7 +1246,7 @@ function renderCourseDetailSection(course, asgns, groups, scores) {
       const cid = parseInt(btn.dataset.courseId, 10);
       const force = btn.dataset.force === 'true';
       const section = document.getElementById(`syllabus-section-${cid}`);
-      if (section) section.innerHTML = '<div class="syllabus-loading">分析中</div>';
+      if (section) section.innerHTML = `<div class="syllabus-loading">${tr('analyzingShort')}</div>`;
       chrome.runtime.sendMessage({ type: 'ANALYZE_SYLLABUS', courseId: cid, force }, (res) => {
         if (res && res.success) {
           if (!_currentData.syllabusAnalysis) _currentData.syllabusAnalysis = {};
@@ -793,11 +1257,11 @@ function renderCourseDetailSection(course, asgns, groups, scores) {
           if (course) renderCourseDetailSection(course, assignments[cid] || [], assignmentGroups[cid] || [], scores);
         } else {
           const msg = res && res.error === 'NO_API_KEY'
-            ? '請先設定 API 金鑰'
+            ? tr('noApiKeyShort')
             : res && res.error === 'NO_MODEL_ID'
-              ? '請先設定模型 ID'
-              : '分析失敗，請稍後再試';
-          if (section) section.innerHTML = `<div class="syllabus-empty">${msg}</div><button class="btn-syllabus-analyze" data-course-id="${cid}">重試</button>`;
+              ? tr('noModelIdShort')
+              : tr('analysisError');
+          if (section) section.innerHTML = `<div class="syllabus-empty">${msg}</div><button class="btn-syllabus-analyze" data-course-id="${cid}">${tr('retry')}</button>`;
         }
       });
     });
@@ -866,7 +1330,7 @@ function renderWeightPie(groups, syllabusData) {
   return `
     <div class="detail-weight-pie-container">
       <div class="detail-pie" style="background: var(--border);"></div>
-      <div class="detail-pie-label">沒有評分資訊</div>
+      <div class="detail-pie-label">${tr('noGradeInfo')}</div>
     </div>`;
 }
 
@@ -877,7 +1341,7 @@ function renderSyllabusSection(courseId) {
   if (!cached) {
     return `
       <div class="syllabus-section" id="syllabus-section-${courseId}">
-        <button class="btn-syllabus-analyze" data-course-id="${courseId}">分析權重</button>
+        <button class="btn-syllabus-analyze" data-course-id="${courseId}">${tr('analyzeWeight')}</button>
       </div>`;
   }
 
@@ -885,18 +1349,18 @@ function renderSyllabusSection(courseId) {
     syllabus_body: 'Syllabus',
     'syllabus_body+pdf': 'Syllabus PDF',
     syllabus_page_pdf: 'Syllabus PDF',
-    keyword_pdf: '課程 PDF',
-    ai_selected_pdf: 'AI 選取 PDF',
+    keyword_pdf: tr('coursePdf'),
+    ai_selected_pdf: tr('aiSelectedPdf'),
   }[cached.source] || '';
 
   const notFound = !cached.found || !cached.components || cached.components.length === 0;
 
   return `
     <div class="syllabus-section" id="syllabus-section-${courseId}">
-      ${notFound ? `<div class="syllabus-empty">${esc(cached.notes || '未找到評分資訊')}</div>` : ''}
+      ${notFound ? `<div class="syllabus-empty">${esc(cached.notes || tr('weightNotFound'))}</div>` : ''}
       <div class="syllabus-footer">
         ${sourceLabel ? `<span class="syllabus-source">${sourceLabel}</span>` : ''}
-        <button class="btn-syllabus-analyze" data-course-id="${courseId}" data-force="true">更新權重</button>
+        <button class="btn-syllabus-analyze" data-course-id="${courseId}" data-force="true">${tr('updateWeight')}</button>
       </div>
     </div>`;
 }
@@ -975,7 +1439,7 @@ function renderGradeCalculator(course, asgns, groups, scores) {
   return `
     <div class="grade-calc">
       <div class="grade-calc-header">
-        <span class="grade-calc-title">成績計算器</span>
+        <span class="grade-calc-title">${tr('gradeCalcTitle')}</span>
         <span class="grade-calc-final-display" id="final-grade-${course.id}">—</span>
       </div>
       <div class="grade-calc-body">
@@ -1066,7 +1530,7 @@ function renderAssignmentRow(a, groups, courseId) {
   const examFlag = isExam(a);
   const uClass = urgencyClass(a.due_at, examFlag, submitted);
   const groupName = findGroupName(a, groups);
-  const desc = a.description ? stripHtml(a.description) : '（無描述）';
+  const desc = a.description ? stripHtml(a.description) : tr('noDesc');
 
   // 考試成績顯示
   let gradeHtml = '';
@@ -1088,8 +1552,8 @@ function renderAssignmentRow(a, groups, courseId) {
       <div class="assignment-right">
         <div class="due-label ${uClass}">${formatDue(a.due_at)}</div>
         ${gradeHtml}
-        ${submitted ? '<div class="submitted-badge">已繳</div>' : ''}
-        <button class="btn-analyze" data-assignment-id="${a.id}" data-course-id="${courseId}">AI 分析</button>
+        ${submitted ? `<div class="submitted-badge">${tr('submittedBadge')}</div>` : ''}
+        <button class="btn-analyze" data-assignment-id="${a.id}" data-course-id="${courseId}">${tr('analyzeBtn')}</button>
       </div>
     </div>
     <div class="assignment-desc">
@@ -1118,7 +1582,7 @@ function openAnalysisPanel(assignmentId, courseId) {
     renderAnalysisContent(cachedAnalysis.result, assignmentId, assignment, milestoneChecks, cachedAnalysis.timestamp);
   } else {
     document.getElementById('analysis-content').innerHTML =
-      '<div class="analysis-loading">正在呼叫 Claude API 分析中...</div>';
+      `<div class="analysis-loading">${tr('analyzing')}</div>`;
     fetchAnalysis(assignmentId, courseId, assignment, milestoneChecks);
   }
 }
@@ -1128,18 +1592,18 @@ function fetchAnalysis(assignmentId, courseId, assignment, milestoneChecks) {
     { type: 'ANALYZE_ASSIGNMENT', assignmentId, courseId },
     (response) => {
       if (!response) {
-        showAnalysisError('通訊失敗，請重試');
+        showAnalysisError(tr('commError'));
         return;
       }
       if (!response.success) {
         if (response.error === 'NO_API_KEY' || response.error === 'NO_MODEL_ID') {
-          const setupMsg = response.error === 'NO_MODEL_ID' ? '尚未設定模型 ID' : '尚未設定 AI API 金鑰';
+          const setupMsg = response.error === 'NO_MODEL_ID' ? tr('noModelIdMsg') : tr('noApiKeyMsg');
           document.getElementById('analysis-content').innerHTML = `
             <div class="analysis-error">
               ${setupMsg}。<br /><br />
-              請先前往
-              <a href="#" id="open-settings-link">設定頁面</a>
-              選擇模型並輸入 API 金鑰。
+              ${tr('pleaseGoTo')}
+              <a href="#" id="open-settings-link">${tr('settingsPage')}</a>
+              ${tr('andConfigure')}。
             </div>`;
           document.getElementById('open-settings-link').addEventListener('click', (e) => {
             e.preventDefault();
@@ -1182,13 +1646,13 @@ function renderAnalysisContent(result, assignmentId, assignment, milestoneChecks
     minimax: 'MiniMax',
   }[usedModel] || '';
 
-  let html = `<div class="analysis-cached-note">${modelLabel ? `${modelLabel} · ` : ''}${timeAgo} · <button class="btn-reanalyze" id="btn-reanalyze">重新分析</button></div>`;
+  let html = `<div class="analysis-cached-note">${modelLabel ? `${modelLabel} · ` : ''}${timeAgo} · <button class="btn-reanalyze" id="btn-reanalyze">${tr('reanalyze')}</button></div>`;
 
   // Summary
   if (result.summary) {
     html += `
       <div class="analysis-section">
-        <div class="analysis-section-label">摘要</div>
+        <div class="analysis-section-label">${tr('summaryLabel')}</div>
         <div class="analysis-summary">${esc(result.summary)}</div>
       </div>`;
   }
@@ -1197,7 +1661,7 @@ function renderAnalysisContent(result, assignmentId, assignment, milestoneChecks
   if (result.estimatedHours) {
     html += `
       <div class="analysis-section">
-        <div class="analysis-section-label">預估作業時間</div>
+        <div class="analysis-section-label">${tr('estimatedHoursLabel')}</div>
         <div class="analysis-hours">${result.estimatedHours} hrs</div>
       </div>`;
   }
@@ -1206,7 +1670,7 @@ function renderAnalysisContent(result, assignmentId, assignment, milestoneChecks
   if (result.requirements && result.requirements.length) {
     html += `
       <div class="analysis-section">
-        <div class="analysis-section-label">作業要求</div>
+        <div class="analysis-section-label">${tr('requirementsLabel')}</div>
         <ul class="analysis-list">
           ${result.requirements.map((r) => `<li>${esc(r)}</li>`).join('')}
         </ul>
@@ -1215,6 +1679,7 @@ function renderAnalysisContent(result, assignmentId, assignment, milestoneChecks
 
   // Milestones
   if (result.milestones && result.milestones.length) {
+    const locale = _uiLanguage === 'en' ? 'en-US' : 'zh-TW';
     const milestoneItems = result.milestones.map((m, i) => {
       const checkKey = `${assignmentId}_${i}`;
       const isChecked = milestoneChecks[checkKey] ? 'checked' : '';
@@ -1224,9 +1689,9 @@ function renderAnalysisContent(result, assignmentId, assignment, milestoneChecks
       if (assignment.due_at && m.daysBeforeDue != null) {
         const dueDate = new Date(assignment.due_at);
         const milestoneDate = new Date(dueDate.getTime() - m.daysBeforeDue * 86400000);
-        dateStr = milestoneDate.toLocaleDateString('zh-TW', { month: 'short', day: 'numeric' });
+        dateStr = milestoneDate.toLocaleDateString(locale, { month: 'short', day: 'numeric' });
       } else if (m.daysBeforeDue != null) {
-        dateStr = `截止前 ${m.daysBeforeDue} 天`;
+        dateStr = `${tr('daysBeforeDuePrefix')}${m.daysBeforeDue}${tr('daysBeforeDueSuffix')}`;
       }
 
       return `
@@ -1243,7 +1708,7 @@ function renderAnalysisContent(result, assignmentId, assignment, milestoneChecks
 
     html += `
       <div class="analysis-section">
-        <div class="analysis-section-label">里程碑規劃</div>
+        <div class="analysis-section-label">${tr('milestonesLabel')}</div>
         ${milestoneItems}
       </div>`;
   }
@@ -1252,7 +1717,7 @@ function renderAnalysisContent(result, assignmentId, assignment, milestoneChecks
   if (result.tips && result.tips.length) {
     html += `
       <div class="analysis-section">
-        <div class="analysis-section-label">建議</div>
+        <div class="analysis-section-label">${tr('tipsLabel')}</div>
         <ul class="analysis-list">
           ${result.tips.map((t) => `<li>${esc(t)}</li>`).join('')}
         </ul>
@@ -1269,7 +1734,7 @@ function renderAnalysisContent(result, assignmentId, assignment, milestoneChecks
     );
     if (!courseId) return;
     document.getElementById('analysis-content').innerHTML =
-      '<div class="analysis-loading">正在重新分析...</div>';
+      `<div class="analysis-loading">${tr('reanalyzing')}</div>`;
     fetchAnalysis(assignmentId, courseId, assignment, milestoneChecks);
   });
 
@@ -1332,10 +1797,10 @@ document.getElementById('hide-done-cb').addEventListener('change', (e) => {
 // ── 同步按鈕 ──
 document.getElementById('sync-btn').addEventListener('click', () => {
   const btn = document.getElementById('sync-btn');
-  btn.textContent = '同步中...';
+  btn.textContent = tr('syncing');
   btn.disabled = true;
   chrome.runtime.sendMessage({ type: 'SYNC' }, () => {
-    btn.textContent = '同步';
+    btn.textContent = tr('sync');
     btn.disabled = false;
     loadData();
   });
@@ -1344,19 +1809,19 @@ document.getElementById('sync-btn').addEventListener('click', () => {
 // ── 讀取資料 ──
 function loadData() {
   chrome.storage.local.get(
-    ['lastSync', 'courses', 'assignments', 'assignmentGroups', 'scores', 'files', 'analysis', 'milestoneChecks', 'syllabusAnalysis'],
+    ['lastSync', 'schoolName', 'courses', 'assignments', 'assignmentGroups', 'scores', 'files', 'analysis', 'milestoneChecks', 'syllabusAnalysis', 'courseNames'],
     (data) => {
       if (!data.courses || !data.courses.length) {
         currentView = 'grid';
         currentCourseId = null;
-        document.getElementById('header-meta').textContent = '尚無資料，請先前往 Canvas 頁面';
+        document.getElementById('header-meta').textContent = tr('noDataMeta');
         document.getElementById('course-nav').innerHTML = '';
         document.getElementById('week-section').style.display = '';
         document.getElementById('week-section').innerHTML = '';
         document.getElementById('courses-section').innerHTML = `
           <div class="state-msg">
-            <div class="big">尚無資料</div>
-            <div class="small">請先登入 Canvas 並點擊同步</div>
+            <div class="big">${tr('noData')}</div>
+            <div class="small">${tr('noDataHintSync')}</div>
           </div>`;
         return;
       }
@@ -1367,6 +1832,7 @@ function loadData() {
         analysis: data.analysis || {},
         milestoneChecks: data.milestoneChecks || {},
         syllabusAnalysis: data.syllabusAnalysis || {},
+        courseNames: data.courseNames || {},
       });
     }
   );
@@ -1381,11 +1847,13 @@ function updateThemeMenuLabel() {
   const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
   const btn = document.getElementById('menu-theme-toggle');
   if (!btn) return;
-  btn.textContent = isDark ? '切換淺色模式' : '切換深色模式';
+  btn.textContent = isDark ? tr('themeLight') : tr('themeDark');
 }
 
-chrome.storage.local.get(['darkMode'], (data) => {
+chrome.storage.local.get(['darkMode', 'uiLanguage'], (data) => {
+  _uiLanguage = data.uiLanguage || 'zh-TW';
   applyTheme(!!data.darkMode);
+  applyUILanguage();
   updateThemeMenuLabel();
 });
 
@@ -1399,12 +1867,18 @@ if (settingsMenuBtn && settingsMenu) {
     e.stopPropagation();
     settingsMenu.classList.toggle('open');
     settingsMenuBtn.classList.toggle('open', settingsMenu.classList.contains('open'));
+    if (!settingsMenu.classList.contains('open')) {
+      const menuLanguageLabel = document.getElementById('menu-language-label');
+      if (menuLanguageLabel) menuLanguageLabel.classList.remove('submenu-open');
+    }
   });
 
   document.addEventListener('click', (e) => {
     if (!settingsMenu.contains(e.target) && !settingsMenuBtn.contains(e.target)) {
       settingsMenu.classList.remove('open');
       settingsMenuBtn.classList.remove('open');
+      const menuLanguageLabel = document.getElementById('menu-language-label');
+      if (menuLanguageLabel) menuLanguageLabel.classList.remove('submenu-open');
     }
   });
 }
@@ -1417,6 +1891,8 @@ if (menuThemeToggle) {
     updateThemeMenuLabel();
     if (settingsMenu) settingsMenu.classList.remove('open');
     if (settingsMenuBtn) settingsMenuBtn.classList.remove('open');
+    const menuLanguageLabel = document.getElementById('menu-language-label');
+    if (menuLanguageLabel) menuLanguageLabel.classList.remove('submenu-open');
   });
 }
 
@@ -1426,6 +1902,8 @@ if (menuOpenApiSettings) {
     chrome.tabs.create({ url });
     if (settingsMenu) settingsMenu.classList.remove('open');
     if (settingsMenuBtn) settingsMenuBtn.classList.remove('open');
+    const menuLanguageLabel = document.getElementById('menu-language-label');
+    if (menuLanguageLabel) menuLanguageLabel.classList.remove('submenu-open');
   });
 }
 

@@ -1,4 +1,58 @@
 const ATTENDANCE_KEYWORDS = ['attendance', '簽到', 'check-in', 'checkin', 'sign in', 'sign-in'];
+let _uiLanguage = 'zh-TW';
+let _schoolName = 'Canvas';
+
+const I18N = {
+  'zh-TW': {
+    subtitle: (school) => `${school} · 七天待辦`,
+    loading: '載入中...',
+    emptyLabel: '七天內無待辦',
+    emptyState: '七天內沒有待繳作業',
+    dueCount: (n) => `七天內 · ${n} 件待辦`,
+    dashboard: '開啟 Dashboard',
+    unsynced: '未同步',
+    justNow: '剛才',
+  },
+  'zh-CN': {
+    subtitle: (school) => `${school} · 七天待办`,
+    loading: '加载中...',
+    emptyLabel: '七天内无待办',
+    emptyState: '七天内没有待缴作业',
+    dueCount: (n) => `七天内 · ${n} 件待办`,
+    dashboard: '打开 Dashboard',
+    unsynced: '未同步',
+    justNow: '刚才',
+  },
+  en: {
+    subtitle: (school) => `${school} · 7-Day Tasks`,
+    loading: 'Loading...',
+    emptyLabel: 'No tasks in 7 days',
+    emptyState: 'No pending tasks in the next 7 days',
+    dueCount: (n) => `Next 7 days · ${n} tasks`,
+    dashboard: 'Open Dashboard',
+    unsynced: 'Not synced',
+    justNow: 'Just now',
+  },
+};
+
+function tr(key) {
+  return (I18N[_uiLanguage] && I18N[_uiLanguage][key]) || I18N['zh-TW'][key];
+}
+
+function applyTheme(dark) {
+  document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+}
+
+function applyUILanguage() {
+  const subtitle = document.getElementById('popup-subtitle');
+  if (subtitle) subtitle.textContent = tr('subtitle')(_schoolName);
+  const taskLabel = document.getElementById('task-label');
+  if (taskLabel && taskLabel.textContent === '載入中...') {
+    taskLabel.textContent = tr('loading');
+  }
+  const btn = document.getElementById('dashboard-btn');
+  if (btn) btn.textContent = tr('dashboard');
+}
 
 function isAttendance(name) {
   const lower = (name || '').toLowerCase();
@@ -11,10 +65,10 @@ function isExam(name) {
 }
 
 function formatRelativeSync(isoString) {
-  if (!isoString) return '未同步';
+  if (!isoString) return tr('unsynced');
   const diff = Date.now() - new Date(isoString).getTime();
   const minutes = Math.floor(diff / 60000);
-  if (minutes < 1) return '剛才';
+  if (minutes < 1) return tr('justNow');
   if (minutes < 60) return `${minutes}m ago`;
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours}h ago`;
@@ -42,11 +96,10 @@ function urgencyClass(isoString) {
   return 'later';
 }
 
-function getCourseCode(course) {
+function getDisplayName(course, courseNames) {
   if (!course) return '';
-  // Try to extract a short code from course name
-  const match = course.name && course.name.match(/^([A-Z]{2,6}\d{4}[A-Z]?)/);
-  return match ? match[1] : (course.course_code || '').split('-')[0].trim();
+  const custom = (courseNames || {})[course.id];
+  return custom || course.name || '';
 }
 
 function buildCourseMap(courses) {
@@ -82,22 +135,22 @@ function getUpcomingTasks(assignments, courseMap) {
   return tasks;
 }
 
-function renderTasks(tasks) {
+function renderTasks(tasks, courseNames) {
   const list = document.getElementById('task-list');
   const label = document.getElementById('task-label');
   list.innerHTML = '';
 
   if (tasks.length === 0) {
-    label.textContent = '七天內無待辦';
-    list.innerHTML = '<li class="empty-state">輕鬆！七天內沒有未繳作業</li>';
+    label.textContent = tr('emptyLabel');
+    list.innerHTML = `<li class="empty-state">${tr('emptyState')}</li>`;
     return;
   }
 
-  label.textContent = `七天內 · ${tasks.length} 件待辦`;
+  label.textContent = tr('dueCount')(tasks.length);
 
   for (const task of tasks) {
     const cls = task.exam ? 'exam' : urgencyClass(task.due_at);
-    const code = getCourseCode(task.course);
+    const displayName = getDisplayName(task.course, courseNames);
     const dueStr = formatDueShort(task.due_at);
 
     const li = document.createElement('li');
@@ -106,7 +159,7 @@ function renderTasks(tasks) {
       <span class="task-dot ${cls}"></span>
       <div class="task-body">
         <div class="task-name">${task.name}</div>
-        <div class="task-meta">${code}</div>
+        <div class="task-meta">${displayName}</div>
       </div>
       <span class="task-due ${cls}">${dueStr}</span>
     `;
@@ -115,12 +168,12 @@ function renderTasks(tasks) {
 }
 
 function loadData() {
-  chrome.storage.local.get(['lastSync', 'courses', 'assignments'], (data) => {
+  chrome.storage.local.get(['lastSync', 'courses', 'assignments', 'courseNames'], (data) => {
     document.getElementById('sync-time').textContent = formatRelativeSync(data.lastSync);
 
     const courseMap = buildCourseMap(data.courses);
     const tasks = getUpcomingTasks(data.assignments || {}, courseMap);
-    renderTasks(tasks);
+    renderTasks(tasks, data.courseNames || {});
   });
 }
 
@@ -129,4 +182,10 @@ document.getElementById('dashboard-btn').addEventListener('click', () => {
   chrome.tabs.create({ url });
 });
 
-loadData();
+chrome.storage.local.get(['darkMode', 'uiLanguage', 'schoolName'], (data) => {
+  _uiLanguage = data.uiLanguage || 'zh-TW';
+  _schoolName = data.schoolName || 'Canvas';
+  applyTheme(!!data.darkMode);
+  applyUILanguage();
+  loadData();
+});

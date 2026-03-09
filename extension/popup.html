@@ -11,7 +11,7 @@
   />
   <style>
     :root {
-      --bg:      #faf9f5;
+      --bg:      #f2f0e8;
       --surface: #f2f0e8;
       --dark:    #141413;
       --mid:     #9a9890;
@@ -22,6 +22,15 @@
       --green:   #788c5d;
       --warm:    #b09050;
       --purple:  #a86070;
+    }
+
+    html[data-theme="dark"] {
+      --bg:      #23262d;
+      --surface: #23262d;
+      --dark:    #eceff4;
+      --mid:     #9aa3b2;
+      --muted:   #7f8897;
+      --border:  #343843;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -175,7 +184,7 @@
     <h1>Canvas Dashboard</h1>
     <span class="sync-time" id="sync-time">—</span>
   </div>
-  <div class="subtitle">HKUST(GZ) · 七天待辦</div>
+  <div class="subtitle" id="popup-subtitle">HKUST(GZ) · 七天待辦</div>
 
   <div class="section-label" id="task-label">載入中...</div>
   <ul class="task-list" id="task-list"></ul>
