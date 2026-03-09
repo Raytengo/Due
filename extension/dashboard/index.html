@@ -208,13 +208,22 @@
       border-radius: 10px;
       color: var(--muted);
       flex-shrink: 0;
-      line-height: 1.6;
+      line-height: 1;
+      min-width: 28px;
+      height: 24px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .nav-course-badge.urgent {
       background: rgba(217, 119, 87, 0.08);
       border-color: var(--orange);
       color: var(--orange);
+    }
+
+    .nav-course-badge.is-placeholder {
+      visibility: hidden;
     }
 
     /* Sidebar footer */
@@ -227,7 +236,7 @@
     .footer-row {
       display: flex;
       gap: 8px;
-      align-items: stretch;
+      align-items: center;
     }
 
     .btn-sync {
@@ -236,7 +245,8 @@
       font-size: 11px;
       text-transform: uppercase;
       letter-spacing: 0.06em;
-      padding: 8px 14px;
+      padding: 0 14px;
+      height: 34px;
       border: 1px solid var(--border);
       border-radius: 5px;
       background: var(--bg);
@@ -253,13 +263,14 @@
 
     .btn-theme-toggle {
       width: 34px;
+      height: 34px;
       flex-shrink: 0;
       border: 1px solid var(--border);
       border-radius: 5px;
       background: var(--bg);
       color: var(--muted);
       cursor: pointer;
-      font-size: 13px;
+      font-size: 14px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -268,6 +279,85 @@
 
     .btn-theme-toggle:hover {
       border-color: var(--orange);
+      color: var(--orange);
+    }
+
+    .btn-theme-toggle.open {
+      border-color: var(--orange);
+      color: var(--orange);
+      background: rgba(217, 119, 87, 0.08);
+    }
+
+    .settings-menu-wrap {
+      position: relative;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+    }
+
+    .settings-menu {
+      position: absolute;
+      right: 0;
+      bottom: calc(100% + 10px);
+      min-width: 176px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--bg);
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.14);
+      padding: 6px;
+      display: none;
+      z-index: 10;
+    }
+
+    .settings-menu::after {
+      content: '';
+      position: absolute;
+      right: 10px;
+      top: 100%;
+      border-width: 6px;
+      border-style: solid;
+      border-color: var(--bg) transparent transparent transparent;
+      filter: drop-shadow(0 1px 0 var(--border));
+    }
+
+    .settings-menu-title {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--mid);
+      padding: 6px 8px 4px;
+    }
+
+    .settings-menu-divider {
+      height: 1px;
+      background: var(--border);
+      margin: 4px 0;
+    }
+
+    .settings-menu.open {
+      display: block;
+    }
+
+    .settings-menu-item {
+      width: 100%;
+      border: none;
+      background: transparent;
+      color: var(--dark);
+      text-align: left;
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-family: 'DM Sans', sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      transition: background 0.12s, color 0.12s;
+    }
+
+    .settings-menu-item:hover {
+      background: var(--surface);
       color: var(--orange);
     }
 
@@ -363,6 +453,7 @@
       flex-direction: column;
       align-items: center;
       gap: 16px;
+      padding-top: 28px;
     }
 
     .week-pie {
@@ -1567,6 +1658,20 @@
       padding: 12px 0;
     }
 
+    .syllabus-loading::after {
+      content: '...';
+      display: inline-block;
+      width: 0;
+      overflow: hidden;
+      vertical-align: bottom;
+      animation: loading-dots 1.2s steps(4, end) infinite;
+    }
+
+    @keyframes loading-dots {
+      from { width: 0; }
+      to { width: 1.4em; }
+    }
+
     .detail-right-panel {
       flex: 1;
       min-width: 0;
@@ -1687,7 +1792,15 @@
         <div class="sidebar-footer">
           <div class="footer-row">
             <button class="btn-sync" id="sync-btn">同步</button>
-            <button class="btn-theme-toggle" id="theme-toggle" title="切換深色模式">☾</button>
+            <div class="settings-menu-wrap">
+              <button class="btn-theme-toggle" id="settings-menu-btn" title="設定">⚙</button>
+              <div class="settings-menu" id="settings-menu">
+                <div class="settings-menu-title">Quick Actions</div>
+                <div class="settings-menu-divider"></div>
+                <button class="settings-menu-item" id="menu-theme-toggle">切換深色模式 <span>↗</span></button>
+                <button class="settings-menu-item" id="menu-open-api-settings">API 設定 <span>↗</span></button>
+              </div>
+            </div>
           </div>
         </div>
 

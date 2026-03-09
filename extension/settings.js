@@ -1,39 +1,88 @@
-const statusEl = document.getElementById('status');
+﻿const statusEl = document.getElementById('status');
+
+const PROVIDERS = {
+  gemini: {
+    label: 'Google Gemini',
+    keyPlaceholder: 'AIza...',
+    baseUrlDefault: 'https://generativelanguage.googleapis.com/v1beta',
+    modelHint: '請自行輸入模型，例如：gemini-2.5-flash',
+    baseUrlHint: 'Gemini 通常用預設 base URL。',
+  },
+  anthropic: {
+    label: 'Anthropic Claude',
+    keyPlaceholder: 'sk-ant-...',
+    baseUrlDefault: 'https://api.anthropic.com',
+    modelHint: '請自行輸入模型，例如：claude-sonnet-4-5',
+    baseUrlHint: 'Anthropic 通常用預設 base URL。',
+  },
+  openai: {
+    label: 'OpenAI',
+    keyPlaceholder: 'sk-...',
+    baseUrlDefault: 'https://api.openai.com/v1',
+    modelHint: '請自行輸入模型，例如：gpt-5.2',
+    baseUrlHint: 'OpenAI 預設為 https://api.openai.com/v1。',
+  },
+  qwen: {
+    label: 'Qwen (通義千問)',
+    keyPlaceholder: 'sk-...',
+    baseUrlDefault: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    modelHint: '請自行輸入模型，例如：qwen-plus',
+    baseUrlHint: 'DashScope 使用 OpenAI 相容 endpoint。',
+  },
+  minimax: {
+    label: 'MiniMax',
+    keyPlaceholder: 'sk-...',
+    baseUrlDefault: 'https://api.minimax.chat/v1',
+    modelHint: '請自行輸入模型，例如：MiniMax-M1',
+    baseUrlHint: 'MiniMax 使用 OpenAI 相容 endpoint。',
+  },
+};
+
+function setProviderUI(provider, keepCustom = false) {
+  const cfg = PROVIDERS[provider] || PROVIDERS.gemini;
+
+  const providerSelect = document.getElementById('provider-select');
+  if (providerSelect) providerSelect.value = provider;
+
+  document.getElementById('provider-title').textContent = cfg.label;
+  document.getElementById('provider-key').placeholder = cfg.keyPlaceholder;
+  document.getElementById('provider-model-hint').textContent = cfg.modelHint;
+  document.getElementById('provider-base-url-hint').textContent = cfg.baseUrlHint;
+
+  if (!keepCustom) {
+    document.getElementById('provider-model').value = '';
+    document.getElementById('provider-base-url').value = cfg.baseUrlDefault;
+  }
+}
 
 // ── Load saved settings ──
-chrome.storage.local.get(['aiModel', 'geminiApiKey', 'geminiModel', 'claudeApiKey'], (data) => {
-  const model = data.aiModel || 'gemini';
-  selectModel(model);
+chrome.storage.local.get([
+  'aiProvider', 'aiApiKey', 'aiModelId', 'aiBaseUrl',
+  'aiModel', 'geminiApiKey', 'geminiModel', 'claudeApiKey', 'claudeModel',
+], (data) => {
+  let provider = data.aiProvider;
+  if (!provider) {
+    provider = data.aiModel === 'claude' ? 'anthropic' : 'gemini';
+  }
+  if (!PROVIDERS[provider]) {
+    provider = 'gemini';
+  }
 
-  if (data.geminiApiKey)  document.getElementById('gemini-key').value  = data.geminiApiKey;
-  if (data.claudeApiKey)  document.getElementById('claude-key').value  = data.claudeApiKey;
-  if (data.geminiModel)   document.getElementById('gemini-model').value = data.geminiModel;
+  setProviderUI(provider, true);
+
+  // New unified keys first, then fallback to legacy keys.
+  const legacyKey = provider === 'gemini' ? data.geminiApiKey : provider === 'anthropic' ? data.claudeApiKey : '';
+  const legacyModel = provider === 'gemini' ? data.geminiModel : provider === 'anthropic' ? data.claudeModel : '';
+
+  document.getElementById('provider-key').value = data.aiApiKey || legacyKey || '';
+  document.getElementById('provider-model').value = data.aiModelId || legacyModel || '';
+  document.getElementById('provider-base-url').value = data.aiBaseUrl || (PROVIDERS[provider]?.baseUrlDefault || '');
 });
 
-// ── Model selector ──
-document.querySelectorAll('input[name="ai-model"]').forEach((radio) => {
-  radio.addEventListener('change', () => selectModel(radio.value));
+// ── Provider selector ──
+document.getElementById('provider-select').addEventListener('change', (e) => {
+  setProviderUI(e.target.value);
 });
-
-function selectModel(model) {
-  // Radio state
-  document.querySelectorAll('input[name="ai-model"]').forEach((r) => {
-    r.checked = (r.value === model);
-  });
-
-  // Visual state
-  document.getElementById('opt-gemini').classList.toggle('active', model === 'gemini');
-  document.getElementById('opt-claude').classList.toggle('active', model === 'claude');
-
-  document.getElementById('section-gemini').classList.toggle('dimmed', model !== 'gemini');
-  document.getElementById('section-claude').classList.toggle('dimmed', model !== 'claude');
-
-  document.getElementById('badge-gemini').className = model === 'gemini' ? 'provider-badge active-badge' : 'provider-badge';
-  document.getElementById('badge-gemini').textContent = model === 'gemini' ? '使用中' : '備用';
-
-  document.getElementById('badge-claude').className = model === 'claude' ? 'provider-badge active-badge' : 'provider-badge';
-  document.getElementById('badge-claude').textContent = model === 'claude' ? '使用中' : '備用';
-}
 
 // ── Toggle key visibility ──
 document.querySelectorAll('.toggle-vis').forEach((btn) => {
@@ -47,36 +96,52 @@ document.querySelectorAll('.toggle-vis').forEach((btn) => {
 
 // ── Save ──
 document.getElementById('save-btn').addEventListener('click', () => {
-  const aiModel = document.querySelector('input[name="ai-model"]:checked')?.value || 'gemini';
-  const geminiKey = document.getElementById('gemini-key').value.trim();
-  const geminiModel = document.getElementById('gemini-model').value.trim() || 'gemini-2.0-flash-lite';
-  const claudeKey = document.getElementById('claude-key').value.trim();
+  const provider = document.getElementById('provider-select').value || 'gemini';
+  const key = document.getElementById('provider-key').value.trim();
+  const modelId = document.getElementById('provider-model').value.trim();
+  const baseUrl = document.getElementById('provider-base-url').value.trim() || PROVIDERS[provider].baseUrlDefault;
 
-  // Validate active model's key
-  if (aiModel === 'gemini' && geminiKey && !geminiKey.startsWith('AIza')) {
-    showStatus('Gemini 金鑰格式錯誤（應以 AIza 開頭）', 'err');
+  if (!key) {
+    showStatus('請先輸入 API 金鑰', 'err');
     return;
   }
-  if (aiModel === 'claude' && claudeKey && !claudeKey.startsWith('sk-ant-')) {
-    showStatus('Claude 金鑰格式錯誤（應以 sk-ant- 開頭）', 'err');
+  if (!modelId) {
+    showStatus('請先輸入模型 ID', 'err');
     return;
   }
 
-  const payload = { aiModel, geminiModel };
-  if (geminiKey) payload.geminiApiKey = geminiKey;
-  if (claudeKey) payload.claudeApiKey = claudeKey;
+  if (provider === 'gemini' && !key.startsWith('AIza')) {
+    showStatus('Gemini 金鑰格式通常以 AIza 開頭', 'err');
+    return;
+  }
+  if (provider === 'anthropic' && !key.startsWith('sk-ant-')) {
+    showStatus('Anthropic 金鑰格式通常以 sk-ant- 開頭', 'err');
+    return;
+  }
+
+  const payload = {
+    aiProvider: provider,
+    aiApiKey: key,
+    aiModelId: modelId,
+    aiBaseUrl: baseUrl,
+    // legacy compatibility
+    aiModel: provider === 'anthropic' ? 'claude' : 'gemini',
+    geminiApiKey: provider === 'gemini' ? key : '',
+    claudeApiKey: provider === 'anthropic' ? key : '',
+    geminiModel: provider === 'gemini' ? modelId : '',
+    claudeModel: provider === 'anthropic' ? modelId : '',
+  };
 
   chrome.storage.local.set(payload, () => {
     showStatus('設定已儲存', 'ok');
   });
 });
 
-// ── Clear all keys ──
+// ── Clear key ──
 document.getElementById('clear-btn').addEventListener('click', () => {
-  chrome.storage.local.remove(['geminiApiKey', 'claudeApiKey'], () => {
-    document.getElementById('gemini-key').value = '';
-    document.getElementById('claude-key').value = '';
-    showStatus('所有金鑰已清除', 'ok');
+  chrome.storage.local.remove(['aiApiKey', 'geminiApiKey', 'claudeApiKey'], () => {
+    document.getElementById('provider-key').value = '';
+    showStatus('API 金鑰已清除', 'ok');
   });
 });
 

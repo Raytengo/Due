@@ -72,22 +72,52 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
+const PROVIDER_DEFAULTS = {
+  gemini: { baseUrl: 'https://generativelanguage.googleapis.com/v1beta' },
+  anthropic: { baseUrl: 'https://api.anthropic.com' },
+  openai: { baseUrl: 'https://api.openai.com/v1' },
+  deepseek: { baseUrl: 'https://api.deepseek.com/v1' },
+  qwen: { baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1' },
+  moonshot: { baseUrl: 'https://api.moonshot.cn/v1' },
+  zhipu: { baseUrl: 'https://open.bigmodel.cn/api/paas/v4' },
+  minimax: { baseUrl: 'https://api.minimax.chat/v1' },
+};
+
+function normalizeBaseUrl(url) {
+  return (url || '').replace(/\/+$/, '');
+}
+
+function resolveAiConfig(data) {
+  const provider = data.aiProvider || (data.aiModel === 'claude' ? 'anthropic' : 'gemini');
+  const defaults = PROVIDER_DEFAULTS[provider] || PROVIDER_DEFAULTS.gemini;
+  const key = data.aiApiKey
+    || (provider === 'gemini' ? data.geminiApiKey : '')
+    || (provider === 'anthropic' ? data.claudeApiKey : '')
+    || '';
+  const model = (data.aiModelId
+    || (provider === 'gemini' ? data.geminiModel : '')
+    || (provider === 'anthropic' ? data.claudeModel : '')
+    || '').trim();
+  const baseUrl = normalizeBaseUrl(data.aiBaseUrl || defaults.baseUrl);
+  return { provider, key, model, baseUrl };
+}
+
 // ── AI Analysis handler ──
 async function handleAnalyze({ assignmentId, courseId }, sendResponse) {
   try {
     const data = await chrome.storage.local.get([
-      'aiModel', 'geminiApiKey', 'geminiModel', 'claudeApiKey',
+      'aiProvider', 'aiApiKey', 'aiModelId', 'aiBaseUrl',
+      'aiModel', 'geminiApiKey', 'geminiModel', 'claudeApiKey', 'claudeModel',
       'assignments', 'files', 'announcements', 'analysis',
     ]);
 
-    const aiModel = data.aiModel || 'gemini';
-
-    if (aiModel === 'gemini' && !data.geminiApiKey) {
+    const ai = resolveAiConfig(data);
+    if (!ai.key) {
       sendResponse({ success: false, error: 'NO_API_KEY' });
       return;
     }
-    if (aiModel === 'claude' && !data.claudeApiKey) {
-      sendResponse({ success: false, error: 'NO_API_KEY' });
+    if (!ai.model) {
+      sendResponse({ success: false, error: 'NO_MODEL_ID' });
       return;
     }
 
@@ -124,8 +154,7 @@ async function handleAnalyze({ assignmentId, courseId }, sendResponse) {
     const courseFiles = ((data.files || {})[courseId] || []).filter((f) => !seenIds.has(f.id));
     if (courseFiles.length > 0) {
       const selectedIds = await selectRelevantFiles(
-        assignment, desc, courseFiles, aiModel,
-        data.claudeApiKey, data.geminiApiKey, data.geminiModel || 'gemini-2.0-flash-lite'
+        assignment, desc, courseFiles, ai
       );
       for (const fileId of selectedIds) {
         if (seenIds.has(fileId)) continue;
@@ -141,8 +170,7 @@ async function handleAnalyze({ assignmentId, courseId }, sendResponse) {
     const courseAnnouncements = ((data.announcements || {})[courseId] || []);
     if (courseAnnouncements.length > 0) {
       const selectedAnnIds = await selectRelevantAnnouncements(
-        assignment, desc, courseAnnouncements, aiModel,
-        data.claudeApiKey, data.geminiApiKey, data.geminiModel || 'gemini-2.0-flash-lite'
+        assignment, desc, courseAnnouncements, ai
       );
       for (const annId of selectedAnnIds) {
         const ann = courseAnnouncements.find((a) => a.id === annId);
@@ -185,11 +213,7 @@ async function handleAnalyze({ assignmentId, courseId }, sendResponse) {
       '"tips": string[], "estimatedHours": number }';
 
     let responseText;
-    if (aiModel === 'gemini') {
-      responseText = await callGemini(parts, systemPrompt, data.geminiApiKey, data.geminiModel || 'gemini-2.0-flash-lite');
-    } else {
-      responseText = await callClaude(parts, systemPrompt, data.claudeApiKey, 'claude-opus-4-6');
-    }
+    responseText = await callProvider(parts, systemPrompt, ai);
 
     let parsed;
     try {
@@ -200,10 +224,10 @@ async function handleAnalyze({ assignmentId, courseId }, sendResponse) {
     }
 
     const analysis = data.analysis || {};
-    analysis[assignmentId] = { timestamp: new Date().toISOString(), model: aiModel, result: parsed };
+    analysis[assignmentId] = { timestamp: new Date().toISOString(), model: ai.provider, result: parsed };
     await chrome.storage.local.set({ analysis });
 
-    sendResponse({ success: true, result: parsed, model: aiModel });
+    sendResponse({ success: true, result: parsed, model: ai.provider });
   } catch (err) {
     sendResponse({ success: false, error: err.message });
   }
@@ -236,7 +260,7 @@ function findSyllabusByKeyword(files) {
   return null;
 }
 
-async function selectSyllabusPdfWithAI(files, aiModel, claudeKey, geminiKey, geminiModel) {
+async function selectSyllabusPdfWithAI(files, ai) {
   const fileList = files.slice(0, 60).map((f) => `${f.id}: ${f.display_name || f.filename}`).join('\n');
   const prompt =
     `Course files:\n${fileList}\n\n` +
@@ -244,11 +268,7 @@ async function selectSyllabusPdfWithAI(files, aiModel, claudeKey, geminiKey, gem
     `Return only the file ID as a JSON integer, or null if none seem relevant. Return ONLY the JSON value.`;
   try {
     let raw;
-    if (aiModel === 'gemini') {
-      raw = await callGemini([{ type: 'text', text: prompt }], 'Return only valid JSON, no explanation.', geminiKey, geminiModel, 0);
-    } else {
-      raw = await callClaude([{ type: 'text', text: prompt }], 'Return only valid JSON, no explanation.', claudeKey, 'claude-haiku-4-5', 0);
-    }
+    raw = await callProvider([{ type: 'text', text: prompt }], 'Return only valid JSON, no explanation.', ai, 0);
     const cleaned = raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
     const id = JSON.parse(cleaned);
     return Number.isInteger(id) ? (files.find((f) => f.id === id) || null) : null;
@@ -260,7 +280,8 @@ async function selectSyllabusPdfWithAI(files, aiModel, claudeKey, geminiKey, gem
 async function handleSyllabusAnalyze({ courseId, force }, sendResponse) {
   try {
     const data = await chrome.storage.local.get([
-      'aiModel', 'geminiApiKey', 'geminiModel', 'claudeApiKey',
+      'aiProvider', 'aiApiKey', 'aiModelId', 'aiBaseUrl',
+      'aiModel', 'geminiApiKey', 'geminiModel', 'claudeApiKey', 'claudeModel',
       'files', 'syllabusAnalysis',
     ]);
 
@@ -273,9 +294,9 @@ async function handleSyllabusAnalyze({ courseId, force }, sendResponse) {
       }
     }
 
-    const aiModel = data.aiModel || 'gemini';
-    if (aiModel === 'gemini' && !data.geminiApiKey) { sendResponse({ success: false, error: 'NO_API_KEY' }); return; }
-    if (aiModel === 'claude' && !data.claudeApiKey) { sendResponse({ success: false, error: 'NO_API_KEY' }); return; }
+    const ai = resolveAiConfig(data);
+    if (!ai.key) { sendResponse({ success: false, error: 'NO_API_KEY' }); return; }
+    if (!ai.model) { sendResponse({ success: false, error: 'NO_MODEL_ID' }); return; }
 
     const parts = [];
     let source = 'none';
@@ -316,8 +337,7 @@ async function handleSyllabusAnalyze({ courseId, force }, sendResponse) {
         if (!syllabusFile) {
           // Step 3: AI selects from file list
           syllabusFile = await selectSyllabusPdfWithAI(
-            courseFiles, aiModel,
-            data.claudeApiKey, data.geminiApiKey, data.geminiModel || 'gemini-2.0-flash-lite'
+            courseFiles, ai
           );
           if (syllabusFile) source = 'ai_selected_pdf';
           else debugNote = `PDF 清單中無 syllabus 相關檔案（共 ${courseFiles.length} 個）`;
@@ -363,11 +383,7 @@ async function handleSyllabusAnalyze({ courseId, force }, sendResponse) {
       '{ "found": boolean, "components": [{"name": string, "weight": number|null, "description": string}], "notes": string }';
 
     let responseText;
-    if (aiModel === 'gemini') {
-      responseText = await callGemini(parts, systemPrompt, data.geminiApiKey, data.geminiModel || 'gemini-2.0-flash-lite', 0);
-    } else {
-      responseText = await callClaude(parts, systemPrompt, data.claudeApiKey, 'claude-opus-4-6', 0);
-    }
+    responseText = await callProvider(parts, systemPrompt, ai, 0);
 
     let parsed;
     try {
@@ -413,7 +429,7 @@ function extractAllFileIds(html) {
   return [...ids];
 }
 
-async function selectRelevantFiles(assignment, desc, courseFiles, aiModel, claudeKey, geminiKey, geminiModel) {
+async function selectRelevantFiles(assignment, desc, courseFiles, ai) {
   const fileList = courseFiles
     .slice(0, 60)
     .map((f) => `${f.id}: ${f.display_name || f.filename}`)
@@ -428,19 +444,7 @@ async function selectRelevantFiles(assignment, desc, courseFiles, aiModel, claud
 
   try {
     let raw;
-    if (aiModel === 'gemini') {
-      raw = await callGemini(
-        [{ type: 'text', text: prompt }],
-        'Return only valid JSON, no explanation.',
-        geminiKey, geminiModel
-      );
-    } else {
-      raw = await callClaude(
-        [{ type: 'text', text: prompt }],
-        'Return only valid JSON, no explanation.',
-        claudeKey, 'claude-haiku-4-5'
-      );
-    }
+    raw = await callProvider([{ type: 'text', text: prompt }], 'Return only valid JSON, no explanation.', ai);
     const cleaned = raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
     const ids = JSON.parse(cleaned);
     return Array.isArray(ids) ? ids.filter((x) => Number.isInteger(x)) : [];
@@ -449,7 +453,7 @@ async function selectRelevantFiles(assignment, desc, courseFiles, aiModel, claud
   }
 }
 
-async function selectRelevantAnnouncements(assignment, desc, announcements, aiModel, claudeKey, geminiKey, geminiModel) {
+async function selectRelevantAnnouncements(assignment, desc, announcements, ai) {
   const annList = announcements
     .slice(0, 30)
     .map((a) => `${a.id}: ${a.title}`)
@@ -464,19 +468,7 @@ async function selectRelevantAnnouncements(assignment, desc, announcements, aiMo
 
   try {
     let raw;
-    if (aiModel === 'gemini') {
-      raw = await callGemini(
-        [{ type: 'text', text: prompt }],
-        'Return only valid JSON, no explanation.',
-        geminiKey, geminiModel
-      );
-    } else {
-      raw = await callClaude(
-        [{ type: 'text', text: prompt }],
-        'Return only valid JSON, no explanation.',
-        claudeKey, 'claude-haiku-4-5'
-      );
-    }
+    raw = await callProvider([{ type: 'text', text: prompt }], 'Return only valid JSON, no explanation.', ai);
     const cleaned = raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
     const ids = JSON.parse(cleaned);
     return Array.isArray(ids) ? ids.filter((x) => Number.isInteger(x)) : [];
@@ -495,6 +487,30 @@ async function tryFetchPdf(url) {
   } catch (_) {
     return null;
   }
+}
+
+function stripPdfForOpenAICompatible(parts) {
+  const textParts = parts.filter((p) => p.type === 'text');
+  const pdfCount = parts.filter((p) => p.type === 'pdf').length;
+  if (!pdfCount) return textParts;
+  return [
+    ...textParts,
+    {
+      type: 'text',
+      text: `[Note] ${pdfCount} PDF attachment(s) were detected but this provider path currently sends text-only content.`,
+    },
+  ];
+}
+
+async function callProvider(parts, systemPrompt, ai, temperature = undefined) {
+  if (ai.provider === 'gemini') {
+    return callGemini(parts, systemPrompt, ai.key, ai.model, temperature);
+  }
+  if (ai.provider === 'anthropic') {
+    return callClaude(parts, systemPrompt, ai.key, ai.model, temperature);
+  }
+  const textOnlyParts = stripPdfForOpenAICompatible(parts);
+  return callOpenAICompatible(textOnlyParts, systemPrompt, ai.key, ai.model, ai.baseUrl, temperature);
 }
 
 // ── Gemini API ──
@@ -559,6 +575,40 @@ async function callClaude(parts, systemPrompt, apiKey, modelId, temperature = un
 
   const json = await res.json();
   return json.content[0].text;
+}
+
+// ── OpenAI-compatible API ──
+async function callOpenAICompatible(parts, systemPrompt, apiKey, modelId, baseUrl, temperature = undefined) {
+  const messages = [];
+  if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
+  messages.push({
+    role: 'user',
+    content: parts.map((p) => p.text).join('\n\n'),
+  });
+
+  const body = {
+    model: modelId,
+    messages,
+    max_tokens: 2048,
+  };
+  if (temperature !== undefined) body.temperature = temperature;
+
+  const endpoint = `${normalizeBaseUrl(baseUrl)}/chat/completions`;
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) throw new Error(`OpenAI-compatible API ${res.status}: ${await res.text()}`);
+
+  const json = await res.json();
+  const text = json.choices?.[0]?.message?.content;
+  if (!text) throw new Error('API 回傳空結果');
+  return text;
 }
 
 // ── Helpers ──

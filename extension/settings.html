@@ -31,16 +31,21 @@
       font-weight: 400;
       font-size: 14px;
       line-height: 1.6;
-      min-height: 100vh;
+      height: 100vh;
+      overflow: hidden;
       display: flex;
-      align-items: flex-start;
+      align-items: center;
       justify-content: center;
-      padding: 60px 20px 80px;
+      padding: 14px 16px;
     }
 
     .card {
       width: 100%;
       max-width: 520px;
+      height: calc(100vh - 28px);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
     }
 
     h1 {
@@ -56,10 +61,10 @@
       text-transform: uppercase;
       letter-spacing: 0.08em;
       color: var(--mid);
-      margin-bottom: 36px;
+      margin-bottom: 16px;
     }
 
-    /* ── Model selector ── */
+    /* ── Provider selector ── */
     .section-label {
       font-family: 'DM Mono', monospace;
       font-size: 10px;
@@ -69,96 +74,44 @@
       margin-bottom: 10px;
     }
 
-    .model-selector {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 32px;
+    .provider-select-wrap {
+      margin-bottom: 12px;
     }
 
-    .model-option {
-      flex: 1;
-      padding: 14px 16px;
+    .provider-select {
+      width: 100%;
+      padding: 10px 40px 10px 12px;
       border: 1px solid var(--border);
-      border-radius: 8px;
-      background: var(--surface);
-      cursor: pointer;
-      transition: all 0.15s;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      position: relative;
-    }
-
-    .model-option:hover {
-      border-color: var(--mid);
-    }
-
-    .model-option.active {
-      border-color: var(--orange);
-      background: var(--bg);
-    }
-
-    .model-option input[type="radio"] {
-      position: absolute;
-      opacity: 0;
-      width: 0;
-      height: 0;
-    }
-
-    .model-radio-dot {
-      width: 14px;
-      height: 14px;
-      border: 1.5px solid var(--border);
-      border-radius: 50%;
-      flex-shrink: 0;
-      transition: all 0.15s;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .model-option.active .model-radio-dot {
-      border-color: var(--orange);
-    }
-
-    .model-radio-dot::after {
-      content: '';
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: var(--orange);
-      opacity: 0;
-      transition: opacity 0.15s;
-    }
-
-    .model-option.active .model-radio-dot::after {
-      opacity: 1;
-    }
-
-    .model-info {
-      flex: 1;
-      min-width: 0;
-    }
-
-    .model-name {
-      font-size: 13px;
+      border-radius: 6px;
+      background-color: var(--bg);
+      background-image:
+        linear-gradient(45deg, transparent 50%, var(--mid) 50%),
+        linear-gradient(135deg, var(--mid) 50%, transparent 50%);
+      background-position:
+        calc(100% - 18px) calc(50% - 2px),
+        calc(100% - 12px) calc(50% - 2px);
+      background-size: 6px 6px, 6px 6px;
+      background-repeat: no-repeat;
+      appearance: none;
+      -webkit-appearance: none;
       color: var(--dark);
-      font-weight: 400;
+      font-family: 'DM Mono', monospace;
+      font-size: 12px;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
     }
 
-    .model-desc {
-      font-family: 'DM Mono', monospace;
-      font-size: 10px;
-      color: var(--mid);
-      margin-top: 2px;
+    .provider-select:focus {
+      border-color: var(--orange);
+      box-shadow: 0 0 0 3px rgba(217, 119, 87, 0.14);
     }
 
     /* ── Provider sections ── */
     .provider-section {
       border: 1px solid var(--border);
       border-radius: 8px;
-      padding: 20px 22px;
-      margin-bottom: 16px;
+      padding: 14px 16px;
+      margin-bottom: 10px;
       background: var(--surface);
       transition: opacity 0.15s;
     }
@@ -171,7 +124,7 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 16px;
+      margin-bottom: 10px;
     }
 
     .provider-title {
@@ -225,7 +178,7 @@
     input:focus { border-color: var(--orange); }
 
     .field-row {
-      margin-bottom: 14px;
+      margin-bottom: 10px;
     }
 
     .toggle-vis {
@@ -254,7 +207,7 @@
     .actions {
       display: flex;
       gap: 8px;
-      margin-top: 24px;
+      margin-top: 10px;
     }
 
     .btn {
@@ -299,7 +252,7 @@
     .global-hint {
       font-size: 12px;
       color: var(--mid);
-      margin-top: 20px;
+      margin-top: 10px;
       line-height: 1.55;
       text-align: center;
     }
@@ -307,63 +260,43 @@
 </head>
 <body>
   <div class="card">
-    <h1>AI 分析設定</h1>
-    <div class="subtitle">Canvas Dashboard · AI 模型整合</div>
+    <h1>API 設定</h1>
+    <div class="subtitle">Canvas Dashboard · Provider + Model</div>
 
-    <div class="section-label">使用模型</div>
-    <div class="model-selector">
-      <label class="model-option active" id="opt-gemini">
-        <input type="radio" name="ai-model" value="gemini" checked />
-        <div class="model-radio-dot"></div>
-        <div class="model-info">
-          <div class="model-name">Gemini</div>
-          <div class="model-desc">Google AI Studio</div>
-        </div>
-      </label>
-      <label class="model-option" id="opt-claude">
-        <input type="radio" name="ai-model" value="claude" />
-        <div class="model-radio-dot"></div>
-        <div class="model-info">
-          <div class="model-name">Claude</div>
-          <div class="model-desc">Anthropic</div>
-        </div>
-      </label>
+    <div class="section-label">服務商</div>
+    <div class="provider-select-wrap">
+      <select id="provider-select" class="provider-select">
+        <option value="gemini">Gemini</option>
+        <option value="anthropic">Anthropic</option>
+        <option value="openai">OpenAI</option>
+        <option value="minimax">MiniMax</option>
+        <option value="qwen">Qwen</option>
+      </select>
     </div>
 
-    <!-- Gemini section -->
-    <div class="provider-section" id="section-gemini">
+    <div class="provider-section" id="provider-config-section">
       <div class="provider-header">
-        <span class="provider-title">Google Gemini</span>
-        <span class="provider-badge active-badge" id="badge-gemini">使用中</span>
+        <span class="provider-title" id="provider-title">Google Gemini</span>
+        <span class="provider-badge active-badge" id="provider-badge">使用中</span>
       </div>
 
       <div class="field-row">
-        <label for="gemini-key">Google AI Studio API 金鑰</label>
-        <input type="password" id="gemini-key" placeholder="AIza..." autocomplete="off" spellcheck="false" />
-        <button class="toggle-vis" data-target="gemini-key">顯示</button>
+        <label for="provider-key">API 金鑰</label>
+        <input type="password" id="provider-key" placeholder="輸入 API Key" autocomplete="off" spellcheck="false" />
+        <button class="toggle-vis" data-target="provider-key">顯示</button>
       </div>
 
       <div class="field-row">
-        <label for="gemini-model">模型 ID</label>
-        <input type="text" id="gemini-model" value="gemini-2.0-flash-lite" spellcheck="false" />
-        <div class="field-hint">常用：gemini-2.0-flash-lite · gemini-2.0-flash · gemini-1.5-flash</div>
-      </div>
-    </div>
-
-    <!-- Claude section -->
-    <div class="provider-section dimmed" id="section-claude">
-      <div class="provider-header">
-        <span class="provider-title">Anthropic Claude</span>
-        <span class="provider-badge" id="badge-claude">備用</span>
+        <label for="provider-model">模型 ID</label>
+        <input type="text" id="provider-model" value="" spellcheck="false" />
+        <div class="field-hint" id="provider-model-hint">例如：gemini-2.0-flash-lite</div>
       </div>
 
       <div class="field-row">
-        <label for="claude-key">Anthropic API 金鑰</label>
-        <input type="password" id="claude-key" placeholder="sk-ant-..." autocomplete="off" spellcheck="false" />
-        <button class="toggle-vis" data-target="claude-key">顯示</button>
+        <label for="provider-base-url">Base URL</label>
+        <input type="text" id="provider-base-url" value="https://generativelanguage.googleapis.com/v1beta" spellcheck="false" />
+        <div class="field-hint" id="provider-base-url-hint">留預設即可；OpenAI 相容服務可改成對應 endpoint</div>
       </div>
-
-      <div class="field-hint" style="margin-top:0">固定使用 claude-opus-4-6 模型</div>
     </div>
 
     <div class="actions">

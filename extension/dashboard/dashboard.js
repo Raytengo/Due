@@ -1,4 +1,4 @@
-// ── 顏色池（評分比重分組用） ──
+﻿// ── 顏色池（評分比重分組用） ──
 const GROUP_COLORS = [
   '#d97757', '#6a9bcc', '#788c5d', '#b09050',
   '#a86070', '#7a9ba8', '#b08060', '#6a7c5d',
@@ -125,6 +125,12 @@ let currentCourseId = null;
 let currentPage = 'week';      // 'week' | 'courses'
 const cardPages = {};           // { [courseId]: pageIndex }
 
+function currentItemLabel() {
+  if (currentFilter === 'exam') return '考試';
+  if (currentFilter === 'all') return '項目';
+  return '作業';
+}
+
 // ── 套用篩選到作業列表 ──
 function applyFilters(asgns) {
   // 永久排除簽到/出勤/參與類
@@ -199,20 +205,24 @@ function renderNav(courses, assignments) {
 
   navEl.innerHTML = sorted.map((c) => {
     const asgns = assignments[c.id] || [];
-    const pendingCount = asgns.filter((a) => !isSubmitted(a) && a.due_at && new Date(a.due_at) > new Date()).length;
-    const urgentCount = asgns.filter((a) => {
+    const filtered = applyFilters(asgns);
+    const pendingCount = filtered.length;
+    const urgentCount = filtered.filter((a) => {
       if (!a.due_at || isSubmitted(a)) return false;
       const diff = new Date(a.due_at) - Date.now();
       return diff > 0 && diff <= 7 * 86400000;
     }).length;
 
-    const badgeClass = urgentCount ? 'nav-course-badge urgent' : 'nav-course-badge';
-    const badgeText = pendingCount || '';
+    const hasBadge = pendingCount > 0;
+    const badgeClass = hasBadge
+      ? (urgentCount ? 'nav-course-badge urgent' : 'nav-course-badge')
+      : 'nav-course-badge is-placeholder';
+    const badgeText = hasBadge ? pendingCount : '0';
 
     return `
       <button class="nav-course-item" data-target-course="${c.id}">
         <span class="nav-course-name">${esc(c.name)}</span>
-        ${badgeText ? `<span class="${badgeClass}">${badgeText}</span>` : ''}
+        <span class="${badgeClass}">${badgeText}</span>
       </button>`;
   }).join('');
 
@@ -496,6 +506,7 @@ function renderCardBottom(courseId, sorted, pageIdx) {
   const page = Math.min(pageIdx, totalPages - 1);
   const visible = sorted.slice(page * pageSize, (page + 1) * pageSize);
 
+  const itemLabel = currentItemLabel();
   const rows = visible.length
     ? visible.map((a) => {
         const uClass = urgencyClass(a.due_at, isExam(a), isSubmitted(a));
@@ -505,7 +516,7 @@ function renderCardBottom(courseId, sorted, pageIdx) {
             <div class="card-row-due ${uClass}">${formatDue(a.due_at)}</div>
           </div>`;
       }).join('')
-    : '<div class="card-empty">無待繳作業</div>';
+    : `<div class="card-empty">無待繳${itemLabel}</div>`;
 
   const pager = totalPages > 1 ? `
     <div class="card-pager">
@@ -700,6 +711,7 @@ function renderCourseDetailSection(course, asgns, groups, scores) {
   const weightPieHtml = renderWeightPie(groups, syllabusData);
   const gradeCalcHtml = renderGradeCalculator(course, asgns, groups, scores);
   const assignmentRows = filtered.map((a) => renderAssignmentRow(a, groups, course.id)).join('');
+  const itemLabel = currentItemLabel();
 
   el.innerHTML = `
     <button class="detail-back" id="detail-back-btn">← 返回</button>
@@ -719,8 +731,8 @@ function renderCourseDetailSection(course, asgns, groups, scores) {
         </div>
         <div class="detail-right-panel">
           ${gradeCalcHtml}
-          <div class="detail-assignments-label">作業清單</div>
-          ${assignmentRows || '<div style="padding:12px 0;color:var(--mid);font-size:13px;">無作業</div>'}
+          <div class="detail-assignments-label">${itemLabel}清單</div>
+          ${assignmentRows || `<div style="padding:12px 0;color:var(--mid);font-size:13px;">無${itemLabel}</div>`}
         </div>
       </div>
     </div>`;
@@ -770,7 +782,7 @@ function renderCourseDetailSection(course, asgns, groups, scores) {
       const cid = parseInt(btn.dataset.courseId, 10);
       const force = btn.dataset.force === 'true';
       const section = document.getElementById(`syllabus-section-${cid}`);
-      if (section) section.innerHTML = '<div class="syllabus-loading">分析中...</div>';
+      if (section) section.innerHTML = '<div class="syllabus-loading">分析中</div>';
       chrome.runtime.sendMessage({ type: 'ANALYZE_SYLLABUS', courseId: cid, force }, (res) => {
         if (res && res.success) {
           if (!_currentData.syllabusAnalysis) _currentData.syllabusAnalysis = {};
@@ -780,7 +792,11 @@ function renderCourseDetailSection(course, asgns, groups, scores) {
           const course = courses.find((c) => c.id === cid);
           if (course) renderCourseDetailSection(course, assignments[cid] || [], assignmentGroups[cid] || [], scores);
         } else {
-          const msg = res && res.error === 'NO_API_KEY' ? '請先設定 API 金鑰' : '分析失敗，請稍後再試';
+          const msg = res && res.error === 'NO_API_KEY'
+            ? '請先設定 API 金鑰'
+            : res && res.error === 'NO_MODEL_ID'
+              ? '請先設定模型 ID'
+              : '分析失敗，請稍後再試';
           if (section) section.innerHTML = `<div class="syllabus-empty">${msg}</div><button class="btn-syllabus-analyze" data-course-id="${cid}">重試</button>`;
         }
       });
@@ -861,7 +877,7 @@ function renderSyllabusSection(courseId) {
   if (!cached) {
     return `
       <div class="syllabus-section" id="syllabus-section-${courseId}">
-        <button class="btn-syllabus-analyze" data-course-id="${courseId}">分析評分方式</button>
+        <button class="btn-syllabus-analyze" data-course-id="${courseId}">分析權重</button>
       </div>`;
   }
 
@@ -880,7 +896,7 @@ function renderSyllabusSection(courseId) {
       ${notFound ? `<div class="syllabus-empty">${esc(cached.notes || '未找到評分資訊')}</div>` : ''}
       <div class="syllabus-footer">
         ${sourceLabel ? `<span class="syllabus-source">${sourceLabel}</span>` : ''}
-        <button class="btn-syllabus-analyze" data-course-id="${courseId}" data-force="true">重新分析</button>
+        <button class="btn-syllabus-analyze" data-course-id="${courseId}" data-force="true">更新權重</button>
       </div>
     </div>`;
 }
@@ -1116,10 +1132,11 @@ function fetchAnalysis(assignmentId, courseId, assignment, milestoneChecks) {
         return;
       }
       if (!response.success) {
-        if (response.error === 'NO_API_KEY') {
+        if (response.error === 'NO_API_KEY' || response.error === 'NO_MODEL_ID') {
+          const setupMsg = response.error === 'NO_MODEL_ID' ? '尚未設定模型 ID' : '尚未設定 AI API 金鑰';
           document.getElementById('analysis-content').innerHTML = `
             <div class="analysis-error">
-              尚未設定 AI API 金鑰。<br /><br />
+              ${setupMsg}。<br /><br />
               請先前往
               <a href="#" id="open-settings-link">設定頁面</a>
               選擇模型並輸入 API 金鑰。
@@ -1153,7 +1170,17 @@ function showAnalysisError(msg) {
 function renderAnalysisContent(result, assignmentId, assignment, milestoneChecks, timestamp) {
   const timeAgo = formatLastSync(timestamp);
   const usedModel = _currentData.analysis?.[assignmentId]?.model || '';
-  const modelLabel = usedModel === 'gemini' ? 'Gemini' : usedModel === 'claude' ? 'Claude' : '';
+  const modelLabel = {
+    gemini: 'Gemini',
+    anthropic: 'Anthropic',
+    claude: 'Anthropic',
+    openai: 'OpenAI',
+    deepseek: 'DeepSeek',
+    qwen: 'Qwen',
+    moonshot: 'Moonshot',
+    zhipu: 'Zhipu',
+    minimax: 'MiniMax',
+  }[usedModel] || '';
 
   let html = `<div class="analysis-cached-note">${modelLabel ? `${modelLabel} · ` : ''}${timeAgo} · <button class="btn-reanalyze" id="btn-reanalyze">重新分析</button></div>`;
 
@@ -1348,17 +1375,59 @@ function loadData() {
 // ── 深色模式 ──
 function applyTheme(dark) {
   document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
-  document.getElementById('theme-toggle').textContent = dark ? '☀' : '☾';
+}
+
+function updateThemeMenuLabel() {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const btn = document.getElementById('menu-theme-toggle');
+  if (!btn) return;
+  btn.textContent = isDark ? '切換淺色模式' : '切換深色模式';
 }
 
 chrome.storage.local.get(['darkMode'], (data) => {
   applyTheme(!!data.darkMode);
+  updateThemeMenuLabel();
 });
 
-document.getElementById('theme-toggle').addEventListener('click', () => {
-  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-  applyTheme(!isDark);
-  chrome.storage.local.set({ darkMode: !isDark });
-});
+const settingsMenuBtn = document.getElementById('settings-menu-btn');
+const settingsMenu = document.getElementById('settings-menu');
+const menuThemeToggle = document.getElementById('menu-theme-toggle');
+const menuOpenApiSettings = document.getElementById('menu-open-api-settings');
+
+if (settingsMenuBtn && settingsMenu) {
+  settingsMenuBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    settingsMenu.classList.toggle('open');
+    settingsMenuBtn.classList.toggle('open', settingsMenu.classList.contains('open'));
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!settingsMenu.contains(e.target) && !settingsMenuBtn.contains(e.target)) {
+      settingsMenu.classList.remove('open');
+      settingsMenuBtn.classList.remove('open');
+    }
+  });
+}
+
+if (menuThemeToggle) {
+  menuThemeToggle.addEventListener('click', () => {
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    applyTheme(!isDark);
+    chrome.storage.local.set({ darkMode: !isDark });
+    updateThemeMenuLabel();
+    if (settingsMenu) settingsMenu.classList.remove('open');
+    if (settingsMenuBtn) settingsMenuBtn.classList.remove('open');
+  });
+}
+
+if (menuOpenApiSettings) {
+  menuOpenApiSettings.addEventListener('click', () => {
+    const url = chrome.runtime.getURL('settings.html');
+    chrome.tabs.create({ url });
+    if (settingsMenu) settingsMenu.classList.remove('open');
+    if (settingsMenuBtn) settingsMenuBtn.classList.remove('open');
+  });
+}
 
 loadData();
+
