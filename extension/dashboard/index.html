@@ -1470,6 +1470,99 @@
       font-weight: 500;
     }
 
+    /* ── Syllabus Section ── */
+    .syllabus-section {
+      margin-top: 20px;
+      width: 100%;
+    }
+
+    .btn-syllabus-analyze {
+      display: block;
+      width: 100%;
+      padding: 7px 10px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--surface);
+      color: var(--dark);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 12px;
+      font-weight: 300;
+      cursor: pointer;
+      text-align: center;
+      transition: border-color 0.15s;
+    }
+
+    .btn-syllabus-analyze:hover { border-color: var(--orange); }
+
+    .btn-syllabus-reanalyze {
+      font-size: 11px;
+      padding: 4px 8px;
+      width: auto;
+      color: var(--muted);
+    }
+
+    .syllabus-components { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
+
+    .syllabus-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 8px;
+    }
+
+    .syllabus-name { font-size: 12px; color: var(--dark); flex: 1; }
+
+    .syllabus-weight {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      color: var(--orange);
+      flex-shrink: 0;
+    }
+
+    .syllabus-desc {
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 4px;
+      padding-left: 2px;
+    }
+
+    .syllabus-notes {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 6px;
+      border-top: 1px solid var(--border);
+      padding-top: 6px;
+    }
+
+    .syllabus-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 8px;
+      gap: 8px;
+    }
+
+    .syllabus-source {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      color: var(--mid);
+    }
+
+    .syllabus-empty {
+      font-size: 12px;
+      color: var(--muted);
+      text-align: center;
+      padding: 8px 0;
+    }
+
+    .syllabus-loading {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      color: var(--orange);
+      text-align: center;
+      padding: 12px 0;
+    }
+
     .detail-right-panel {
       flex: 1;
       min-width: 0;

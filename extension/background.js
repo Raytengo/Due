@@ -58,6 +58,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     });
     return true;
   }
+
+  if (message.type === 'ANALYZE_SYLLABUS') {
+    handleSyllabusAnalyze(message, sendResponse);
+    return true;
+  }
+
+  if (message.type === 'GET_SYLLABUS_ANALYSIS') {
+    chrome.storage.local.get(['syllabusAnalysis'], (data) => {
+      sendResponse({ success: true, analysis: (data.syllabusAnalysis || {})[message.courseId] || null });
+    });
+    return true;
+  }
 });
 
 // ── AI Analysis handler ──
@@ -192,6 +204,135 @@ async function handleAnalyze({ assignmentId, courseId }, sendResponse) {
     await chrome.storage.local.set({ analysis });
 
     sendResponse({ success: true, result: parsed, model: aiModel });
+  } catch (err) {
+    sendResponse({ success: false, error: err.message });
+  }
+}
+
+// ── Syllabus Analysis ──
+const SYLLABUS_KEYWORDS = ['syllabus', 'course outline', 'course_outline', 'grading', 'week1', 'week_1', 'lecture1', 'lecture_1', 'introduction', 'overview', 'course info', 'courseinfo'];
+
+async function fetchSyllabusBody(courseId) {
+  try {
+    const data = await fetchJSON(`${BASE_URL}/api/v1/courses/${courseId}?include[]=syllabus_body`);
+    const body = data.syllabus_body || '';
+    return body.trim().length > 50 ? stripHtmlService(body) : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function findSyllabusByKeyword(files) {
+  for (const f of files) {
+    const name = (f.display_name || f.filename || '').toLowerCase();
+    if (SYLLABUS_KEYWORDS.some((k) => name.includes(k))) return f;
+  }
+  return null;
+}
+
+async function selectSyllabusPdfWithAI(files, aiModel, claudeKey, geminiKey, geminiModel) {
+  const fileList = files.slice(0, 60).map((f) => `${f.id}: ${f.display_name || f.filename}`).join('\n');
+  const prompt =
+    `Course files:\n${fileList}\n\n` +
+    `Which file most likely contains the course syllabus or grading policy? ` +
+    `Return only the file ID as a JSON integer, or null if none seem relevant. Return ONLY the JSON value.`;
+  try {
+    let raw;
+    if (aiModel === 'gemini') {
+      raw = await callGemini([{ type: 'text', text: prompt }], 'Return only valid JSON, no explanation.', geminiKey, geminiModel);
+    } else {
+      raw = await callClaude([{ type: 'text', text: prompt }], 'Return only valid JSON, no explanation.', claudeKey, 'claude-haiku-4-5');
+    }
+    const cleaned = raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
+    const id = JSON.parse(cleaned);
+    return Number.isInteger(id) ? (files.find((f) => f.id === id) || null) : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+async function handleSyllabusAnalyze({ courseId }, sendResponse) {
+  try {
+    const data = await chrome.storage.local.get([
+      'aiModel', 'geminiApiKey', 'geminiModel', 'claudeApiKey',
+      'files', 'syllabusAnalysis',
+    ]);
+
+    const aiModel = data.aiModel || 'gemini';
+    if (aiModel === 'gemini' && !data.geminiApiKey) { sendResponse({ success: false, error: 'NO_API_KEY' }); return; }
+    if (aiModel === 'claude' && !data.claudeApiKey) { sendResponse({ success: false, error: 'NO_API_KEY' }); return; }
+
+    const parts = [];
+    let source = 'none';
+
+    // Step 1: syllabus_body via API
+    const syllabusText = await fetchSyllabusBody(courseId);
+    if (syllabusText) {
+      parts.push({ type: 'text', text: `Course Syllabus:\n${syllabusText}` });
+      source = 'syllabus_body';
+    } else {
+      // Step 2: keyword match on file list
+      const courseFiles = (data.files || {})[courseId] || [];
+      let syllabusFile = findSyllabusByKeyword(courseFiles);
+
+      if (!syllabusFile && courseFiles.length > 0) {
+        // Step 3: AI selects from file list
+        syllabusFile = await selectSyllabusPdfWithAI(
+          courseFiles, aiModel,
+          data.claudeApiKey, data.geminiApiKey, data.geminiModel || 'gemini-2.0-flash-lite'
+        );
+        if (syllabusFile) source = 'ai_selected_pdf';
+      } else if (syllabusFile) {
+        source = 'keyword_pdf';
+      }
+
+      if (syllabusFile) {
+        // Always prefer the credentials-based Canvas API URL (pre-signed S3 URLs expire)
+        let pdf = await tryFetchPdf(`${BASE_URL}/api/v1/files/${syllabusFile.id}/download`);
+        if (!pdf && syllabusFile.url) pdf = await tryFetchPdf(syllabusFile.url);
+        if (pdf) parts.push(pdf);
+      }
+    }
+
+    if (parts.length === 0) {
+      const result = { found: false, components: [], notes: '找不到課程大綱或評分說明文件', source: 'none' };
+      const syllabusAnalysis = data.syllabusAnalysis || {};
+      syllabusAnalysis[courseId] = { timestamp: new Date().toISOString(), ...result };
+      await chrome.storage.local.set({ syllabusAnalysis });
+      sendResponse({ success: true, result });
+      return;
+    }
+
+    parts.push({
+      type: 'text',
+      text: 'Extract the grading/assessment breakdown from this course material. List each graded component with its name, percentage weight (or null if not specified), and a brief description.',
+    });
+
+    const systemPrompt =
+      'Return ONLY valid JSON with no markdown fences: ' +
+      '{ "found": boolean, "components": [{"name": string, "weight": number|null, "description": string}], "notes": string }';
+
+    let responseText;
+    if (aiModel === 'gemini') {
+      responseText = await callGemini(parts, systemPrompt, data.geminiApiKey, data.geminiModel || 'gemini-2.0-flash-lite');
+    } else {
+      responseText = await callClaude(parts, systemPrompt, data.claudeApiKey, 'claude-opus-4-6');
+    }
+
+    let parsed;
+    try {
+      const cleaned = responseText.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
+      parsed = JSON.parse(cleaned);
+    } catch (_) {
+      parsed = { found: false, components: [], notes: responseText };
+    }
+    parsed.source = source;
+
+    const syllabusAnalysis = data.syllabusAnalysis || {};
+    syllabusAnalysis[courseId] = { timestamp: new Date().toISOString(), ...parsed };
+    await chrome.storage.local.set({ syllabusAnalysis });
+
+    sendResponse({ success: true, result: parsed });
   } catch (err) {
     sendResponse({ success: false, error: err.message });
   }

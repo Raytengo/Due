@@ -685,7 +685,8 @@ function renderCourseDetailSection(course, asgns, groups, scores) {
   const metaParts = [];
   if (pendingCount) metaParts.push(`${pendingCount} 件待繳`);
 
-  const weightPieHtml = renderWeightPie(groups);
+  const syllabusData = (_currentData.syllabusAnalysis || {})[course.id] || null;
+  const weightPieHtml = renderWeightPie(groups, syllabusData);
   const gradeCalcHtml = renderGradeCalculator(course, asgns, groups, scores);
   const assignmentRows = filtered.map((a) => renderAssignmentRow(a, groups, course.id)).join('');
 
@@ -703,6 +704,7 @@ function renderCourseDetailSection(course, asgns, groups, scores) {
       <div class="detail-card-bottom">
         <div class="detail-left-panel">
           ${weightPieHtml}
+          ${renderSyllabusSection(course.id)}
         </div>
         <div class="detail-right-panel">
           ${gradeCalcHtml}
@@ -751,56 +753,120 @@ function renderCourseDetailSection(course, asgns, groups, scores) {
       recalculateGrades(parseInt(input.dataset.courseId, 10));
     });
   });
+
+  el.querySelectorAll('.btn-syllabus-analyze').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const cid = parseInt(btn.dataset.courseId, 10);
+      const section = document.getElementById(`syllabus-section-${cid}`);
+      if (section) section.innerHTML = '<div class="syllabus-loading">分析中...</div>';
+      chrome.runtime.sendMessage({ type: 'ANALYZE_SYLLABUS', courseId: cid }, (res) => {
+        if (res && res.success) {
+          if (!_currentData.syllabusAnalysis) _currentData.syllabusAnalysis = {};
+          _currentData.syllabusAnalysis[cid] = { timestamp: new Date().toISOString(), ...res.result };
+          // Re-render entire detail section so pie chart updates
+          const { courses = [], assignments = {}, assignmentGroups = {}, scores = {} } = _currentData;
+          const course = courses.find((c) => c.id === cid);
+          if (course) renderCourseDetailSection(course, assignments[cid] || [], assignmentGroups[cid] || [], scores);
+        } else {
+          const msg = res && res.error === 'NO_API_KEY' ? '請先設定 API 金鑰' : '分析失敗，請稍後再試';
+          if (section) section.innerHTML = `<div class="syllabus-empty">${msg}</div><button class="btn-syllabus-analyze" data-course-id="${cid}">重試</button>`;
+        }
+      });
+    });
+  });
 }
 
 
 // ── Weight Pie Chart ──
-function renderWeightPie(groups) {
-  const hasWeights = groups.some((g) => g.group_weight);
-
-  if (!hasWeights || !groups.length) {
-    // 没有评分信息，显示灰色圆饼图
-    return `
-      <div class="detail-weight-pie-container">
-        <div class="detail-pie" style="background: var(--border);"></div>
-        <div class="detail-pie-label">沒有評分資訊</div>
-      </div>`;
-  }
-
+function renderWeightPie(groups, syllabusData) {
+  const hasGroupWeights = groups.some((g) => g.group_weight);
   const total = groups.reduce((s, g) => s + (g.group_weight || 0), 0);
-  if (!total) {
+
+  // Use Canvas assignment groups if available
+  if (hasGroupWeights && total > 0) {
+    let currentPct = 0;
+    const gradientParts = groups.map((g, i) => {
+      const pct = ((g.group_weight || 0) / total) * 100;
+      const startPct = currentPct;
+      currentPct += pct;
+      return `${GROUP_COLORS[i % GROUP_COLORS.length]} ${startPct}% ${currentPct}%`;
+    }).join(', ');
+
+    const legend = groups.map((g, i) => `
+      <div class="detail-pie-legend-item">
+        <div class="detail-pie-legend-dot" style="background:${GROUP_COLORS[i % GROUP_COLORS.length]}"></div>
+        <span class="detail-pie-legend-text">${esc(g.name)}</span>
+        <span class="detail-pie-legend-weight">${g.group_weight || 0}%</span>
+      </div>`).join('');
+
     return `
       <div class="detail-weight-pie-container">
-        <div class="detail-pie" style="background: var(--border);"></div>
-        <div class="detail-pie-label">沒有評分資訊</div>
+        <div class="detail-pie" style="background: conic-gradient(${gradientParts});"></div>
+        <div class="detail-pie-legend">${legend}</div>
       </div>`;
   }
 
-  // 计算圆饼图的 conic-gradient
-  let currentPct = 0;
-  const gradientParts = groups.map((g, i) => {
-    const pct = ((g.group_weight || 0) / total) * 100;
-    const startPct = currentPct;
-    currentPct += pct;
-    const color = GROUP_COLORS[i % GROUP_COLORS.length];
-    return `${color} ${startPct}% ${currentPct}%`;
-  }).join(', ');
+  // Fallback: use syllabus analysis components
+  if (syllabusData && syllabusData.found && syllabusData.components && syllabusData.components.length > 0) {
+    const components = syllabusData.components.filter((c) => c.weight != null && c.weight > 0);
+    if (components.length > 0) {
+      const syllabusTotal = components.reduce((s, c) => s + c.weight, 0);
+      let currentPct = 0;
+      const gradientParts = components.map((c, i) => {
+        const pct = (c.weight / syllabusTotal) * 100;
+        const startPct = currentPct;
+        currentPct += pct;
+        return `${GROUP_COLORS[i % GROUP_COLORS.length]} ${startPct}% ${currentPct}%`;
+      }).join(', ');
 
-  const pieStyle = `background: conic-gradient(${gradientParts});`;
+      const legend = components.map((c, i) => `
+        <div class="detail-pie-legend-item">
+          <div class="detail-pie-legend-dot" style="background:${GROUP_COLORS[i % GROUP_COLORS.length]}"></div>
+          <span class="detail-pie-legend-text">${esc(c.name)}</span>
+          <span class="detail-pie-legend-weight">${c.weight}%</span>
+        </div>`).join('');
 
-  // 图例
-  const legend = groups.map((g, i) => `
-    <div class="detail-pie-legend-item">
-      <div class="detail-pie-legend-dot" style="background:${GROUP_COLORS[i % GROUP_COLORS.length]}"></div>
-      <span class="detail-pie-legend-text">${esc(g.name)}</span>
-      <span class="detail-pie-legend-weight">${g.group_weight || 0}%</span>
-    </div>`).join('');
+      return `
+        <div class="detail-weight-pie-container">
+          <div class="detail-pie" style="background: conic-gradient(${gradientParts});"></div>
+          <div class="detail-pie-legend">${legend}</div>
+        </div>`;
+    }
+  }
 
+  // No data
   return `
     <div class="detail-weight-pie-container">
-      <div class="detail-pie" style="${pieStyle}"></div>
-      <div class="detail-pie-legend">
-        ${legend}
+      <div class="detail-pie" style="background: var(--border);"></div>
+      <div class="detail-pie-label">沒有評分資訊</div>
+    </div>`;
+}
+
+// ── Syllabus Section ──
+function renderSyllabusSection(courseId) {
+  const cached = (_currentData.syllabusAnalysis || {})[courseId];
+
+  if (!cached) {
+    return `
+      <div class="syllabus-section" id="syllabus-section-${courseId}">
+        <button class="btn-syllabus-analyze" data-course-id="${courseId}">分析評分方式</button>
+      </div>`;
+  }
+
+  const sourceLabel = {
+    syllabus_body: 'Canvas Syllabus',
+    keyword_pdf: '課程 PDF',
+    ai_selected_pdf: 'AI 選取 PDF',
+  }[cached.source] || '';
+
+  const notFound = !cached.found || !cached.components || cached.components.length === 0;
+
+  return `
+    <div class="syllabus-section" id="syllabus-section-${courseId}">
+      ${notFound ? `<div class="syllabus-empty">${esc(cached.notes || '未找到評分資訊')}</div>` : ''}
+      <div class="syllabus-footer">
+        ${sourceLabel ? `<span class="syllabus-source">${sourceLabel}</span>` : ''}
+        <button class="btn-syllabus-analyze" data-course-id="${courseId}">重新分析</button>
       </div>
     </div>`;
 }
@@ -1237,7 +1303,7 @@ document.getElementById('sync-btn').addEventListener('click', () => {
 // ── 讀取資料 ──
 function loadData() {
   chrome.storage.local.get(
-    ['lastSync', 'courses', 'assignments', 'assignmentGroups', 'scores', 'files', 'analysis', 'milestoneChecks'],
+    ['lastSync', 'courses', 'assignments', 'assignmentGroups', 'scores', 'files', 'analysis', 'milestoneChecks', 'syllabusAnalysis'],
     (data) => {
       if (!data.courses || !data.courses.length) {
         currentView = 'grid';
@@ -1259,6 +1325,7 @@ function loadData() {
         files: data.files || {},
         analysis: data.analysis || {},
         milestoneChecks: data.milestoneChecks || {},
+        syllabusAnalysis: data.syllabusAnalysis || {},
       });
     }
   );
