@@ -21,24 +21,38 @@
       --blue:    #6a9bcc;
       --green:   #788c5d;
       --warm:    #b09050;
+      --purple:  #a86070;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      width: 280px;
+      width: 320px;
       background: var(--bg);
       color: var(--dark);
       font-family: 'DM Sans', sans-serif;
       font-weight: 300;
-      padding: 20px;
+      padding: 18px 18px 14px;
+      margin: 0;
+    }
+
+    .header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 2px;
     }
 
     h1 {
       font-family: 'Source Serif 4', Georgia, serif;
       font-weight: 400;
-      font-size: 18px;
-      margin-bottom: 4px;
+      font-size: 17px;
+    }
+
+    .sync-time {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      color: var(--mid);
     }
 
     .subtitle {
@@ -47,38 +61,93 @@
       text-transform: uppercase;
       letter-spacing: 0.08em;
       color: var(--mid);
-      margin-bottom: 16px;
+      margin-bottom: 14px;
+    }
+
+    .section-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .task-list {
+      list-style: none;
+      margin-bottom: 12px;
+      max-height: 320px;
+      overflow-y: auto;
+    }
+
+    .task-list::-webkit-scrollbar { width: 3px; }
+    .task-list::-webkit-scrollbar-track { background: transparent; }
+    .task-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .task-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 9px;
+      padding: 7px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .task-item:last-child { border-bottom: none; }
+
+    .task-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      margin-top: 5px;
+      flex-shrink: 0;
+    }
+
+    .task-dot.urgent  { background: var(--orange); }
+    .task-dot.soon    { background: var(--warm); }
+    .task-dot.exam    { background: var(--purple); }
+
+    .task-body { flex: 1; min-width: 0; }
+
+    .task-name {
+      font-size: 12.5px;
+      color: var(--dark);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      line-height: 1.4;
+    }
+
+    .task-meta {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      color: var(--muted);
+      margin-top: 1px;
+    }
+
+    .task-due {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      flex-shrink: 0;
+      margin-top: 4px;
+    }
+
+    .task-due.urgent { color: var(--orange); }
+    .task-due.soon   { color: var(--warm); }
+    .task-due.exam   { color: var(--purple); }
+    .task-due.later  { color: var(--blue); }
+
+    .empty-state {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      color: var(--mid);
+      text-align: center;
+      padding: 24px 0 20px;
     }
 
     .divider {
       border: none;
       border-top: 1px solid var(--border);
-      margin: 14px 0;
-    }
-
-    .stat-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 8px;
-    }
-
-    .stat-label {
-      font-family: 'DM Mono', monospace;
-      font-size: 10px;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: var(--muted);
-    }
-
-    .stat-value {
-      font-family: 'DM Mono', monospace;
-      font-size: 13px;
-      color: var(--dark);
-    }
-
-    .stat-value.urgent {
-      color: var(--orange);
+      margin: 12px 0;
     }
 
     .btn {
@@ -86,83 +155,33 @@
       width: 100%;
       padding: 9px 14px;
       border: 1px solid var(--border);
-      border-radius: 6px;
-      background: var(--surface);
-      color: var(--dark);
+      border-radius: 8px;
+      background: var(--dark);
+      color: var(--bg);
       font-family: 'DM Sans', sans-serif;
       font-weight: 300;
       font-size: 13px;
       cursor: pointer;
       text-align: center;
-      transition: border-color 0.15s, background 0.15s;
-      margin-bottom: 8px;
-      text-decoration: none;
+      transition: background 0.15s;
     }
 
-    .btn:hover {
-      border-color: var(--orange);
-      background: var(--bg);
-    }
-
-    .btn.primary {
-      background: var(--dark);
-      color: var(--bg);
-      border-color: var(--dark);
-    }
-
-    .btn.primary:hover {
-      background: #2a2a27;
-      border-color: #2a2a27;
-    }
-
-    .btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    .sync-status {
-      font-family: 'DM Mono', monospace;
-      font-size: 10px;
-      color: var(--mid);
-      text-align: center;
-      margin-top: 4px;
-    }
-
-    .sync-status.syncing {
-      color: var(--orange);
-    }
-
-    .sync-status.done {
-      color: var(--green);
-    }
+    .btn:hover { background: #2a2a27; }
+    .btn { border-radius: 10px; }
   </style>
 </head>
 <body>
-  <h1>Canvas Dashboard</h1>
-  <div class="subtitle">HKUST(GZ) · Canvas LMS</div>
+  <div class="header">
+    <h1>Canvas Dashboard</h1>
+    <span class="sync-time" id="sync-time">—</span>
+  </div>
+  <div class="subtitle">HKUST(GZ) · 七天待辦</div>
 
-  <div class="stat-row">
-    <span class="stat-label">上次同步</span>
-    <span class="stat-value" id="last-sync">—</span>
-  </div>
-  <div class="stat-row">
-    <span class="stat-label">課程數量</span>
-    <span class="stat-value" id="course-count">—</span>
-  </div>
-  <div class="stat-row">
-    <span class="stat-label">今日到期</span>
-    <span class="stat-value urgent" id="due-today">—</span>
-  </div>
+  <div class="section-label" id="task-label">載入中...</div>
+  <ul class="task-list" id="task-list"></ul>
 
   <hr class="divider" />
-
-  <button class="btn primary" id="sync-btn">手動同步</button>
-  <div class="sync-status" id="sync-status"></div>
-
-  <hr class="divider" />
-
   <button class="btn" id="dashboard-btn">開啟 Dashboard</button>
-  <button class="btn" id="settings-btn">設定 API 金鑰</button>
 
   <script src="popup.js"></script>
 </body>
