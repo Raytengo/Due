@@ -350,7 +350,7 @@ function renderWeekSection(courses, assignments) {
     const cards = list.map((a) => {
       const uClass = urgencyClass(a.due_at, isExam(a));
       return `
-        <div class="week-task-card">
+        <div class="week-task-card" data-course-id="${a._course.id}">
           <div class="week-task-course">${esc(a._course.course_code || a._course.name)}</div>
           <div class="week-task-title">${esc(a.name)}</div>
           <div class="week-task-due ${uClass}">${formatDue(a.due_at)}</div>
@@ -397,6 +397,15 @@ function renderWeekSection(courses, assignments) {
         </div>
       </div>
     </div>`;
+
+  el.querySelectorAll('.week-task-card').forEach((card) => {
+    card.addEventListener('click', () => {
+      const courseId = parseInt(card.dataset.courseId, 10);
+      if (!Number.isNaN(courseId)) {
+        showCourseDetail(courseId, card);
+      }
+    });
+  });
 }
 
 // ── 卡片格 ──
@@ -550,8 +559,8 @@ function showCourseDetail(courseId, cardEl) {
 
   // ── FIRST: 在小卡片上标记共享元素 ──
   cardEl.style.viewTransitionName = 'course-shell';
-  const cCode = cardEl.querySelector('.card-code');
-  const cName = cardEl.querySelector('.card-name');
+  const cCode = cardEl.querySelector('.card-code, .week-task-course');
+  const cName = cardEl.querySelector('.card-name, .week-task-title');
   const cBadge = cardEl.querySelector('.card-badge-urgent');
   const cMeta = cardEl.querySelector('.card-meta');
   if (cCode) cCode.style.viewTransitionName = 'course-code';
@@ -682,8 +691,10 @@ function renderCourseDetailSection(course, asgns, groups, scores) {
   }).length;
 
   const pendingCount = filtered.length;
-  const metaParts = [];
-  if (pendingCount) metaParts.push(`${pendingCount} 件待繳`);
+  const detailMeta = `${pendingCount} 件待繳`;
+  const detailUrgentBadge = urgentCount
+    ? `<div class="card-badge-urgent">${urgentCount} 件緊急</div>`
+    : '<div class="card-badge-urgent is-placeholder" aria-hidden="true">0 件緊急</div>';
 
   const syllabusData = (_currentData.syllabusAnalysis || {})[course.id] || null;
   const weightPieHtml = renderWeightPie(groups, syllabusData);
@@ -696,10 +707,10 @@ function renderCourseDetailSection(course, asgns, groups, scores) {
       <div class="detail-card-top">
         <div class="detail-top-row">
           <div class="detail-code">${esc(course.course_code || '')}</div>
-          ${urgentCount ? `<div class="card-badge-urgent">${urgentCount} 件緊急</div>` : ''}
+          ${detailUrgentBadge}
         </div>
         <div class="detail-name">${esc(course.name)}</div>
-        ${metaParts.length ? `<div class="detail-meta">${metaParts.join(' · ')}</div>` : ''}
+        <div class="detail-meta">${detailMeta}</div>
       </div>
       <div class="detail-card-bottom">
         <div class="detail-left-panel">
