@@ -123,7 +123,6 @@ let showSubmitted = false;
 let currentView = 'grid';      // 'grid' | 'course'
 let currentCourseId = null;
 let currentPage = 'week';      // 'week' | 'courses'
-let weekExpanded = false;      // 学期待办是否展开
 const cardPages = {};           // { [courseId]: pageIndex }
 
 // ── 套用篩選到作業列表 ──
@@ -233,8 +232,24 @@ function updateTabs() {
 }
 
 function switchPage(page) {
-  currentPage = page;
-  loadData();
+  if (page === currentPage) return;
+
+  const mainSection = document.getElementById('main-section');
+  const direction = (currentPage === 'week' && page === 'courses') ? 'left' : 'right';
+
+  // 添加退出动画
+  mainSection.classList.add(`slide-out-${direction}`);
+
+  setTimeout(() => {
+    currentPage = page;
+    mainSection.classList.remove(`slide-out-left`, `slide-out-right`);
+    mainSection.classList.add(`slide-in-${direction === 'left' ? 'left' : 'right'}`);
+    loadData();
+
+    setTimeout(() => {
+      mainSection.classList.remove(`slide-in-left`, `slide-in-right`);
+    }, 300);
+  }, 300);
 }
 
 // ── 本週待辦 ──
@@ -269,54 +284,6 @@ function renderWeekSection(courses, assignments) {
     if (days <= 7) urgent.push(a);
     else if (days <= 30) soon.push(a);
     else later.push(a);
-  }
-
-  // 截斷邏輯（只在未展開時應用）
-  let displayUrgent = urgent;
-  let displaySoon = soon;
-  let displayLater = later;
-  let hasMore = false;
-
-  if (!weekExpanded) {
-    const MAX_DISPLAY = 8;
-    const totalTasks = urgent.length + soon.length + later.length;
-
-    if (totalTasks > MAX_DISPLAY) {
-      hasMore = true;
-      let count = 0;
-
-      // 優先顯示 7天內
-      if (urgent.length <= MAX_DISPLAY) {
-        displayUrgent = urgent;
-        count = urgent.length;
-      } else {
-        displayUrgent = urgent.slice(0, MAX_DISPLAY);
-        displaySoon = [];
-        displayLater = [];
-      }
-
-      // 如果還有空間，顯示 8-30天
-      if (count < MAX_DISPLAY && soon.length > 0) {
-        const availableSpace = MAX_DISPLAY - count;
-        if (soon.length <= availableSpace) {
-          displaySoon = soon;
-          count += soon.length;
-        } else {
-          displaySoon = soon.slice(0, availableSpace);
-          displayLater = [];
-        }
-      }
-
-      // 如果還有空間，顯示 30天以上
-      if (count < MAX_DISPLAY && later.length > 0) {
-        const availableSpace = MAX_DISPLAY - count;
-        if (later.length <= availableSpace) {
-          displayLater = later;
-        } else {
-          displayLater = later.slice(0, availableSpace);
-        }
-      }
-    }
   }
 
   const total = urgent.length + soon.length + later.length;
@@ -356,18 +323,10 @@ function renderWeekSection(courses, assignments) {
   };
 
   const groupsHTML = [
-    renderGroup('7天內', displayUrgent, 'color-urgent', false),
-    renderGroup('8-30天', displaySoon, 'color-soon', false),
-    renderGroup('30天以上', displayLater, 'color-later', true)
+    renderGroup('7天內', urgent, 'color-urgent', false),
+    renderGroup('8-30天', soon, 'color-soon', false),
+    renderGroup('30天以上', later, 'color-later', true)
   ].filter(h => h).join('');
-
-  const toggleButtonHTML = hasMore
-    ? `<button class="week-toggle-btn" onclick="toggleWeekExpand()">顯示更多</button>`
-    : (weekExpanded && total > 0
-      ? `<button class="week-toggle-btn" onclick="toggleWeekExpand()">收起</button>`
-      : '');
-
-  const rightClass = weekExpanded ? 'week-right week-right-expanded' : 'week-right';
 
   el.innerHTML = `
     <div class="week-panel">
@@ -389,18 +348,11 @@ function renderWeekSection(courses, assignments) {
             </div>
           </div>
         </div>
-        <div class="${rightClass}">
+        <div class="week-right">
           ${groupsHTML || '<div class="week-group-empty">無待辦事項</div>'}
-          ${toggleButtonHTML}
         </div>
       </div>
     </div>`;
-}
-
-// ── 切換學期待辦展開狀態 ──
-function toggleWeekExpand() {
-  weekExpanded = !weekExpanded;
-  loadData();
 }
 
 // ── 卡片格 ──
@@ -429,9 +381,19 @@ function renderCardGrid(courses, assignments, assignmentGroups) {
     ${sorted.map((c) => renderCourseCardGrid(c, assignments[c.id] || [], assignmentGroups[c.id] || [])).join('')}
   </div>`;
 
-  el.querySelectorAll('.card-top').forEach((top) => {
-    top.addEventListener('click', () => {
-      showCourseDetail(parseInt(top.dataset.courseId, 10));
+  // 整个卡片可点击
+  el.querySelectorAll('.course-card-grid').forEach((card) => {
+    card.addEventListener('click', (e) => {
+      // 如果点击的是分页按钮，不触发卡片点击
+      if (e.target.closest('.card-pager-btn')) return;
+
+      const courseId = parseInt(card.dataset.courseId, 10);
+      // 添加放大动画
+      card.classList.add('card-clicking');
+
+      setTimeout(() => {
+        showCourseDetail(courseId);
+      }, 150);
     });
   });
 
@@ -562,6 +524,7 @@ function renderCourseDetailSection(course, asgns, groups, scores) {
     return new Date(a.due_at) - new Date(b.due_at);
   });
 
+  const weightPieHtml = renderWeightPie(groups);
   const weightHtml = renderWeightBar(groups);
   const gradeCalcHtml = renderGradeCalculator(course, asgns, groups, scores);
   const assignmentRows = filtered.map((a) => renderAssignmentRow(a, groups, course.id)).join('');
@@ -573,8 +536,13 @@ function renderCourseDetailSection(course, asgns, groups, scores) {
         ${course.course_code ? `<div class="detail-hero-code">${esc(course.course_code)}</div>` : ''}
         <div class="detail-hero-name">${esc(course.name)}</div>
       </div>
-      ${weightHtml}
-      ${gradeCalcHtml}
+      <div class="detail-header-content">
+        ${weightPieHtml}
+        <div class="detail-header-right">
+          ${weightHtml}
+          ${gradeCalcHtml}
+        </div>
+      </div>
       <div class="detail-assignments-label">作業清單</div>
       ${assignmentRows || '<div style="padding:12px 0;color:var(--mid);font-size:13px;">無作業</div>'}
     </div>`;
@@ -620,6 +588,57 @@ function renderCourseDetailSection(course, asgns, groups, scores) {
   });
 }
 
+
+// ── Weight Pie Chart ──
+function renderWeightPie(groups) {
+  const hasWeights = groups.some((g) => g.group_weight);
+
+  if (!hasWeights || !groups.length) {
+    // 没有评分信息，显示灰色圆饼图
+    return `
+      <div class="detail-weight-pie-container">
+        <div class="detail-pie" style="background: var(--border);"></div>
+        <div class="detail-pie-label">沒有評分資訊</div>
+      </div>`;
+  }
+
+  const total = groups.reduce((s, g) => s + (g.group_weight || 0), 0);
+  if (!total) {
+    return `
+      <div class="detail-weight-pie-container">
+        <div class="detail-pie" style="background: var(--border);"></div>
+        <div class="detail-pie-label">沒有評分資訊</div>
+      </div>`;
+  }
+
+  // 计算圆饼图的 conic-gradient
+  let currentPct = 0;
+  const gradientParts = groups.map((g, i) => {
+    const pct = ((g.group_weight || 0) / total) * 100;
+    const startPct = currentPct;
+    currentPct += pct;
+    const color = GROUP_COLORS[i % GROUP_COLORS.length];
+    return `${color} ${startPct}% ${currentPct}%`;
+  }).join(', ');
+
+  const pieStyle = `background: conic-gradient(${gradientParts});`;
+
+  // 图例
+  const legend = groups.map((g, i) => `
+    <div class="detail-pie-legend-item">
+      <div class="detail-pie-legend-dot" style="background:${GROUP_COLORS[i % GROUP_COLORS.length]}"></div>
+      <span class="detail-pie-legend-text">${esc(g.name)}</span>
+      <span class="detail-pie-legend-weight">${g.group_weight || 0}%</span>
+    </div>`).join('');
+
+  return `
+    <div class="detail-weight-pie-container">
+      <div class="detail-pie" style="${pieStyle}"></div>
+      <div class="detail-pie-legend">
+        ${legend}
+      </div>
+    </div>`;
+}
 
 // ── Weight Bar ──
 function renderWeightBar(groups) {
