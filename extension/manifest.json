@@ -11,6 +11,8 @@
   ],
   "host_permissions": [
     "https://hkust-gz.instructure.com/*",
+    "https://*.instructure.com/*",
+    "https://*.canvas-user-content.com/*",
     "https://api.anthropic.com/*",
     "https://generativelanguage.googleapis.com/*"
   ],

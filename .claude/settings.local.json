@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add CLAUDE.md extension/background.js extension/dashboard/dashboard.js extension/dashboard/index.html)",
+      "Bash(git commit:*)",
+      "Bash(git push origin master)"
+    ]
+  }
+}

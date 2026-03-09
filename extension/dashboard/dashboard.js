@@ -757,9 +757,10 @@ function renderCourseDetailSection(course, asgns, groups, scores) {
   el.querySelectorAll('.btn-syllabus-analyze').forEach((btn) => {
     btn.addEventListener('click', () => {
       const cid = parseInt(btn.dataset.courseId, 10);
+      const force = btn.dataset.force === 'true';
       const section = document.getElementById(`syllabus-section-${cid}`);
       if (section) section.innerHTML = '<div class="syllabus-loading">分析中...</div>';
-      chrome.runtime.sendMessage({ type: 'ANALYZE_SYLLABUS', courseId: cid }, (res) => {
+      chrome.runtime.sendMessage({ type: 'ANALYZE_SYLLABUS', courseId: cid, force }, (res) => {
         if (res && res.success) {
           if (!_currentData.syllabusAnalysis) _currentData.syllabusAnalysis = {};
           _currentData.syllabusAnalysis[cid] = { timestamp: new Date().toISOString(), ...res.result };
@@ -854,7 +855,9 @@ function renderSyllabusSection(courseId) {
   }
 
   const sourceLabel = {
-    syllabus_body: 'Canvas Syllabus',
+    syllabus_body: 'Syllabus',
+    'syllabus_body+pdf': 'Syllabus PDF',
+    syllabus_page_pdf: 'Syllabus PDF',
     keyword_pdf: '課程 PDF',
     ai_selected_pdf: 'AI 選取 PDF',
   }[cached.source] || '';
@@ -866,7 +869,7 @@ function renderSyllabusSection(courseId) {
       ${notFound ? `<div class="syllabus-empty">${esc(cached.notes || '未找到評分資訊')}</div>` : ''}
       <div class="syllabus-footer">
         ${sourceLabel ? `<span class="syllabus-source">${sourceLabel}</span>` : ''}
-        <button class="btn-syllabus-analyze" data-course-id="${courseId}">重新分析</button>
+        <button class="btn-syllabus-analyze" data-course-id="${courseId}" data-force="true">重新分析</button>
       </div>
     </div>`;
 }

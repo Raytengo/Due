@@ -210,16 +210,22 @@ async function handleAnalyze({ assignmentId, courseId }, sendResponse) {
 }
 
 // ── Syllabus Analysis ──
-const SYLLABUS_KEYWORDS = ['syllabus', 'course outline', 'course_outline', 'grading', 'week1', 'week_1', 'lecture1', 'lecture_1', 'introduction', 'overview', 'course info', 'courseinfo'];
+const SYLLABUS_KEYWORDS = ['syllabus', 'course outline', 'course_outline', 'grading', 'course info', 'courseinfo', 'assessment', 'course guide', 'unit guide'];
 
-async function fetchSyllabusBody(courseId) {
+async function fetchSyllabusHtml(courseId) {
+  // Try 1: API syllabus_body (lightweight, just the editable HTML)
   try {
     const data = await fetchJSON(`${BASE_URL}/api/v1/courses/${courseId}?include[]=syllabus_body`);
-    const body = data.syllabus_body || '';
-    return body.trim().length > 50 ? stripHtmlService(body) : null;
-  } catch (_) {
-    return null;
-  }
+    if (data.syllabus_body && data.syllabus_body.trim().length > 0) return data.syllabus_body;
+  } catch (_) {}
+
+  // Try 2: Fetch the actual Syllabus web page (contains all file links the user sees)
+  try {
+    const res = await fetch(`${BASE_URL}/courses/${courseId}/assignments/syllabus`, { credentials: 'include' });
+    if (res.ok) return await res.text();
+  } catch (_) {}
+
+  return null;
 }
 
 function findSyllabusByKeyword(files) {
@@ -239,9 +245,9 @@ async function selectSyllabusPdfWithAI(files, aiModel, claudeKey, geminiKey, gem
   try {
     let raw;
     if (aiModel === 'gemini') {
-      raw = await callGemini([{ type: 'text', text: prompt }], 'Return only valid JSON, no explanation.', geminiKey, geminiModel);
+      raw = await callGemini([{ type: 'text', text: prompt }], 'Return only valid JSON, no explanation.', geminiKey, geminiModel, 0);
     } else {
-      raw = await callClaude([{ type: 'text', text: prompt }], 'Return only valid JSON, no explanation.', claudeKey, 'claude-haiku-4-5');
+      raw = await callClaude([{ type: 'text', text: prompt }], 'Return only valid JSON, no explanation.', claudeKey, 'claude-haiku-4-5', 0);
     }
     const cleaned = raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
     const id = JSON.parse(cleaned);
@@ -251,12 +257,21 @@ async function selectSyllabusPdfWithAI(files, aiModel, claudeKey, geminiKey, gem
   }
 }
 
-async function handleSyllabusAnalyze({ courseId }, sendResponse) {
+async function handleSyllabusAnalyze({ courseId, force }, sendResponse) {
   try {
     const data = await chrome.storage.local.get([
       'aiModel', 'geminiApiKey', 'geminiModel', 'claudeApiKey',
       'files', 'syllabusAnalysis',
     ]);
+
+    // ① Cache check — skip full analysis if cached and not forced
+    if (!force) {
+      const cached = (data.syllabusAnalysis || {})[courseId];
+      if (cached) {
+        sendResponse({ success: true, result: cached });
+        return;
+      }
+    }
 
     const aiModel = data.aiModel || 'gemini';
     if (aiModel === 'gemini' && !data.geminiApiKey) { sendResponse({ success: false, error: 'NO_API_KEY' }); return; }
@@ -264,38 +279,73 @@ async function handleSyllabusAnalyze({ courseId }, sendResponse) {
 
     const parts = [];
     let source = 'none';
+    let debugNote = '';
 
-    // Step 1: syllabus_body via API
-    const syllabusText = await fetchSyllabusBody(courseId);
-    if (syllabusText) {
-      parts.push({ type: 'text', text: `Course Syllabus:\n${syllabusText}` });
-      source = 'syllabus_body';
-    } else {
-      // Step 2: keyword match on file list
-      const courseFiles = (data.files || {})[courseId] || [];
-      let syllabusFile = findSyllabusByKeyword(courseFiles);
+    // Step 1: Fetch syllabus HTML (API first, then full web page fallback)
+    const syllabusHtml = await fetchSyllabusHtml(courseId);
 
-      if (!syllabusFile && courseFiles.length > 0) {
-        // Step 3: AI selects from file list
-        syllabusFile = await selectSyllabusPdfWithAI(
-          courseFiles, aiModel,
-          data.claudeApiKey, data.geminiApiKey, data.geminiModel || 'gemini-2.0-flash-lite'
-        );
-        if (syllabusFile) source = 'ai_selected_pdf';
-      } else if (syllabusFile) {
-        source = 'keyword_pdf';
+    if (syllabusHtml) {
+      // Extract ALL file IDs from the HTML, regardless of link format
+      for (const fileId of extractAllFileIds(syllabusHtml)) {
+        // Use course-context URL (not /api/v1/) — this is the format that works with cookies
+        const pdf = await tryFetchPdf(`${BASE_URL}/courses/${courseId}/files/${fileId}/download?download_frd=1`);
+        if (pdf) { parts.push(pdf); source = 'syllabus_page_pdf'; }
       }
 
-      if (syllabusFile) {
-        // Always prefer the credentials-based Canvas API URL (pre-signed S3 URLs expire)
-        let pdf = await tryFetchPdf(`${BASE_URL}/api/v1/files/${syllabusFile.id}/download`);
-        if (!pdf && syllabusFile.url) pdf = await tryFetchPdf(syllabusFile.url);
-        if (pdf) parts.push(pdf);
+      // Add text content if substantial
+      const syllabusText = stripHtmlService(syllabusHtml);
+      if (syllabusText && syllabusText.trim().length > 50) {
+        parts.push({ type: 'text', text: `Course Syllabus:\n${syllabusText}` });
+        if (source === 'none') source = 'syllabus_body';
       }
     }
 
     if (parts.length === 0) {
-      const result = { found: false, components: [], notes: '找不到課程大綱或評分說明文件', source: 'none' };
+      // Step 2: keyword match on file list
+      // Use stored files; if empty, try fetching live from Canvas API
+      let courseFiles = (data.files || {})[courseId] || [];
+      if (courseFiles.length === 0) {
+        try { courseFiles = await fetchFiles(courseId); } catch (_) {}
+      }
+
+      if (courseFiles.length === 0) {
+        debugNote = '找不到課程 PDF 清單（API 403 或尚未同步）';
+      } else {
+        let syllabusFile = findSyllabusByKeyword(courseFiles);
+
+        if (!syllabusFile) {
+          // Step 3: AI selects from file list
+          syllabusFile = await selectSyllabusPdfWithAI(
+            courseFiles, aiModel,
+            data.claudeApiKey, data.geminiApiKey, data.geminiModel || 'gemini-2.0-flash-lite'
+          );
+          if (syllabusFile) source = 'ai_selected_pdf';
+          else debugNote = `PDF 清單中無 syllabus 相關檔案（共 ${courseFiles.length} 個）`;
+        } else {
+          source = 'keyword_pdf';
+        }
+
+        if (syllabusFile) {
+          const fileName = syllabusFile.display_name || syllabusFile.filename || `file ${syllabusFile.id}`;
+          let pdf = await tryFetchPdf(`${BASE_URL}/api/v1/files/${syllabusFile.id}/download`);
+          if (!pdf) {
+            // Fallback: fetch fresh metadata to get a new signed download URL
+            try {
+              const meta = await fetchJSON(`${BASE_URL}/api/v1/files/${syllabusFile.id}`);
+              if (meta.url) pdf = await tryFetchPdf(meta.url);
+            } catch (_) {}
+          }
+          if (pdf) {
+            parts.push(pdf);
+          } else {
+            debugNote = `找到 ${fileName} 但 PDF 下載失敗（HTTP 403？）`;
+          }
+        }
+      }
+    }
+
+    if (parts.length === 0) {
+      const result = { found: false, components: [], notes: debugNote || '找不到課程大綱或評分說明文件', source: 'none' };
       const syllabusAnalysis = data.syllabusAnalysis || {};
       syllabusAnalysis[courseId] = { timestamp: new Date().toISOString(), ...result };
       await chrome.storage.local.set({ syllabusAnalysis });
@@ -314,9 +364,9 @@ async function handleSyllabusAnalyze({ courseId }, sendResponse) {
 
     let responseText;
     if (aiModel === 'gemini') {
-      responseText = await callGemini(parts, systemPrompt, data.geminiApiKey, data.geminiModel || 'gemini-2.0-flash-lite');
+      responseText = await callGemini(parts, systemPrompt, data.geminiApiKey, data.geminiModel || 'gemini-2.0-flash-lite', 0);
     } else {
-      responseText = await callClaude(parts, systemPrompt, data.claudeApiKey, 'claude-opus-4-6');
+      responseText = await callClaude(parts, systemPrompt, data.claudeApiKey, 'claude-opus-4-6', 0);
     }
 
     let parsed;
@@ -351,6 +401,15 @@ function extractCanvasFileIds(html) {
   const re = /\/files\/(\d+)\/(?:download|preview)/g;
   let m;
   while ((m = re.exec(html)) !== null) ids.add(parseInt(m[1], 10));
+  return [...ids];
+}
+
+// Extracts all unique Canvas file IDs from any HTML (handles all link formats)
+function extractAllFileIds(html) {
+  const ids = new Set();
+  const re = /\/files\/(\d+)/g;
+  let m;
+  while ((m = re.exec(html)) !== null) ids.add(m[1]);
   return [...ids];
 }
 
@@ -439,12 +498,15 @@ async function tryFetchPdf(url) {
 }
 
 // ── Gemini API ──
-async function callGemini(parts, systemPrompt, apiKey, modelId) {
+async function callGemini(parts, systemPrompt, apiKey, modelId, temperature = undefined) {
   const geminiParts = parts.map((p) =>
     p.type === 'pdf'
       ? { inlineData: { mimeType: p.mimeType, data: p.base64 } }
       : { text: p.text }
   );
+
+  const generationConfig = { maxOutputTokens: 2048 };
+  if (temperature !== undefined) generationConfig.temperature = temperature;
 
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${encodeURIComponent(apiKey)}`,
@@ -454,7 +516,7 @@ async function callGemini(parts, systemPrompt, apiKey, modelId) {
       body: JSON.stringify({
         ...(systemPrompt ? { systemInstruction: { parts: [{ text: systemPrompt }] } } : {}),
         contents: [{ parts: geminiParts }],
-        generationConfig: { maxOutputTokens: 2048 },
+        generationConfig,
       }),
     }
   );
@@ -468,12 +530,20 @@ async function callGemini(parts, systemPrompt, apiKey, modelId) {
 }
 
 // ── Claude API ──
-async function callClaude(parts, systemPrompt, apiKey, modelId) {
+async function callClaude(parts, systemPrompt, apiKey, modelId, temperature = undefined) {
   const claudeParts = parts.map((p) =>
     p.type === 'pdf'
       ? { type: 'document', source: { type: 'base64', media_type: p.mimeType, data: p.base64 } }
       : { type: 'text', text: p.text }
   );
+
+  const body = {
+    model: modelId,
+    max_tokens: 2048,
+    system: systemPrompt,
+    messages: [{ role: 'user', content: claudeParts }],
+  };
+  if (temperature !== undefined) body.temperature = temperature;
 
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -482,12 +552,7 @@ async function callClaude(parts, systemPrompt, apiKey, modelId) {
       'x-api-key': apiKey,
       'anthropic-version': '2023-06-01',
     },
-    body: JSON.stringify({
-      model: modelId,
-      max_tokens: 2048,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: claudeParts }],
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!res.ok) throw new Error(`Claude API ${res.status}: ${await res.text()}`);
