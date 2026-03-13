@@ -2,15 +2,12 @@
   "manifest_version": 3,
   "name": "Due",
   "version": "1.0.0",
-  "description": "HKUST(GZ) Canvas LMS Dashboard - 自動同步課程作業和截止日期",
+  "description": "Canvas LMS Dashboard - Auto-sync assignments, deadlines, and AI analysis for any Canvas school",
   "permissions": [
     "storage",
-    "activeTab",
-    "scripting",
     "webNavigation"
   ],
   "host_permissions": [
-    "https://hkust-gz.instructure.com/*",
     "https://*.instructure.com/*",
     "https://*.canvas-user-content.com/*",
     "https://api.anthropic.com/*",
@@ -22,12 +19,7 @@
     "https://open.bigmodel.cn/*",
     "https://api.minimax.chat/*"
   ],
-  "web_accessible_resources": [
-    {
-      "resources": ["settings.html", "settings.js", "icons/pin_guide.png"],
-      "matches": ["<all_urls>"]
-    }
-  ],
+
   "background": {
     "service_worker": "background.js"
   },
