@@ -737,6 +737,53 @@ async function fetchSchoolName(courses = []) {
   return inferSchoolNameFromHost();
 }
 
+// ── Auto-analyze grading weights during sync ──
+async function autoAnalyzeGradingWeights(courses) {
+  try {
+    // Get existing analysis data and AI config
+    const data = await chrome.storage.local.get([
+      'syllabusAnalysis', 'aiProvider', 'aiApiKey', 'aiModelId', 'aiBaseUrl',
+      'aiModel', 'geminiApiKey', 'geminiModel', 'claudeApiKey', 'claudeModel',
+    ]);
+
+    // Check if API key is configured
+    const ai = resolveAiConfig(data);
+    if (!ai.key) {
+      console.log('[Due] No API key configured — skipping auto-analysis of grading weights');
+      return;
+    }
+
+    const syllabusAnalysis = data.syllabusAnalysis || {};
+
+    // Find courses without analysis data
+    const coursesToAnalyze = courses.filter((course) => !syllabusAnalysis[course.id]);
+
+    if (coursesToAnalyze.length === 0) {
+      console.log('[Due] All courses already have grading weight analysis — skipping auto-analysis');
+      return;
+    }
+
+    console.log(`[Due] Auto-analyzing grading weights for ${coursesToAnalyze.length} course(s)...`);
+
+    // Analyze each course without analysis (sequentially to avoid rate limits)
+    for (const course of coursesToAnalyze) {
+      try {
+        await new Promise((resolve) => {
+          handleSyllabusAnalyze({ courseId: course.id, force: false }, () => {
+            resolve();
+          });
+        });
+      } catch (err) {
+        console.warn(`[Due] Auto-analysis failed for course ${course.id}:`, err.message);
+      }
+    }
+
+    console.log(`[Due] Auto-analysis of grading weights completed`);
+  } catch (err) {
+    console.error('[Due] Auto-analysis error:', err);
+  }
+}
+
 // ── Sync ──
 async function syncAll() {
   if (!BASE_URL) {
@@ -794,6 +841,9 @@ async function syncAll() {
     files,
     announcements,
   });
+
+  // Auto-analyze grading weights for courses without existing analysis
+  await autoAnalyzeGradingWeights(courses);
 
   console.log(`[Due] 同步完成，共 ${courses.length} 門課程`);
 }
