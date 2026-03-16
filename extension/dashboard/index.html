@@ -2377,6 +2377,7 @@
       flex-direction: column;
       align-items: center;
       gap: 16px;
+      max-width: 220px;
     }
 
     .detail-pie {
@@ -2417,6 +2418,8 @@
       flex: 1;
       font-size: 12px;
       color: var(--dark);
+      word-break: break-word;
+      overflow-wrap: break-word;
     }
 
     .detail-pie-legend-weight {
@@ -2735,7 +2738,7 @@
                 Due ， 提醒你該做的事 ⚡️
                 <div
                   style="margin-top: 40px; font-style: italic; color: var(--muted); line-height: 1.7; font-size: 14px;">
-                  「Canvas 很靠北，找個作業要翻半天，要是還要整理當週的待辦就真的會很那個」- 有人
+                  「Canvas 很靠北，找個作業要翻半天」- 有人
                   <div style="margin-top: 15px;">
                     「蛤?明天要交Lab喔」- 另外一個人
                   </div>
@@ -2781,8 +2784,34 @@
             </div>
           </div>
 
-          <!-- Step 2:釘選 Due 到工具列 -->
+          <!-- Step 2: Canvas Login -->
           <div class="welcome-step" id="wstep-2">
+            <div class="welcome-icon">
+              <svg viewBox="0 0 24 24">
+                <circle cx="12" cy="8" r="4" />
+                <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+              </svg>
+            </div>
+            <div class="welcome-eyebrow">2 / 5</div>
+            <div class="welcome-title">登入 Canvas (必須)</div>
+            <div class="welcome-body" style="flex:1">
+              Due 透過你的 Canvas 登入狀態同步資料，不需要額外設定或 Token。
+              <ul class="welcome-inst-list">
+                <div style="margin-bottom: 10px;"></div>
+                <li><span class="welcome-inst-num">1</span><span class="welcome-inst-text">登入 <a
+                      class="welcome-inline-link" id="welcome-canvas-link">Canvas ↗</a>
+                    (點一下這個連結用於第一次同步😭)</span></li>
+                <li><span class="welcome-inst-num">2</span><span class="welcome-inst-text">Due
+                    會<strong>在你每次打開Canvas時自動更新</strong>你的所有課程與作業</span></li>
+                <li><span class="welcome-inst-num">3</span><span class="welcome-inst-text">點擊工具列或進入 Dashboard
+                    都可以看到相關資訊</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- Step 3:釘選 Due 到工具列 -->
+          <div class="welcome-step" id="wstep-3">
             <div class="welcome-icon">
               <svg viewBox="0 0 24 24">
                 <path
@@ -2790,7 +2819,7 @@
                 <line x1="12" y1="16" x2="12" y2="22" />
               </svg>
             </div>
-            <div class="welcome-eyebrow">2 / 5</div>
+            <div class="welcome-eyebrow">3 / 5</div>
             <div class="welcome-title">釘選 Due 到工具列</div>
             <div class="welcome-body split" style="flex:1">
               <div class="welcome-body-text">
@@ -2809,32 +2838,6 @@
                 <img src="../icons/pin_guide.png" alt="釘選 Due 示意圖"
                   onerror="this.closest('.welcome-preview').style.display='none'" />
               </div>
-            </div>
-          </div>
-
-          <!-- Step 3: Canvas Login -->
-          <div class="welcome-step" id="wstep-3">
-            <div class="welcome-icon">
-              <svg viewBox="0 0 24 24">
-                <circle cx="12" cy="8" r="4" />
-                <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
-              </svg>
-            </div>
-            <div class="welcome-eyebrow">3 / 5</div>
-            <div class="welcome-title">登入 Canvas</div>
-            <div class="welcome-body" style="flex:1">
-              Due 透過你的 Canvas 登入狀態同步資料，不需要額外設定或 Token。
-              <ul class="welcome-inst-list">
-                <div style="margin-bottom: 10px;"></div>
-                <li><span class="welcome-inst-num">1</span><span class="welcome-inst-text">登入 <a
-                      class="welcome-inline-link" id="welcome-canvas-link">Canvas ↗</a>
-                    (基本上所有人應該都是登入的，如果沒有你可能沒在上課😭)</span></li>
-                <li><span class="welcome-inst-num">2</span><span class="welcome-inst-text">登入後，Due
-                    會<strong>在你每次打開Canvas時自動同步</strong>你的所有課程與作業</span></li>
-                <li><span class="welcome-inst-num">3</span><span class="welcome-inst-text">點擊工具列或進入 Dashboard
-                    都可以看到你的作業</span>
-                </li>
-              </ul>
             </div>
           </div>
 

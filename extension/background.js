@@ -1,4 +1,9 @@
-const BASE_URL = 'https://hkust-gz.instructure.com';
+let BASE_URL = '';
+
+// Load stored Canvas URL on startup (service worker may restart)
+chrome.storage.local.get(['canvasBaseUrl'], (data) => {
+  if (data.canvasBaseUrl) BASE_URL = data.canvasBaseUrl;
+});
 
 // 首次安裝時開啟教學頁面
 chrome.runtime.onInstalled.addListener((details) => {
@@ -7,13 +12,21 @@ chrome.runtime.onInstalled.addListener((details) => {
   }
 });
 
-// 監聽造訪 Canvas 頁面，自動觸發同步
+// 監聽造訪任何 Canvas 頁面，自動偵測學校 URL 並觸發同步
 chrome.webNavigation
   ? chrome.webNavigation.onCompleted.addListener(
       (details) => {
-        if (details.frameId === 0) syncAll();
+        if (details.frameId !== 0) return;
+        try {
+          const origin = new URL(details.url).origin;
+          if (origin !== BASE_URL) {
+            BASE_URL = origin;
+            chrome.storage.local.set({ canvasBaseUrl: origin });
+          }
+        } catch (_) {}
+        syncAll();
       },
-      { url: [{ hostContains: 'hkust-gz.instructure.com' }] }
+      { url: [{ hostSuffix: '.instructure.com' }] }
     )
   : null;
 
@@ -328,45 +341,37 @@ async function handleSyllabusAnalyze({ courseId, force }, sendResponse) {
       }
     }
 
-    if (parts.length === 0) {
-      // Step 2: keyword match on file list
-      // Use stored files; if empty, try fetching live from Canvas API
-      let courseFiles = (data.files || {})[courseId] || [];
-      if (courseFiles.length === 0) {
-        try { courseFiles = await fetchFiles(courseId); } catch (_) {}
+    // Step 2: Always try keyword match on file list (not just when parts.length === 0)
+    // Use stored files; if empty, try fetching live from Canvas API
+    let courseFiles = (data.files || {})[courseId] || [];
+    if (courseFiles.length === 0) {
+      try { courseFiles = await fetchFiles(courseId); } catch (_) {}
+    }
+
+    if (courseFiles.length > 0) {
+      let syllabusFile = findSyllabusByKeyword(courseFiles);
+
+      if (!syllabusFile) {
+        // Step 3: AI selects from file list
+        syllabusFile = await selectSyllabusPdfWithAI(
+          courseFiles, ai
+        );
+        if (syllabusFile) source = 'ai_selected_pdf';
+      } else {
+        source = 'keyword_pdf';
       }
 
-      if (courseFiles.length === 0) {
-        debugNote = '找不到課程 PDF 清單（API 403 或尚未同步）';
-      } else {
-        let syllabusFile = findSyllabusByKeyword(courseFiles);
-
-        if (!syllabusFile) {
-          // Step 3: AI selects from file list
-          syllabusFile = await selectSyllabusPdfWithAI(
-            courseFiles, ai
-          );
-          if (syllabusFile) source = 'ai_selected_pdf';
-          else debugNote = `PDF 清單中無 syllabus 相關檔案（共 ${courseFiles.length} 個）`;
-        } else {
-          source = 'keyword_pdf';
+      if (syllabusFile) {
+        let pdf = await tryFetchPdf(syllabusFile.url || `${BASE_URL}/api/v1/files/${syllabusFile.id}/download`);
+        if (!pdf) {
+          // Fallback: fetch fresh metadata to get a new signed download URL
+          try {
+            const meta = await fetchJSON(`${BASE_URL}/api/v1/files/${syllabusFile.id}`);
+            if (meta.url) pdf = await tryFetchPdf(meta.url);
+          } catch (_) {}
         }
-
-        if (syllabusFile) {
-          const fileName = syllabusFile.display_name || syllabusFile.filename || `file ${syllabusFile.id}`;
-          let pdf = await tryFetchPdf(`${BASE_URL}/api/v1/files/${syllabusFile.id}/download`);
-          if (!pdf) {
-            // Fallback: fetch fresh metadata to get a new signed download URL
-            try {
-              const meta = await fetchJSON(`${BASE_URL}/api/v1/files/${syllabusFile.id}`);
-              if (meta.url) pdf = await tryFetchPdf(meta.url);
-            } catch (_) {}
-          }
-          if (pdf) {
-            parts.push(pdf);
-          } else {
-            debugNote = `找到 ${fileName} 但 PDF 下載失敗（HTTP 403？）`;
-          }
+        if (pdf) {
+          parts.push(pdf);
         }
       }
     }
@@ -701,10 +706,9 @@ function isGenericSchoolName(name) {
 
 function inferSchoolNameFromHost() {
   try {
-    const host = new URL(BASE_URL).host; // hkust-gz.instructure.com
+    const host = new URL(BASE_URL).host; // e.g. hkust-gz.instructure.com
     const sub = host.split('.')[0] || '';
     if (!sub) return 'Canvas';
-    // hkust-gz -> HKUST(GZ)
     const parts = sub.split('-').filter(Boolean).map((p) => p.toUpperCase());
     if (parts.length >= 2) return `${parts[0]}(${parts.slice(1).join('-')})`;
     return parts[0];
@@ -735,7 +739,11 @@ async function fetchSchoolName(courses = []) {
 
 // ── Sync ──
 async function syncAll() {
-  console.log('[Due] 開始同步...');
+  if (!BASE_URL) {
+    console.warn('[Due] Canvas URL not yet detected — please visit your Canvas site first.');
+    return;
+  }
+  console.log('[Due] 開始同步...', BASE_URL);
 
   let courses;
   let schoolName = 'Canvas';

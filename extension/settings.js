@@ -58,7 +58,6 @@ function setProviderUI(provider, keepCustom = false) {
 // ── Load saved settings ──
 chrome.storage.local.get([
   'aiProvider', 'aiApiKey', 'aiModelId', 'aiBaseUrl',
-  'uiLanguage',
   'aiModel', 'geminiApiKey', 'geminiModel', 'claudeApiKey', 'claudeModel',
 ], (data) => {
   let provider = data.aiProvider;
@@ -78,7 +77,6 @@ chrome.storage.local.get([
   document.getElementById('provider-key').value = data.aiApiKey || legacyKey || '';
   document.getElementById('provider-model').value = data.aiModelId || legacyModel || '';
   document.getElementById('provider-base-url').value = data.aiBaseUrl || (PROVIDERS[provider]?.baseUrlDefault || '');
-  document.getElementById('language-select').value = data.uiLanguage || 'zh-TW';
 });
 
 // ── Provider selector ──
@@ -102,7 +100,6 @@ document.getElementById('save-btn').addEventListener('click', () => {
   const key = document.getElementById('provider-key').value.trim();
   const modelId = document.getElementById('provider-model').value.trim();
   const baseUrl = document.getElementById('provider-base-url').value.trim() || PROVIDERS[provider].baseUrlDefault;
-  const uiLanguage = document.getElementById('language-select').value || 'zh-TW';
 
   if (!key) {
     showStatus('請先輸入 API 金鑰', 'err');
@@ -127,7 +124,6 @@ document.getElementById('save-btn').addEventListener('click', () => {
     aiApiKey: key,
     aiModelId: modelId,
     aiBaseUrl: baseUrl,
-    uiLanguage,
     // legacy compatibility
     aiModel: provider === 'anthropic' ? 'claude' : 'gemini',
     geminiApiKey: provider === 'gemini' ? key : '',

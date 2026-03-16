@@ -1235,7 +1235,9 @@ function renderCourseDetailSection(course, asgns, groups, scores) {
       e.stopPropagation();
       const assignmentId = title.dataset.assignmentId;
       const courseId = title.dataset.courseId;
-      const url = `https://hkust-gz.instructure.com/courses/${courseId}/assignments/${assignmentId}`;
+      const base = _currentData.canvasBaseUrl || '';
+      if (!base) return;
+      const url = `${base}/courses/${courseId}/assignments/${assignmentId}`;
       window.open(url, '_blank');
     });
   });
@@ -1820,7 +1822,7 @@ document.getElementById('sync-btn').addEventListener('click', () => {
 // ── 讀取資料 ──
 function loadData() {
   chrome.storage.local.get(
-    ['lastSync', 'schoolName', 'courses', 'assignments', 'assignmentGroups', 'scores', 'files', 'analysis', 'milestoneChecks', 'syllabusAnalysis', 'courseNames'],
+    ['lastSync', 'schoolName', 'canvasBaseUrl', 'courses', 'assignments', 'assignmentGroups', 'scores', 'files', 'analysis', 'milestoneChecks', 'syllabusAnalysis', 'courseNames'],
     (data) => {
       if (!data.courses || !data.courses.length) {
         currentView = 'grid';
@@ -2000,7 +2002,8 @@ document.getElementById('welcome-api-link')?.addEventListener('click', (e) => {
 });
 document.getElementById('welcome-canvas-link')?.addEventListener('click', (e) => {
   e.preventDefault();
-  chrome.tabs.create({ url: 'https://hkust-gz.instructure.com' });
+  const base = _currentData.canvasBaseUrl || '';
+  if (base) chrome.tabs.create({ url: base });
 });
 
 // Delegate: overlay background click to close, data-wgo step nav, dot clicks

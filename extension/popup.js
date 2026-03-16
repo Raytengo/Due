@@ -133,6 +133,15 @@ function getUpcomingTasks(assignments, courseMap) {
   return tasks;
 }
 
+function esc(str) {
+  if (!str) return '';
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 function renderTasks(tasks, courseNames) {
   const list = document.getElementById('task-list');
   list.innerHTML = '';
@@ -152,10 +161,10 @@ function renderTasks(tasks, courseNames) {
     li.innerHTML = `
       <span class="task-dot ${cls}"></span>
       <div class="task-body">
-        <div class="task-name${task.html_url ? ' clickable' : ''}">${task.name}</div>
-        <div class="task-meta">${displayName}</div>
+        <div class="task-name${task.html_url ? ' clickable' : ''}">${esc(task.name)}</div>
+        <div class="task-meta">${esc(displayName)}</div>
       </div>
-      <span class="task-due ${cls}">${dueStr}</span>
+      <span class="task-due ${cls}">${esc(dueStr)}</span>
     `;
     if (task.html_url && /^https?:\/\/.+\/courses\/\d+\/(assignments|quizzes|discussion_topics)\/\d+/.test(task.html_url)) {
       li.querySelector('.task-name').addEventListener('click', () => {
