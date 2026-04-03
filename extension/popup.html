@@ -49,13 +49,88 @@
       margin: 0;
     }
 
+    .popup-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .usage-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
     .section-label {
       font-family: 'DM Mono', monospace;
       font-size: 10px;
       text-transform: uppercase;
       letter-spacing: 0.08em;
       color: var(--muted);
-      margin-bottom: 10px;
+    }
+
+    .usage-chip {
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.35);
+      color: var(--dark);
+      border-radius: 999px;
+      padding: 4px 8px;
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      line-height: 1;
+      letter-spacing: 0.04em;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: transform 0.15s, border-color 0.15s, color 0.15s;
+    }
+
+    .usage-chip:hover {
+      transform: translateY(-1px);
+      border-color: var(--orange);
+      color: var(--orange);
+    }
+
+    .usage-chip.usage-high {
+      background: rgba(217, 119, 87, 0.08);
+      border-color: rgba(217, 119, 87, 0.4);
+      color: var(--orange);
+    }
+
+    .usage-chip.usage-full {
+      background: rgba(224, 90, 71, 0.08);
+      border-color: rgba(224, 90, 71, 0.4);
+      color: #e05a47;
+    }
+
+    .usage-chip.is-empty {
+      color: var(--muted);
+    }
+
+    .usage-refresh {
+      width: 20px;
+      height: 20px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      border-radius: 999px;
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      line-height: 1;
+      cursor: pointer;
+      transition: transform 0.15s, border-color 0.15s, color 0.15s;
+    }
+
+    .usage-refresh:hover:not(:disabled) {
+      transform: translateY(-1px);
+      border-color: var(--orange);
+      color: var(--orange);
+    }
+
+    .usage-refresh:disabled {
+      opacity: 0.45;
+      cursor: progress;
     }
 
     .task-list {
@@ -220,7 +295,14 @@
 </head>
 
 <body>
-  <div class="section-label" id="task-label">NEXT 7-DAY TASKS</div>
+  <div class="popup-header">
+    <div class="section-label" id="task-label">NEXT 7-D TASKS</div>
+    <div class="usage-actions">
+      <button class="usage-chip is-empty" id="claude-usage-chip" type="button" title="Claude usage">CLAUDE --</button>
+      <button class="usage-refresh" id="claude-usage-refresh" type="button"
+        title="Refresh Claude usage">&#8635;</button>
+    </div>
+  </div>
   <ul class="task-list" id="task-list"></ul>
 
   <hr class="divider" />

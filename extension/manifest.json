@@ -1,15 +1,18 @@
 {
   "manifest_version": 3,
   "name": "Due",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Canvas LMS Dashboard - Auto-sync assignments, deadlines, and AI analysis for any Canvas school",
   "permissions": [
     "storage",
-    "webNavigation"
+    "tabs",
+    "webNavigation",
+    "scripting"
   ],
   "host_permissions": [
     "https://*.instructure.com/*",
     "https://*.canvas-user-content.com/*",
+    "https://claude.ai/*",
     "https://api.anthropic.com/*",
     "https://generativelanguage.googleapis.com/*",
     "https://api.openai.com/*",
@@ -19,7 +22,19 @@
     "https://open.bigmodel.cn/*",
     "https://api.minimax.chat/*"
   ],
-
+  "content_scripts": [
+    {
+      "matches": ["https://claude.ai/*"],
+      "js": ["claude_injected.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["https://claude.ai/*"],
+      "js": ["claude_content.js"],
+      "run_at": "document_start"
+    }
+  ],
   "background": {
     "service_worker": "background.js"
   },

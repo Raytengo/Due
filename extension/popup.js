@@ -11,30 +11,54 @@ let _uiLanguage = 'zh-TW';
 
 const I18N = {
   'zh-TW': {
-    taskHeading: 'NEXT 7-DAY TASKS',
+    taskHeading: 'NEXT 7-D TASKS',
     emptyState: '\u4E03\u5929\u5167\u6C92\u6709\u5F85\u7E73\u4F5C\u696D',
     dashboard: '\u958B\u555F Dashboard',
+    claudeUnknown: 'CLAUDE --',
+    claudeNeverSynced: 'Claude usage \u5C1A\u672A\u540C\u6B65',
+    claudeLastSync: '\u4E0A\u6B21\u540C\u6B65',
+    claudeResetAt: '\u91CD\u7F6E\u6642\u9593',
+    claudeRefresh: '\u91CD\u65B0\u6293\u53D6 Claude usage',
+    claudeRefreshMissing: '\u8ACB\u5148\u6253\u958B\u4E00\u500B Claude \u5206\u9801\u518D\u91CD\u65B0\u6293\u53D6',
+    claudeRefreshing: '\u6293\u53D6\u4E2D...',
     today: '\u4ECA\u5929',
     tomorrow: '\u660E\u5929',
     daysLater: (n) => `${n}\u5929\u5F8C`,
   },
   'zh-CN': {
-    taskHeading: 'NEXT 7-DAY TASKS',
+    taskHeading: 'NEXT 7-D TASKS',
     emptyState: '\u4E03\u5929\u5185\u6CA1\u6709\u5F85\u7F34\u4F5C\u4E1A',
     dashboard: '\u6253\u5F00 Dashboard',
+    claudeUnknown: 'CLAUDE --',
+    claudeNeverSynced: 'Claude usage \u5C1A\u672A\u540C\u6B65',
+    claudeLastSync: '\u4E0A\u6B21\u540C\u6B65',
+    claudeResetAt: '\u91CD\u7F6E\u65F6\u95F4',
+    claudeRefresh: '\u91CD\u65B0\u6293\u53D6 Claude usage',
+    claudeRefreshMissing: '\u8BF7\u5148\u6253\u5F00\u4E00\u4E2A Claude \u5206\u9875\u518D\u91CD\u65B0\u6293\u53D6',
+    claudeRefreshing: '\u6293\u53D6\u4E2D...',
     today: '\u4ECA\u5929',
     tomorrow: '\u660E\u5929',
     daysLater: (n) => `${n}\u5929\u540E`,
   },
   en: {
-    taskHeading: 'NEXT 7-DAY TASKS',
+    taskHeading: 'NEXT 7-D TASKS',
     emptyState: 'No pending tasks in the next 7 days',
     dashboard: 'Open Dashboard',
+    claudeUnknown: 'CLAUDE --',
+    claudeNeverSynced: 'Claude usage has not been synced yet',
+    claudeLastSync: 'Last sync',
+    claudeResetAt: 'Reset',
+    claudeRefresh: 'Refresh Claude usage',
+    claudeRefreshMissing: 'Open a Claude tab first, then refresh usage',
+    claudeRefreshing: 'Refreshing...',
     today: 'Today',
     tomorrow: 'Tomorrow',
     daysLater: (n) => `${n}d`,
   },
 };
+
+let _claudeRefreshBusy = false;
+let _currentClaudeUsage = null;
 
 function tr(key) {
   return (I18N[_uiLanguage] && I18N[_uiLanguage][key]) || I18N['zh-TW'][key];
@@ -99,6 +123,51 @@ function buildCourseMap(courses) {
   const map = {};
   for (const c of (courses || [])) map[c.id] = c;
   return map;
+}
+
+function formatAbsoluteDate(isoString) {
+  if (!isoString) return '';
+  const date = new Date(isoString);
+  if (Number.isNaN(date.getTime())) return '';
+  return new Intl.DateTimeFormat(_uiLanguage === 'en' ? 'en-US' : _uiLanguage, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(date);
+}
+
+function formatCountdown(isoString) {
+  if (!isoString) return '';
+  const target = new Date(isoString);
+  if (Number.isNaN(target.getTime())) return '';
+
+  const diffMs = target.getTime() - Date.now();
+  if (diffMs <= 0) return '0m';
+
+  const totalMinutes = Math.ceil(diffMs / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours <= 0) return `${minutes}m`;
+  if (minutes === 0) return `${hours}h`;
+  return `${hours}h ${minutes}m`;
+}
+
+function buildClaudeSummary(usage) {
+  if (!usage) return '--';
+  const parts = [];
+  if (Number.isFinite(usage.usedPercent)) parts.push(`${usage.usedPercent}%`);
+  const countdown = formatCountdown(usage.resetAt);
+  if (countdown) parts.push(countdown);
+  return parts.join(' / ') || '--';
+}
+
+function setClaudeRefreshBusy(busy) {
+  _claudeRefreshBusy = busy;
+  const btn = document.getElementById('claude-usage-refresh');
+  if (!btn) return;
+  btn.disabled = busy;
+  btn.textContent = busy ? '...' : '\u21bb';
 }
 
 function getUpcomingTasks(assignments, courseMap) {
@@ -175,11 +244,74 @@ function renderTasks(tasks, courseNames) {
   }
 }
 
+function renderClaudeUsage(usage) {
+  _currentClaudeUsage = usage;
+  const chip = document.getElementById('claude-usage-chip');
+  if (!chip) return;
+
+  if (!usage) {
+    chip.textContent = tr('claudeUnknown');
+    chip.title = tr('claudeNeverSynced');
+    chip.classList.add('is-empty');
+    chip.className = 'chip is-empty'; // Reset classes
+    return;
+  }
+
+  // Handle expired/reset state logic
+  const target = new Date(usage.resetAt);
+  const isExpired = !Number.isNaN(target.getTime()) && (target.getTime() <= Date.now());
+
+  let summary = '';
+  let percent = usage.usedPercent;
+
+  if (isExpired) {
+    summary = '0% / --';
+    percent = 0;
+  } else {
+    summary = buildClaudeSummary(usage);
+  }
+
+  chip.textContent = `CLAUDE ${summary}`;
+
+  // Apply colors based on usage percent
+  chip.className = 'usage-chip'; // Reset
+  if (percent === 100) {
+    chip.classList.add('usage-full');
+  } else if (percent > 75) {
+    chip.classList.add('usage-high');
+  } else if (isExpired || percent === 0 || !usage) {
+    chip.classList.add('is-empty');
+  }
+
+  const titleLines = [];
+  if (usage.lastSync) {
+    titleLines.push(`${tr('claudeLastSync')}: ${formatAbsoluteDate(usage.lastSync)}`);
+  }
+  if (usage.resetAt) {
+    titleLines.push(`${tr('claudeResetAt')}: ${formatAbsoluteDate(usage.resetAt)}`);
+  }
+  chip.title = titleLines.join('\n') || tr('claudeNeverSynced');
+}
+
+// Keep countdown ticking while popup is open
+setInterval(() => {
+  if (_currentClaudeUsage) {
+    renderClaudeUsage(_currentClaudeUsage);
+  }
+}, 30000); // refresh every 30s
+
+function applyClaudeRefreshCopy() {
+  const btn = document.getElementById('claude-usage-refresh');
+  if (!btn) return;
+  btn.title = _claudeRefreshBusy ? tr('claudeRefreshing') : tr('claudeRefresh');
+}
+
 function loadData() {
-  chrome.storage.local.get(['courses', 'assignments', 'courseNames'], (data) => {
+  chrome.storage.local.get(['courses', 'assignments', 'courseNames', 'claudeUsage'], (data) => {
     const courseMap = buildCourseMap(data.courses);
     const tasks = getUpcomingTasks(data.assignments || {}, courseMap);
     renderTasks(tasks, data.courseNames || {});
+    renderClaudeUsage(data.claudeUsage || null);
   });
 }
 
@@ -188,9 +320,37 @@ document.getElementById('dashboard-btn').addEventListener('click', () => {
   chrome.tabs.create({ url });
 });
 
+document.getElementById('claude-usage-chip').addEventListener('click', () => {
+  chrome.tabs.create({ url: 'https://claude.ai/settings/usage' });
+});
+
+async function triggerClaudeRefreshSilently() {
+  if (_claudeRefreshBusy) return;
+  setClaudeRefreshBusy(true);
+  applyClaudeRefreshCopy();
+  try {
+    const response = await chrome.runtime.sendMessage({ type: 'SYNC_CLAUDE_USAGE', force: true });
+    // If it fails (no tab), we just keep the old data silently
+  } catch (err) {
+    console.warn('[Due] Auto-refresh failed:', err.message);
+  } finally {
+    setClaudeRefreshBusy(false);
+    applyClaudeRefreshCopy();
+    loadData();
+  }
+}
+
+document.getElementById('claude-usage-refresh').addEventListener('click', triggerClaudeRefreshSilently);
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName !== 'local') return;
+  if (changes.claudeUsage) renderClaudeUsage(changes.claudeUsage.newValue || null);
+});
+
 chrome.storage.local.get(['darkMode', 'uiLanguage'], (data) => {
   _uiLanguage = data.uiLanguage || 'zh-TW';
   applyTheme(!!data.darkMode);
   applyUILanguage();
+  applyClaudeRefreshCopy();
   loadData();
 });

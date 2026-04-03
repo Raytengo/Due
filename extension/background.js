@@ -1,5 +1,6 @@
 let BASE_URL = '';
 
+
 // Load stored Canvas URL on startup (service worker may restart)
 chrome.storage.local.get(['canvasBaseUrl'], (data) => {
   if (data.canvasBaseUrl) BASE_URL = data.canvasBaseUrl;
@@ -15,20 +16,23 @@ chrome.runtime.onInstalled.addListener((details) => {
 // 監聽造訪任何 Canvas 頁面，自動偵測學校 URL 並觸發同步
 chrome.webNavigation
   ? chrome.webNavigation.onCompleted.addListener(
-      (details) => {
-        if (details.frameId !== 0) return;
-        try {
-          const origin = new URL(details.url).origin;
-          if (origin !== BASE_URL) {
-            BASE_URL = origin;
-            chrome.storage.local.set({ canvasBaseUrl: origin });
-          }
-        } catch (_) {}
-        syncAll();
-      },
-      { url: [{ hostSuffix: '.instructure.com' }] }
-    )
+    (details) => {
+      if (details.frameId !== 0) return;
+      try {
+        const origin = new URL(details.url).origin;
+        if (origin !== BASE_URL) {
+          BASE_URL = origin;
+          chrome.storage.local.set({ canvasBaseUrl: origin });
+        }
+      } catch (_) { }
+      syncAll();
+    },
+    { url: [{ hostSuffix: '.instructure.com' }] }
+  )
   : null;
+
+// Claude usage is now handled passively via content script (claude_injected.js + claude_content.js)
+// No webNavigation listener needed for claude.ai
 
 // ── Message handlers ──
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -88,6 +92,28 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     chrome.storage.local.get(['syllabusAnalysis'], (data) => {
       sendResponse({ success: true, analysis: (data.syllabusAnalysis || {})[message.courseId] || null });
     });
+    return true;
+  }
+
+  if (message.type === 'CLAUDE_ORG_ID_LEARNED') {
+    // Passively learned orgId from any claude.ai org API call — store for future direct fetches
+    chrome.storage.local.set({ claudeOrgId: message.orgId });
+    return false;
+  }
+
+  if (message.type === 'CLAUDE_USAGE_INTERCEPTED') {
+    // Passively received from content script — parse and store
+    const record = parseApiUsage(message.data);
+    if (record) {
+      chrome.storage.local.set({ claudeOrgId: message.orgId, claudeUsage: record });
+    }
+    return false; // no sendResponse needed
+  }
+
+  if (message.type === 'SYNC_CLAUDE_USAGE') {
+    fetchClaudeUsageDirect()
+      .then((usage) => sendResponse({ success: true, usage }))
+      .catch((err) => sendResponse({ success: false, error: err.message }));
     return true;
   }
 });
@@ -160,7 +186,7 @@ async function handleAnalyze({ assignmentId, courseId }, sendResponse) {
         const pdf = await tryFetchPdf(`${BASE_URL}/api/v1/files/${att.id}/download`);
         if (pdf) parts.push(pdf);
       }
-    } catch (_) {}
+    } catch (_) { }
 
     // ── Step 2: Canvas file links embedded in description HTML ──
     for (const fileId of extractCanvasFileIds(assignment.description || '')) {
@@ -261,13 +287,13 @@ async function fetchSyllabusHtml(courseId) {
   try {
     const data = await fetchJSON(`${BASE_URL}/api/v1/courses/${courseId}?include[]=syllabus_body`);
     if (data.syllabus_body && data.syllabus_body.trim().length > 0) return data.syllabus_body;
-  } catch (_) {}
+  } catch (_) { }
 
   // Try 2: Fetch the actual Syllabus web page (contains all file links the user sees)
   try {
     const res = await fetch(`${BASE_URL}/courses/${courseId}/assignments/syllabus`, { credentials: 'include' });
     if (res.ok) return await res.text();
-  } catch (_) {}
+  } catch (_) { }
 
   return null;
 }
@@ -345,7 +371,7 @@ async function handleSyllabusAnalyze({ courseId, force }, sendResponse) {
     // Use stored files; if empty, try fetching live from Canvas API
     let courseFiles = (data.files || {})[courseId] || [];
     if (courseFiles.length === 0) {
-      try { courseFiles = await fetchFiles(courseId); } catch (_) {}
+      try { courseFiles = await fetchFiles(courseId); } catch (_) { }
     }
 
     if (courseFiles.length > 0) {
@@ -368,7 +394,7 @@ async function handleSyllabusAnalyze({ courseId, force }, sendResponse) {
           try {
             const meta = await fetchJSON(`${BASE_URL}/api/v1/files/${syllabusFile.id}`);
             if (meta.url) pdf = await tryFetchPdf(meta.url);
-          } catch (_) {}
+          } catch (_) { }
         }
         if (pdf) {
           parts.push(pdf);
@@ -638,6 +664,84 @@ function stripHtmlService(html) {
   return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
+// ── Claude Usage (API-based) ──
+
+// Parse the /api/organizations/{id}/usage JSON response
+function parseApiUsage(data) {
+  if (!data || !data.five_hour) return null;
+  const { utilization, resets_at } = data.five_hour;
+  if (utilization == null) return null;
+  return {
+    usedPercent: Math.round(Number(utilization)),
+    resetAt: resets_at || null,
+    lastSync: new Date().toISOString(),
+  };
+}
+
+// Fetch usage by executing script inside an existing claude.ai tab
+// (Cloudflare blocks direct fetch from service worker context)
+async function fetchClaudeUsageDirect() {
+  // Find any claude.ai tab
+  const tabs = await chrome.tabs.query({});
+  const claudeTab = tabs.find((t) => {
+    try { return t.url && new URL(t.url).hostname === 'claude.ai'; } catch (_) { return false; }
+  });
+
+  if (!claudeTab) {
+    console.warn('[Due] No claude.ai tab open — cannot fetch usage');
+    return null;
+  }
+
+  try {
+    const [result] = await chrome.scripting.executeScript({
+      target: { tabId: claudeTab.id },
+      func: async () => {
+        try {
+          // Step 1: get orgId
+          const orgRes = await fetch('/api/organizations', { credentials: 'include' });
+          if (!orgRes.ok) return { error: `org status ${orgRes.status}` };
+          const orgs = await orgRes.json();
+          if (!Array.isArray(orgs) || orgs.length === 0 || !orgs[0].uuid) {
+            return { error: 'no org found' };
+          }
+          const orgId = orgs[0].uuid;
+
+          // Step 2: get usage
+          const usageRes = await fetch(`/api/organizations/${orgId}/usage`, { credentials: 'include' });
+          if (!usageRes.ok) return { error: `usage status ${usageRes.status}` };
+          const data = await usageRes.json();
+
+          return { orgId, data };
+        } catch (err) {
+          return { error: err.message };
+        }
+      },
+    });
+
+    if (!result || !result.result) return null;
+    const { orgId, data, error } = result.result;
+
+    if (error) {
+      console.warn('[Due] In-tab usage fetch error:', error);
+      return null;
+    }
+
+    // Store orgId for content script use
+    if (orgId) await chrome.storage.local.set({ claudeOrgId: orgId });
+
+    const record = parseApiUsage(data);
+    if (record) {
+      await chrome.storage.local.set({ claudeUsage: record });
+      return record;
+    }
+  } catch (err) {
+    console.warn('[Due] executeScript failed:', err.message);
+  }
+
+  return null;
+}
+
+
 // ── Canvas API pagination ──
 async function fetchAllPages(url) {
   const results = [];
@@ -722,7 +826,7 @@ async function fetchSchoolName(courses = []) {
   try {
     const account = await fetchJSON(`${BASE_URL}/api/v1/accounts/self`);
     if (account && account.name && !isGenericSchoolName(account.name)) return account.name;
-  } catch (_) {}
+  } catch (_) { }
 
   // 2) Try course account_id(s), pick first non-generic account name.
   const accountIds = [...new Set((courses || []).map((c) => c.account_id).filter(Boolean))];
@@ -730,7 +834,7 @@ async function fetchSchoolName(courses = []) {
     try {
       const account = await fetchJSON(`${BASE_URL}/api/v1/accounts/${accountId}`);
       if (account && account.name && !isGenericSchoolName(account.name)) return account.name;
-    } catch (_) {}
+    } catch (_) { }
   }
 
   // 3) Fallback from hostname.
