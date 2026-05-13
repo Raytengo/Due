@@ -23,6 +23,7 @@ const I18N = {
     claudeRefreshing: '\u6293\u53D6\u4E2D...',
     today: '\u4ECA\u5929',
     tomorrow: '\u660E\u5929',
+    hoursLater: (n) => `${n}h\u5F8C`,
     daysLater: (n) => `${n}\u5929\u5F8C`,
   },
   'zh-CN': {
@@ -38,6 +39,7 @@ const I18N = {
     claudeRefreshing: '\u6293\u53D6\u4E2D...',
     today: '\u4ECA\u5929',
     tomorrow: '\u660E\u5929',
+    hoursLater: (n) => `${n}h\u540E`,
     daysLater: (n) => `${n}\u5929\u540E`,
   },
   en: {
@@ -53,6 +55,7 @@ const I18N = {
     claudeRefreshing: 'Refreshing...',
     today: 'Today',
     tomorrow: 'Tomorrow',
+    hoursLater: (n) => `${n}h`,
     daysLater: (n) => `${n}d`,
   },
 };
@@ -94,12 +97,25 @@ function formatDueShort(isoString) {
   const due = new Date(isoString);
   const now = new Date();
   const diffMs = due - now;
-  const diffHours = Math.ceil(diffMs / 3600000);
-  const diffDays = Math.ceil(diffMs / 86400000);
+  if (diffMs <= 0) {
+    const hoursLater = tr('hoursLater');
+    return typeof hoursLater === 'function' ? hoursLater(0) : '0h';
+  }
 
-  if (diffHours <= 0) return tr('today');
-  if (diffHours <= 24) return `${diffHours}h`;
-  if (diffDays <= 1) return tr('tomorrow');
+  const isSameDay =
+    due.getFullYear() === now.getFullYear() &&
+    due.getMonth() === now.getMonth() &&
+    due.getDate() === now.getDate();
+
+  if (isSameDay) {
+    const roundedHours = Math.floor((diffMs + 1800000) / 3600000);
+    const hoursLater = tr('hoursLater');
+    return typeof hoursLater === 'function' ? hoursLater(roundedHours) : `${roundedHours}h`;
+  }
+
+  const dueDayUtc = Date.UTC(due.getFullYear(), due.getMonth(), due.getDate());
+  const nowDayUtc = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  const diffDays = Math.round((dueDayUtc - nowDayUtc) / 86400000);
 
   const daysLater = tr('daysLater');
   return typeof daysLater === 'function' ? daysLater(diffDays) : `${diffDays}d`;

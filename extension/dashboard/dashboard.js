@@ -383,14 +383,26 @@ function formatDue(dueAt) {
   const d = new Date(dueAt);
   const now = new Date();
   const diffMs = d - now;
-  const diffDays = Math.ceil(diffMs / 86400000);
 
   const locale = _uiLanguage === 'en' ? 'en-US' : 'zh-TW';
   const dateStr = d.toLocaleDateString(locale, { month: 'short', day: 'numeric' });
 
   if (diffMs < 0) return `${dateStr}（${tr('overdue')}）`;
-  if (diffDays === 0) return `${dateStr}（${tr('today')}）`;
-  if (diffDays === 1) return `${dateStr}（${tr('tomorrow')}）`;
+
+  const isSameDay =
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate();
+
+  if (isSameDay) {
+    const roundedHours = Math.floor((diffMs + 1800000) / 3600000);
+    const hourLabel = _uiLanguage === 'en' ? `${roundedHours}h left` : `${roundedHours}h後`;
+    return `${dateStr}（${hourLabel}）`;
+  }
+
+  const dueDayUtc = Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
+  const nowDayUtc = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  const diffDays = Math.round((dueDayUtc - nowDayUtc) / 86400000);
   return `${dateStr}（${diffDays} ${tr('daysLater')}）`;
 }
 

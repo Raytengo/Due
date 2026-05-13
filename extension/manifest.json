@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Due",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Canvas LMS Dashboard - Auto-sync assignments, deadlines, and AI analysis for any Canvas school",
   "permissions": [
     "storage",
