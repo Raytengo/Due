@@ -120,13 +120,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 const PROVIDER_DEFAULTS = {
   gemini: { baseUrl: 'https://generativelanguage.googleapis.com/v1beta' },
-  anthropic: { baseUrl: 'https://api.anthropic.com' },
-  openai: { baseUrl: 'https://api.openai.com/v1' },
-  deepseek: { baseUrl: 'https://api.deepseek.com/v1' },
   qwen: { baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1' },
-  moonshot: { baseUrl: 'https://api.moonshot.cn/v1' },
-  zhipu: { baseUrl: 'https://open.bigmodel.cn/api/paas/v4' },
-  minimax: { baseUrl: 'https://api.minimax.chat/v1' },
+  deepseek: { baseUrl: 'https://api.deepseek.com/v1' },
 };
 
 function normalizeBaseUrl(url) {
@@ -134,16 +129,10 @@ function normalizeBaseUrl(url) {
 }
 
 function resolveAiConfig(data) {
-  const provider = data.aiProvider || (data.aiModel === 'claude' ? 'anthropic' : 'gemini');
-  const defaults = PROVIDER_DEFAULTS[provider] || PROVIDER_DEFAULTS.gemini;
-  const key = data.aiApiKey
-    || (provider === 'gemini' ? data.geminiApiKey : '')
-    || (provider === 'anthropic' ? data.claudeApiKey : '')
-    || '';
-  const model = (data.aiModelId
-    || (provider === 'gemini' ? data.geminiModel : '')
-    || (provider === 'anthropic' ? data.claudeModel : '')
-    || '').trim();
+  const provider = PROVIDER_DEFAULTS[data.aiProvider] ? data.aiProvider : 'gemini';
+  const defaults = PROVIDER_DEFAULTS[provider];
+  const key = data.aiApiKey || (provider === 'gemini' ? data.geminiApiKey : '') || '';
+  const model = (data.aiModelId || (provider === 'gemini' ? data.geminiModel : '') || '').trim();
   const baseUrl = normalizeBaseUrl(data.aiBaseUrl || defaults.baseUrl);
   return { provider, key, model, baseUrl };
 }
@@ -153,7 +142,7 @@ async function handleAnalyze({ assignmentId, courseId }, sendResponse) {
   try {
     const data = await chrome.storage.local.get([
       'aiProvider', 'aiApiKey', 'aiModelId', 'aiBaseUrl',
-      'aiModel', 'geminiApiKey', 'geminiModel', 'claudeApiKey', 'claudeModel',
+      'geminiApiKey', 'geminiModel',
       'assignments', 'files', 'announcements', 'analysis',
     ]);
 
@@ -327,7 +316,7 @@ async function handleSyllabusAnalyze({ courseId, force }, sendResponse) {
   try {
     const data = await chrome.storage.local.get([
       'aiProvider', 'aiApiKey', 'aiModelId', 'aiBaseUrl',
-      'aiModel', 'geminiApiKey', 'geminiModel', 'claudeApiKey', 'claudeModel',
+      'geminiApiKey', 'geminiModel',
       'files', 'syllabusAnalysis',
     ]);
 
@@ -544,9 +533,6 @@ async function callProvider(parts, systemPrompt, ai, temperature = undefined) {
   if (ai.provider === 'gemini') {
     return callGemini(parts, systemPrompt, ai.key, ai.model, temperature);
   }
-  if (ai.provider === 'anthropic') {
-    return callClaude(parts, systemPrompt, ai.key, ai.model, temperature);
-  }
   const textOnlyParts = stripPdfForOpenAICompatible(parts);
   return callOpenAICompatible(textOnlyParts, systemPrompt, ai.key, ai.model, ai.baseUrl, temperature);
 }
@@ -581,38 +567,6 @@ async function callGemini(parts, systemPrompt, apiKey, modelId, temperature = un
   const candidate = json.candidates?.[0];
   if (!candidate) throw new Error('Gemini 回傳空結果');
   return candidate.content.parts[0].text;
-}
-
-// ── Claude API ──
-async function callClaude(parts, systemPrompt, apiKey, modelId, temperature = undefined) {
-  const claudeParts = parts.map((p) =>
-    p.type === 'pdf'
-      ? { type: 'document', source: { type: 'base64', media_type: p.mimeType, data: p.base64 } }
-      : { type: 'text', text: p.text }
-  );
-
-  const body = {
-    model: modelId,
-    max_tokens: 2048,
-    system: systemPrompt,
-    messages: [{ role: 'user', content: claudeParts }],
-  };
-  if (temperature !== undefined) body.temperature = temperature;
-
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify(body),
-  });
-
-  if (!res.ok) throw new Error(`Claude API ${res.status}: ${await res.text()}`);
-
-  const json = await res.json();
-  return json.content[0].text;
 }
 
 // ── OpenAI-compatible API ──

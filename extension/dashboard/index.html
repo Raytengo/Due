@@ -102,9 +102,8 @@
 
     .sidebar-brand .meta {
       font-family: 'DM Mono', monospace;
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
+      font-size: 13px;
+      letter-spacing: 0.05em;
       color: var(--mid);
       line-height: 1.5;
       white-space: nowrap;
@@ -114,6 +113,11 @@
     /* Sidebar section */
     .sidebar-section {
       margin-bottom: 24px;
+    }
+
+    .sidebar-divider {
+      border-top: 1px solid var(--border);
+      margin-bottom: 16px;
     }
 
     .sidebar-label {
@@ -208,6 +212,17 @@
       background: var(--bg);
     }
 
+    .nav-course-item.active {
+      background: var(--bg);
+      color: var(--orange);
+      border-left: 2px solid var(--orange);
+      padding-left: 8px;
+    }
+
+    .nav-course-item.active .nav-course-name {
+      color: var(--orange);
+    }
+
     .nav-course-name {
       flex: 1;
       min-width: 0;
@@ -280,6 +295,29 @@
       border-color: var(--orange);
       color: var(--orange);
     }
+
+    @keyframes dot-bounce {
+      0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+      40% { transform: translateY(-4px); opacity: 1; }
+    }
+
+    .sync-dots {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .sync-dots span {
+      display: inline-block;
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: currentColor;
+      animation: dot-bounce 1.2s ease-in-out infinite;
+    }
+
+    .sync-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .sync-dots span:nth-child(3) { animation-delay: 0.4s; }
 
     .btn-theme-toggle {
       width: 34px;
@@ -438,12 +476,14 @@
       gap: 12px;
       margin-bottom: 18px;
       flex-shrink: 0;
+      align-items: center;
+      padding-left: 5px;
     }
 
     .page-tab {
       font-family: 'DM Mono', monospace;
-      font-size: 12px;
-      padding: 8px 18px;
+      font-size: 14px;
+      padding: 8px 23px;
       border: 1px solid var(--border);
       border-radius: 6px;
       background: var(--surface);
@@ -462,6 +502,87 @@
       background: var(--dark);
       color: var(--bg);
       border-color: var(--dark);
+    }
+
+    .page-tabs.detail-mode .page-tab {
+      display: none;
+    }
+
+    .detail-back-tab {
+      font-family: 'DM Mono', monospace;
+      font-size: 15px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      border: none;
+      background: none;
+      color: var(--muted);
+      cursor: pointer;
+      padding: 0;
+      margin-left: 11px;
+      margin-top: 4px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: color 0.12s;
+    }
+
+    .detail-back-tab:hover {
+      color: var(--orange);
+    }
+
+    .page-tabs.detail-mode .detail-back-tab {
+      display: inline-flex;
+    }
+
+    .btn-show-submitted {
+      margin-left: auto;
+      height: 35px;
+      padding: 0 23px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: none;
+      color: var(--muted);
+      font-family: 'DM Mono', monospace;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+
+    .btn-show-submitted:hover {
+      border-color: var(--dark);
+      color: var(--dark);
+    }
+
+    .btn-show-submitted.active {
+      background: var(--dark);
+      color: var(--bg);
+      border-color: var(--dark);
+    }
+
+    .btn-add-assignment {
+      margin-left: 0;
+      margin-right: 5px;
+      height: 35px;
+      padding: 0 23px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: none;
+      color: var(--muted);
+      font-family: 'DM Mono', monospace;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+
+    .btn-add-assignment:hover {
+      border-color: var(--dark);
+      color: var(--dark);
     }
 
     #main-section {
@@ -498,6 +619,7 @@
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      margin: 0 4px;
     }
 
     .week-content {
@@ -1111,6 +1233,37 @@
     .btn-analyze:hover {
       border-color: var(--blue);
       color: var(--blue);
+    }
+
+    .btn-delete-custom-assignment {
+      width: 26px;
+      height: 26px;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 14px;
+      line-height: 1;
+      transition: all 0.12s;
+    }
+
+    .btn-delete-custom-assignment:hover {
+      border-color: var(--orange);
+      color: var(--orange);
+      background: rgba(217, 119, 87, 0.08);
+    }
+
+    .assignment-item.custom-assignment .assignment-title {
+      padding-right: 8px;
+    }
+
+    .custom-assignment-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      color: var(--mid);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
     }
 
     /* ── Welcome Modal ── */
@@ -1813,6 +1966,140 @@
       transform: translateX(0);
     }
 
+    .custom-assignment-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(20, 20, 19, 0.28);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      z-index: 2500;
+    }
+
+    .custom-assignment-overlay.open {
+      display: flex;
+    }
+
+    .custom-assignment-modal {
+      width: 90vw;
+      max-width: 600px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg);
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.18);
+      padding: 22px;
+    }
+
+    .custom-assignment-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+
+    .custom-assignment-title {
+      font-family: 'Source Serif 4', Georgia, serif;
+      font-size: 26px;
+      font-weight: 400;
+      line-height: 1.2;
+    }
+
+    .custom-assignment-close {
+      width: 30px;
+      height: 30px;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .custom-assignment-form {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .custom-assignment-field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .custom-assignment-field label {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--mid);
+    }
+
+    .custom-assignment-field input,
+    .custom-assignment-field select,
+    .custom-assignment-field textarea {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--surface);
+      color: var(--dark);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px;
+      padding: 10px 12px;
+      outline: none;
+      transition: border-color 0.12s;
+    }
+
+    .custom-assignment-field textarea {
+      min-height: 110px;
+      resize: vertical;
+      line-height: 1.6;
+    }
+
+    .custom-assignment-field input:focus,
+    .custom-assignment-field select:focus,
+    .custom-assignment-field textarea:focus {
+      border-color: var(--orange);
+    }
+
+    .custom-assignment-error {
+      min-height: 18px;
+      color: var(--orange);
+      font-size: 12px;
+    }
+
+    .custom-assignment-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      padding-top: 4px;
+    }
+
+    .custom-assignment-actions button {
+      height: 34px;
+      padding: 0 16px;
+      border-radius: 6px;
+      font-family: 'DM Mono', monospace;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+    }
+
+    .btn-custom-cancel {
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+    }
+
+    .btn-custom-save {
+      border: 1px solid var(--orange);
+      background: var(--orange);
+      color: var(--bg);
+    }
+
     .analysis-panel-header {
       display: flex;
       align-items: center;
@@ -2190,7 +2477,7 @@
       align-items: center;
       justify-content: flex-end;
       gap: 8px;
-      padding-top: 10px;
+      padding-top: 3px;
       flex-shrink: 0;
     }
 
@@ -2231,8 +2518,10 @@
       flex: 1;
       min-height: 0;
       overflow: hidden;
-      padding: 4px 40px 16px;
+      padding: 0 5px 16px 5px;
+      display: flex;
       flex-direction: column;
+      gap: 8px;
     }
 
     .course-detail-view {
@@ -2429,9 +2718,32 @@
       font-weight: 500;
     }
 
+    .btn-edit-weights {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      margin-top: 10px;
+      padding: 5px 12px;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      background: none;
+      color: var(--muted);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 11px;
+      font-weight: 300;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s;
+      letter-spacing: 0.02em;
+    }
+
+    .btn-edit-weights:hover {
+      border-color: var(--orange);
+      color: var(--orange);
+    }
+
     /* ── Syllabus Section ── */
     .syllabus-section {
-      margin-top: 20px;
+      margin-top: 10px;
       width: 100%;
     }
 
@@ -2644,6 +2956,200 @@
         opacity: 0;
       }
     }
+
+    /* ── Weight Edit Modal ── */
+    .weight-edit-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.35);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .weight-edit-overlay.open {
+      display: flex;
+    }
+
+    .weight-edit-modal {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      width: 420px;
+      max-height: 80vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.14);
+    }
+
+    .weight-edit-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 20px 14px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .weight-edit-title {
+      font-family: 'Source Serif 4', Georgia, serif;
+      font-size: 18px;
+      color: var(--dark);
+    }
+
+    .weight-edit-ai-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid var(--border);
+      background: none;
+      color: var(--muted);
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      padding: 5px 12px;
+      border-radius: 6px;
+      transition: border-color 0.15s, color 0.15s, background 0.15s;
+    }
+
+    .weight-edit-ai-btn:hover {
+      border-color: var(--orange);
+      color: var(--orange);
+    }
+
+    .weight-edit-ai-btn.loading {
+      opacity: 0.6;
+      pointer-events: none;
+    }
+
+    .weight-edit-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .weight-edit-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .weight-edit-color {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .weight-edit-name {
+      flex: 1;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+      font-weight: 300;
+      padding: 6px 10px;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      background: var(--bg);
+      color: var(--dark);
+      outline: none;
+      transition: border-color 0.12s;
+    }
+
+    .weight-edit-name:focus { border-color: var(--orange); }
+
+    .weight-edit-pct {
+      width: 64px;
+      font-family: 'DM Mono', monospace;
+      font-size: 13px;
+      padding: 6px 8px;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      background: var(--bg);
+      color: var(--dark);
+      text-align: right;
+      outline: none;
+      transition: border-color 0.12s;
+    }
+
+    .weight-edit-pct:focus { border-color: var(--orange); }
+
+    .weight-edit-del {
+      border: none;
+      background: none;
+      color: var(--mid);
+      font-size: 16px;
+      cursor: pointer;
+      padding: 2px 4px;
+      border-radius: 4px;
+      transition: color 0.12s;
+      flex-shrink: 0;
+    }
+
+    .weight-edit-del:hover { color: var(--orange); }
+
+    .weight-edit-add {
+      margin: 0 20px 12px;
+      padding: 7px;
+      border: 1px dashed var(--border);
+      border-radius: 6px;
+      background: none;
+      color: var(--muted);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 12px;
+      cursor: pointer;
+      transition: border-color 0.12s, color 0.12s;
+      flex-shrink: 0;
+    }
+
+    .weight-edit-add:hover { border-color: var(--orange); color: var(--orange); }
+
+    .weight-edit-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .weight-edit-total {
+      font-family: 'DM Mono', monospace;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .weight-edit-total.over { color: var(--orange); }
+
+    .weight-edit-save {
+      padding: 7px 20px;
+      border: none;
+      border-radius: 6px;
+      background: var(--dark);
+      color: var(--bg);
+      font-family: 'DM Mono', monospace;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      transition: opacity 0.12s;
+    }
+
+    .weight-edit-save:hover { opacity: 0.8; }
+
+    html[data-theme="dark"] .weight-edit-modal {
+      background: #1e1d1b;
+    }
+
+    html[data-theme="dark"] .weight-edit-name,
+    html[data-theme="dark"] .weight-edit-pct {
+      background: #141312;
+    }
   </style>
 </head>
 
@@ -2659,19 +3165,9 @@
           <div class="meta" id="header-meta">載入中...</div>
         </div>
 
-        <div class="sidebar-section">
-          <div class="sidebar-label" id="label-filter">篩選</div>
-          <div class="filter-bar">
-            <button class="pill active" data-filter="assignment" id="filter-assignment">作業</button>
-            <button class="pill" data-filter="exam" id="filter-exam">考試</button>
-          </div>
-          <label class="hide-done-label">
-            <input type="checkbox" id="hide-done-cb">
-            <span id="label-hide-done">查看已繳交</span>
-          </label>
-        </div>
 
         <div class="sidebar-section" style="flex:1;min-height:0;">
+          <div class="sidebar-divider"></div>
           <div class="sidebar-label" id="label-courses">課程</div>
           <nav class="course-nav" id="course-nav"></nav>
         </div>
@@ -2705,8 +3201,11 @@
     <!-- ── Main Content ── -->
     <main class="main-content" id="main-content">
       <div class="page-tabs" id="page-tabs">
+        <button class="detail-back-tab" id="detail-back-btn" style="display: none;">← 返回</button>
         <button class="page-tab active" data-page="week" id="tab-week">學期待辦</button>
         <button class="page-tab" data-page="courses" id="tab-courses">課程</button>
+        <button class="btn-show-submitted" id="btn-show-submitted">已繳交</button>
+        <button class="btn-add-assignment" id="btn-add-assignment">+ 新增作業</button>
       </div>
       <div id="main-section"></div>
       <div id="course-detail-container" style="display: none;"></div>
@@ -2732,20 +3231,20 @@
               </svg>
             </div>
             <div class="welcome-eyebrow">1 / 5</div>
-            <div class="welcome-title">歡迎使用 Due</div>
+            <div class="welcome-title" id="wstep-1-title">歡迎使用 Due</div>
             <div class="welcome-body split" style="flex:1; padding-top: 8px;">
               <div class="welcome-body-text">
-                Due ， 提醒你該做的事 ⚡️
+                <span id="wstep-1-intro">Due，提醒你該做的事 ⚡️</span>
                 <div
                   style="margin-top: 40px; font-style: italic; color: var(--muted); line-height: 1.7; font-size: 14px;">
-                  「Canvas 很靠北，找個作業要翻半天」- 有人
+                  <span id="wstep-1-q1">「Canvas 很靠北，找個作業要翻半天」- 有人</span>
                   <div style="margin-top: 15px;">
-                    「蛤?明天要交Lab喔」- 另外一個人
+                    <span id="wstep-1-q2">「蛤?明天要交Lab喔」- 另外一個人</span>
                   </div>
                 </div>
               </div>
 
-              <div class="welcome-dash-mock" style="flex:0 0 280px; margin-top:0; align-self: center;">
+              <div class="welcome-dash-mock" style="flex:0 0 280px; margin-top:0; align-self: center; position: relative; top: -30px;">
                 <div class="welcome-dash-mock-header">
                   <span class="welcome-dash-mock-title">Dashboard 概覽</span>
                   <span class="welcome-ai-mock-badge" style="font-size: 8px;">示例</span>
@@ -2793,19 +3292,14 @@
               </svg>
             </div>
             <div class="welcome-eyebrow">2 / 5</div>
-            <div class="welcome-title">登入 Canvas (必須)</div>
+            <div class="welcome-title" id="wstep-2-title">登入 Canvas（必須）</div>
             <div class="welcome-body" style="flex:1">
-              Due 透過你的 Canvas 登入狀態同步資料，不需要額外設定或 Token。
+              <span id="wstep-2-body">Due 透過你的 Canvas 登入狀態同步資料，不需要額外設定或 Token。</span>
               <ul class="welcome-inst-list">
                 <div style="margin-bottom: 10px;"></div>
-                <li><span class="welcome-inst-num">1</span><span class="welcome-inst-text">登入 <a
-                      class="welcome-inline-link" id="welcome-canvas-link">Canvas ↗</a>
-                    (點一下這個連結用於第一次同步😭)</span></li>
-                <li><span class="welcome-inst-num">2</span><span class="welcome-inst-text">Due
-                    會<strong>在你每次打開Canvas時自動更新</strong>你的所有課程與作業</span></li>
-                <li><span class="welcome-inst-num">3</span><span class="welcome-inst-text">點擊工具列或進入 Dashboard
-                    都可以看到相關資訊</span>
-                </li>
+                <li><span class="welcome-inst-num">1</span><span class="welcome-inst-text" id="wstep-2-li1">登入 <a class="welcome-inline-link" id="welcome-canvas-link">Canvas ↗</a>（點一下這個連結用於第一次同步😭）</span></li>
+                <li><span class="welcome-inst-num">2</span><span class="welcome-inst-text" id="wstep-2-li2">Due 會<strong>在你每次打開Canvas時自動更新</strong>你的所有課程與作業</span></li>
+                <li><span class="welcome-inst-num">3</span><span class="welcome-inst-text" id="wstep-2-li3">點擊工具列或進入 Dashboard 都可以看到相關資訊</span></li>
               </ul>
             </div>
           </div>
@@ -2820,21 +3314,18 @@
               </svg>
             </div>
             <div class="welcome-eyebrow">3 / 5</div>
-            <div class="welcome-title">釘選 Due 到工具列</div>
+            <div class="welcome-title" id="wstep-3-title">釘選 Due 到工具列</div>
             <div class="welcome-body split" style="flex:1">
               <div class="welcome-body-text">
-                釘選後點一下圖示就能查看 7 天待辦 (煮菠愛用😋)
+                <span id="wstep-3-body">釘選後點一下圖示就能查看 7 天待辦（煮菠愛用😋）</span>
                 <ul class="welcome-inst-list">
                   <div style="margin-bottom: 15px;"></div>
-                  <li><span class="welcome-inst-num">1</span><span class="welcome-inst-text">點擊瀏覽器右上角的
-                      <strong>拼圖圖示</strong>（擴充功能）</span></li>
-                  <li><span class="welcome-inst-num">2</span><span class="welcome-inst-text">找到
-                      <strong>Due</strong>，點擊旁邊的<strong>釘選圖示</strong></span></li>
-                  <li><span class="welcome-inst-num">3</span><span class="welcome-inst-text">工具列出現 Due 圖示後即完成</span>
-                  </li>
+                  <li><span class="welcome-inst-num">1</span><span class="welcome-inst-text" id="wstep-3-li1">點擊瀏覽器右上角的<strong>拼圖圖示</strong>（擴充功能）</span></li>
+                  <li><span class="welcome-inst-num">2</span><span class="welcome-inst-text" id="wstep-3-li2">找到 <strong>Due</strong>，點擊旁邊的<strong>釘選圖示</strong></span></li>
+                  <li><span class="welcome-inst-num">3</span><span class="welcome-inst-text" id="wstep-3-li3">工具列出現 Due 圖示後即完成</span></li>
                 </ul>
               </div>
-              <div class="welcome-preview square" style="align-self: center;">
+              <div class="welcome-preview square" style="align-self: center; background: var(--bg); position: relative; top: -15px;">
                 <img src="../icons/pin_guide.png" alt="釘選 Due 示意圖"
                   onerror="this.closest('.welcome-preview').style.display='none'" />
               </div>
@@ -2851,39 +3342,66 @@
               </svg>
             </div>
             <div class="welcome-eyebrow">4 / 5</div>
-            <div class="welcome-title">AI 分析（可選）</div>
+            <div class="welcome-title" id="wstep-4-title">AI 評分權重分析（可選）</div>
             <div class="welcome-body split" style="flex:1; padding-top: 8px;">
               <div class="welcome-body-text">
-                <div><a class="welcome-inline-link" id="welcome-api-link">添加API Key</a> 後 Due 就能分析作業 🦔</div>
-                <div style="margin-top: 50px; font-size: 14px; color: var(--muted);">
-                  💡 不加 API 功能不變但可能抓不到課程評分
-                  <div style="margin-top: 15px;">
-                    💡 如果你不知道API是什麼，可以跳過這頁
+                <div><a class="welcome-inline-link" id="welcome-api-link">添加 API Key</a> <span id="wstep-4-body-a">後，Due 可自動讀取課程 Syllabus，找出各項目的評分比重。</span></div>
+                <div style="margin-top: 12px; font-size: 14px; color: var(--muted);">
+                  💡 <span id="wstep-4-body-b">進入課程詳情頁，點擊「分析權重」即可執行</span>
+                  <div style="margin-top: 6px;">
+                    💡 <span id="wstep-4-body-c">不加 API 也可以手動在課程頁編輯評分比重</span>
+                  </div>
+                  <div style="margin-top: 6px;">
+                    💡 <span id="wstep-4-body-d">如果你不知道 API 是什麼，可以跳過這頁</span>
                   </div>
                 </div>
               </div>
-              <div class="welcome-ai-mock" style="flex:0 0 280px; margin-top:0; font-size: 11px; align-self: center;">
-                <div class="welcome-ai-mock-header">
-                  <span class="welcome-ai-mock-title">AI 分析結果（範例）</span>
-                  <span class="welcome-ai-mock-badge">Preview</span>
+              <div class="welcome-dash-mock" style="flex:0 0 240px; margin-top:0; align-self: center; position: relative; top: -25px;">
+                <div class="welcome-dash-mock-header">
+                  <span class="welcome-dash-mock-title">評分比重（範例）</span>
+                  <span class="welcome-ai-mock-badge" style="font-size: 8px;">示例</span>
                 </div>
-                <div class="welcome-ai-mock-body" style="padding: 12px;">
-                  <div class="welcome-ai-mock-row">
-                    <span class="welcome-ai-mock-key">摘要</span>
-                    <span class="welcome-ai-mock-val" style="font-size: 11px;">需完成一份量化分析報告，包含數據收集、統計分析與結論。</span>
-                  </div>
-                  <div class="welcome-ai-mock-row">
-                    <span class="welcome-ai-mock-key">里程碑</span>
-                    <div class="welcome-ai-mock-milestones">
-                      <div class="welcome-ai-mock-ms" style="font-size: 11px;">閱讀參考資料</div>
-                      <div class="welcome-ai-mock-ms" style="font-size: 11px;">完成數據分析</div>
-                      <div class="welcome-ai-mock-ms" style="font-size: 11px;">撰寫並修改報告</div>
+                <div style="padding: 16px 14px; display: flex; flex-direction: column; align-items: center; gap: 14px;">
+                  <div style="
+                    width: 120px; height: 120px; border-radius: 50%;
+                    background: conic-gradient(
+                      #d97757 0% 10%,
+                      #6a9bcc 10% 30%,
+                      #788c5d 30% 60%,
+                      #b09050 60% 100%
+                    );
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+                  "></div>
+                  <div style="width: 100%; display: flex; flex-direction: column; gap: 6px;">
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                      <div style="display:flex; align-items:center; gap:6px;">
+                        <div style="width:8px;height:8px;border-radius:50%;background:#d97757;flex-shrink:0;"></div>
+                        <span style="font-family:'DM Sans',sans-serif; font-size:11px; color:var(--dark);">In-class test</span>
+                      </div>
+                      <span style="font-family:'DM Mono',monospace; font-size:11px; color:var(--mid);">10%</span>
+                    </div>
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                      <div style="display:flex; align-items:center; gap:6px;">
+                        <div style="width:8px;height:8px;border-radius:50%;background:#6a9bcc;flex-shrink:0;"></div>
+                        <span style="font-family:'DM Sans',sans-serif; font-size:11px; color:var(--dark);">Course Participation</span>
+                      </div>
+                      <span style="font-family:'DM Mono',monospace; font-size:11px; color:var(--mid);">20%</span>
+                    </div>
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                      <div style="display:flex; align-items:center; gap:6px;">
+                        <div style="width:8px;height:8px;border-radius:50%;background:#788c5d;flex-shrink:0;"></div>
+                        <span style="font-family:'DM Sans',sans-serif; font-size:11px; color:var(--dark);">Group Project</span>
+                      </div>
+                      <span style="font-family:'DM Mono',monospace; font-size:11px; color:var(--mid);">30%</span>
+                    </div>
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                      <div style="display:flex; align-items:center; gap:6px;">
+                        <div style="width:8px;height:8px;border-radius:50%;background:#b09050;flex-shrink:0;"></div>
+                        <span style="font-family:'DM Sans',sans-serif; font-size:11px; color:var(--dark);">Final examination</span>
+                      </div>
+                      <span style="font-family:'DM Mono',monospace; font-size:11px; color:var(--mid);">40%</span>
                     </div>
                   </div>
-                </div>
-                <div class="welcome-ai-mock-footer">
-                  <span class="welcome-ai-mock-hours-label">預計時數</span>
-                  <span class="welcome-ai-mock-hours-val">6h</span>
                 </div>
               </div>
             </div>
@@ -2897,27 +3415,27 @@
               </svg>
             </div>
             <div class="welcome-eyebrow">5 / 5</div>
-            <div class="welcome-title">一切就緒</div>
+            <div class="welcome-title" id="wstep-5-title">一切就緒</div>
             <div class="welcome-body" style="flex:1">
-              設定完成。登入 Canvas 後資料會自動同步，可隨時在設定中調整 AI 服務。
+              <span id="wstep-5-body">設定完成。登入 Canvas 後資料會自動同步，可隨時在設定中調整 AI 服務。</span>
               <div class="welcome-done-list">
                 <div class="welcome-done-item">
                   <div class="welcome-done-check"><svg viewBox="0 0 12 12">
                       <polyline points="10 3 5 9 2 6" />
                     </svg></div>
-                  <span>Due 已釘選到瀏覽器工具列</span>
+                  <span id="wstep-5-done1">Due 已釘選到瀏覽器工具列</span>
                 </div>
                 <div class="welcome-done-item">
                   <div class="welcome-done-check"><svg viewBox="0 0 12 12">
                       <polyline points="10 3 5 9 2 6" />
                     </svg></div>
-                  <span>Canvas 登入狀態已確認</span>
+                  <span id="wstep-5-done2">Canvas 登入狀態已確認</span>
                 </div>
                 <div class="welcome-done-item">
                   <div class="welcome-done-check"><svg viewBox="0 0 12 12">
                       <polyline points="10 3 5 9 2 6" />
                     </svg></div>
-                  <span>AI 分析功能已了解（可隨時在設定中配置）</span>
+                  <span id="wstep-5-done3">AI 分析功能已了解（可隨時在設定中配置）</span>
                 </div>
               </div>
             </div>
@@ -2946,20 +3464,59 @@
 
 
 
-  <div class="analysis-backdrop" id="analysis-backdrop"></div>
-  <div class="analysis-panel" id="analysis-panel">
-    <div class="analysis-panel-header">
-      <div>
-        <div class="analysis-panel-title">作業分析</div>
-        <div class="analysis-panel-subtitle" id="analysis-panel-subtitle">Claude AI</div>
+
+  <div class="custom-assignment-overlay" id="custom-assignment-overlay">
+    <div class="custom-assignment-modal">
+      <div class="custom-assignment-header">
+        <div class="custom-assignment-title" id="custom-assignment-modal-title">新增作業</div>
+        <button class="custom-assignment-close" id="custom-assignment-close">✕</button>
       </div>
-      <button class="analysis-panel-close" id="analysis-close">✕</button>
-    </div>
-    <div class="analysis-content" id="analysis-content">
-      <div class="analysis-loading">載入中...</div>
+      <form class="custom-assignment-form" id="custom-assignment-form">
+        <div class="custom-assignment-field">
+          <label for="custom-assignment-course" id="custom-assignment-course-label">課程</label>
+          <select id="custom-assignment-course" required></select>
+        </div>
+        <div class="custom-assignment-field">
+          <label for="custom-assignment-name" id="custom-assignment-name-label">作業名稱</label>
+          <input id="custom-assignment-name" type="text" required />
+        </div>
+        <div class="custom-assignment-field">
+          <label for="custom-assignment-description" id="custom-assignment-description-label">作業描述</label>
+          <textarea id="custom-assignment-description"></textarea>
+        </div>
+        <div class="custom-assignment-field">
+          <label for="custom-assignment-due" id="custom-assignment-due-label">截止日期</label>
+          <input id="custom-assignment-due" type="datetime-local" />
+        </div>
+        <div class="custom-assignment-error" id="custom-assignment-error"></div>
+        <div class="custom-assignment-actions">
+          <button type="button" class="btn-custom-cancel" id="custom-assignment-cancel">取消</button>
+          <button type="submit" class="btn-custom-save" id="custom-assignment-save">儲存</button>
+        </div>
+      </form>
     </div>
   </div>
 
+  <!-- Weight Edit Modal -->
+  <div class="weight-edit-overlay" id="weight-edit-overlay">
+    <div class="weight-edit-modal">
+      <div class="weight-edit-header">
+        <span class="weight-edit-title" id="weight-edit-title">編輯評分權重</span>
+        <button class="weight-edit-ai-btn" id="weight-edit-ai-btn">
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 8v4l3 3"/><path d="M18 2v4h4"/></svg>
+          AI 分析
+        </button>
+      </div>
+      <div class="weight-edit-list" id="weight-edit-list"></div>
+      <button class="weight-edit-add" id="weight-edit-add">+ 新增項目</button>
+      <div class="weight-edit-footer">
+        <span class="weight-edit-total" id="weight-edit-total">總計：0%</span>
+        <button class="weight-edit-save" id="weight-edit-save">儲存</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="customAssignments.js"></script>
   <script src="dashboard.js"></script>
 </body>
 

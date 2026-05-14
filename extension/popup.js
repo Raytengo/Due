@@ -86,11 +86,10 @@ function isAttendance(name) {
 
 function isExam(name) {
   const lower = (name || '').toLowerCase();
-  return /\b(exam|quiz|midterm|final|test)\b/.test(lower)
-    || lower.includes('\u8003\u8A66')
-    || lower.includes('\u8003\u8BD5')
-    || lower.includes('\u6E2C\u9A57')
-    || lower.includes('\u6D4B\u9A8C');
+  return /\b(exam|quiz|midterm|test)\b/.test(lower)
+    || lower.includes('\u8003\u8A66') || lower.includes('\u8003\u8BD5')
+    || lower.includes('\u6E2C\u9A57') || lower.includes('\u6D4B\u9A8C')
+    || lower.includes('\u671F\u4E2D');
 }
 
 function formatDueShort(isoString) {
@@ -195,6 +194,7 @@ function getUpcomingTasks(assignments, courseMap) {
     for (const a of assignments[courseId]) {
       if (!a.due_at) continue;
       if (isAttendance(a.name)) continue;
+      if (isExam(a.name)) continue;
       if (a.submission && (
         a.submission.workflow_state === 'submitted' ||
         a.submission.workflow_state === 'graded' ||
@@ -363,10 +363,15 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
   if (changes.claudeUsage) renderClaudeUsage(changes.claudeUsage.newValue || null);
 });
 
-chrome.storage.local.get(['darkMode', 'uiLanguage'], (data) => {
+chrome.storage.local.get(['darkMode', 'uiLanguage', 'showClaudeUsageInPopup'], (data) => {
   _uiLanguage = data.uiLanguage || 'zh-TW';
   applyTheme(!!data.darkMode);
   applyUILanguage();
   applyClaudeRefreshCopy();
+
+  const showUsage = data.showClaudeUsageInPopup !== false;
+  const usageActions = document.querySelector('.usage-actions');
+  if (usageActions) usageActions.style.display = showUsage ? '' : 'none';
+
   loadData();
 });

@@ -254,21 +254,89 @@
       line-height: 1.55;
       text-align: center;
     }
+
+    /* ── Toggle section ── */
+    .toggle-section {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+      margin-top: 0px;
+      background: var(--surface);
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .toggle-label {
+      font-size: 13px;
+      color: var(--dark);
+    }
+
+    .toggle-desc {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      color: var(--mid);
+      margin-top: 4px;
+    }
+
+    .toggle-switch {
+      position: relative;
+      width: 40px;
+      height: 22px;
+      flex-shrink: 0;
+    }
+
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+      position: absolute;
+    }
+
+    .toggle-track {
+      position: absolute;
+      inset: 0;
+      border-radius: 999px;
+      background: var(--border);
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .toggle-track::after {
+      content: '';
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #fff;
+      transition: transform 0.2s;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.18);
+    }
+
+    .toggle-switch input:checked + .toggle-track {
+      background: var(--dark);
+    }
+
+    .toggle-switch input:checked + .toggle-track::after {
+      transform: translateX(18px);
+    }
   </style>
 </head>
 <body>
   <div class="card">
     <h1>API 設定</h1>
-    <div class="subtitle">Due · Provider + Model</div>
 
-    <div class="section-label">服務商</div>
     <div class="provider-select-wrap">
       <select id="provider-select" class="provider-select">
         <option value="gemini">Gemini</option>
-        <option value="anthropic">Anthropic</option>
-        <option value="openai">OpenAI</option>
-        <option value="minimax">MiniMax</option>
-        <option value="qwen">Qwen</option>
+        <option value="qwen">Qwen (通義千問)</option>
+        <option value="deepseek">DeepSeek</option>
       </select>
     </div>
 
@@ -303,6 +371,19 @@
     </div>
 
     <div class="status" id="status"></div>
+
+    <div class="toggle-section">
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">在 Popup 顯示 Claude 用量</div>
+          <div class="toggle-desc">關閉後 Popup 不顯示 Claude 用量 chip</div>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="toggle-claude-usage" checked />
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+    </div>
 
     <div class="global-hint">金鑰儲存於本機 chrome.storage.local，不會上傳任何伺服器。</div>
   </div>

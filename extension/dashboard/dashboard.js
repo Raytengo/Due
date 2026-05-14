@@ -17,6 +17,18 @@ const I18N = {
     syncing: '同步中...',
     tabWeek: '學期待辦',
     tabCourses: '課程',
+    addAssignment: '+ 新增作業',
+    addAssignmentTitle: '新增作業',
+    customAssignment: '自訂作業',
+    customCourseLabel: '課程',
+    customNameLabel: '作業名稱',
+    customDescriptionLabel: '作業描述',
+    customDueLabel: '截止日期',
+    customCancel: '取消',
+    customSave: '儲存',
+    customNameRequired: '請輸入作業名稱',
+    confirmDeleteCustom: '確定要刪除此自訂作業嗎？',
+    deleteCustomTitle: '刪除自訂作業',
     themeDark: '切換深色模式',
     themeLight: '切換淺色模式',
     languageLabel: '語言',
@@ -24,6 +36,7 @@ const I18N = {
     langZhCn: '简体中文',
     langEn: 'English',
     apiSettings: 'API 設定',
+    menuTutorial: '使用教學',
     // formatDue
     noDueDate: '無截止日期',
     overdue: '已過期',
@@ -65,6 +78,8 @@ const I18N = {
     analyzeWeight: '分析權重',
     updateWeight: '更新權重',
     weightNotFound: '未找到評分資訊',
+    renameCourse: '重命名',
+    weightItemName: '項目名稱',
     coursePdf: '課程 PDF',
     aiSelectedPdf: 'AI 選取 PDF',
     // grade calculator
@@ -103,6 +118,43 @@ const I18N = {
     beyond30DaysShort: '30天+',
     noTasks: '無待辦事項',
     analysisTitle: '作業分析',
+    // ui widgets
+    editWeight: '編輯',
+    weightEditTitle: '編輯評分權重',
+    weightAddItem: '+ 新增項目',
+    weightTotal: '總計：',
+    unnamedWeight: '未命名',
+    submittedBtn: '已繳交',
+    // welcome steps
+    wTitle1: '歡迎使用 Due',
+    wBody1Intro: 'Due，提醒你該做的事 ⚡️',
+    wBody1Q1: '「Canvas 很靠北，找個作業要翻半天」- 有人',
+    wBody1Q2: '「蛤？明天要交Lab喔」- 另外一個人',
+    wTitle2: '登入 Canvas（必須）',
+    wBody2: 'Due 透過你的 Canvas 登入狀態同步資料，不需要額外設定或 Token。',
+    wStep2Li1: '登入 <a class="welcome-inline-link" id="welcome-canvas-link">Canvas ↗</a>（點一下這個連結用於第一次同步😭）',
+    wStep2Li2: 'Due 會<strong>在你每次打開Canvas時自動更新</strong>你的所有課程與作業',
+    wStep2Li3: '點擊工具列或進入 Dashboard 都可以看到相關資訊',
+    wTitle3: '釘選 Due 到工具列',
+    wBody3: '釘選後點一下圖示就能查看 7 天待辦（煮菠愛用😋）',
+    wStep3Li1: '點擊瀏覽器右上角的<strong>拼圖圖示</strong>（擴充功能）',
+    wStep3Li2: '找到 <strong>Due</strong>，點擊旁邊的<strong>釘選圖示</strong>',
+    wStep3Li3: '工具列出現 Due 圖示後即完成',
+    wTitle4: 'AI 評分權重分析（可選）',
+    wBody4a: '添加 API Key 後，Due 可自動讀取課程 Syllabus，找出各項目的評分比重。',
+    wBody4b: '進入課程詳情頁，點擊「分析權重」即可執行',
+    wBody4c: '不加 API 也可以手動在課程頁編輯評分比重',
+    wBody4d: '如果你不知道 API 是什麼，可以跳過這頁',
+    wTitle5: '一切就緒',
+    wBody5: '設定完成。登入 Canvas 後資料會自動同步，可隨時在設定中調整 AI 服務。',
+    wDone1: 'Due 已釘選到瀏覽器工具列',
+    wDone2: 'Canvas 登入狀態已確認',
+    wDone3: 'AI 分析功能已了解（可隨時在設定中配置）',
+    wBtnStart: '開始設定',
+    wBtnPrev: '上一步',
+    wBtnNext: '下一步',
+    wBtnDone: '開始使用',
+    wApiLink: '添加 API Key',
   },
   'zh-CN': {
     filter: '筛选',
@@ -115,6 +167,18 @@ const I18N = {
     syncing: '同步中...',
     tabWeek: '学期待办',
     tabCourses: '课程',
+    addAssignment: '+ 新增作业',
+    addAssignmentTitle: '新增作业',
+    customAssignment: '自定义作业',
+    customCourseLabel: '课程',
+    customNameLabel: '作业名称',
+    customDescriptionLabel: '作业描述',
+    customDueLabel: '截止日期',
+    customCancel: '取消',
+    customSave: '保存',
+    customNameRequired: '请输入作业名称',
+    confirmDeleteCustom: '确定要删除此自定义作业吗？',
+    deleteCustomTitle: '删除自定义作业',
     themeDark: '切换深色模式',
     themeLight: '切换浅色模式',
     languageLabel: '语言',
@@ -122,6 +186,7 @@ const I18N = {
     langZhCn: '简体中文',
     langEn: 'English',
     apiSettings: 'API 设置',
+    menuTutorial: '使用教程',
     noDueDate: '无截止日期',
     overdue: '已过期',
     today: '今天',
@@ -153,6 +218,8 @@ const I18N = {
     analyzeWeight: '分析权重',
     updateWeight: '更新权重',
     weightNotFound: '未找到评分信息',
+    renameCourse: '重命名',
+    weightItemName: '项目名称',
     coursePdf: '课程 PDF',
     aiSelectedPdf: 'AI 选取 PDF',
     gradeCalcTitle: '成绩计算器',
@@ -186,6 +253,41 @@ const I18N = {
     beyond30DaysShort: '30天+',
     noTasks: '无待办事项',
     analysisTitle: '作业分析',
+    editWeight: '编辑',
+    weightEditTitle: '编辑评分权重',
+    weightAddItem: '+ 新增项目',
+    weightTotal: '总计：',
+    unnamedWeight: '未命名',
+    submittedBtn: '已提交',
+    wTitle1: '欢迎使用 Due',
+    wBody1Intro: 'Due，提醒你该做的事 ⚡️',
+    wBody1Q1: '「Canvas 很烦，找个作业要翻半天」- 某人',
+    wBody1Q2: '「啥？明天要交Lab？」- 另一个人',
+    wTitle2: '登录 Canvas（必须）',
+    wBody2: 'Due 通过你的 Canvas 登录状态同步数据，无需额外设置或 Token。',
+    wStep2Li1: '登录 <a class="welcome-inline-link" id="welcome-canvas-link">Canvas ↗</a>（点击此链接以完成第一次同步😭）',
+    wStep2Li2: 'Due 会<strong>在每次打开 Canvas 时自动更新</strong>你的所有课程和作业',
+    wStep2Li3: '点击工具栏图标或进入 Dashboard 即可查看',
+    wTitle3: '固定 Due 到工具栏',
+    wBody3: '固定后点一下图标就能查看 7 天待办😋',
+    wStep3Li1: '点击浏览器右上角的<strong>拼图图标</strong>（扩展程序）',
+    wStep3Li2: '找到 <strong>Due</strong>，点击旁边的<strong>固定图标</strong>',
+    wStep3Li3: '工具栏出现 Due 图标后即完成',
+    wTitle4: 'AI 评分权重分析（可选）',
+    wBody4a: '添加 API Key 后，Due 可自动读取课程 Syllabus，找出各项目的评分比重。',
+    wBody4b: '进入课程详情页，点击「分析权重」即可执行',
+    wBody4c: '不加 API 也可以在课程页手动编辑评分比重',
+    wBody4d: '如果你不知道 API 是什么，可以跳过这页',
+    wTitle5: '一切就绪',
+    wBody5: '设置完成。登录 Canvas 后数据将自动同步，可随时在设置中调整 AI 服务。',
+    wDone1: 'Due 已固定到浏览器工具栏',
+    wDone2: 'Canvas 登录状态已确认',
+    wDone3: '已了解 AI 分析功能（可随时在设置中配置）',
+    wBtnStart: '开始设置',
+    wBtnPrev: '上一步',
+    wBtnNext: '下一步',
+    wBtnDone: '开始使用',
+    wApiLink: '添加 API Key',
   },
   en: {
     filter: 'Filter',
@@ -198,6 +300,18 @@ const I18N = {
     syncing: 'Syncing...',
     tabWeek: 'This Week',
     tabCourses: 'Courses',
+    addAssignment: '+ Add Assignment',
+    addAssignmentTitle: 'Add Assignment',
+    customAssignment: 'Custom Assignment',
+    customCourseLabel: 'Course',
+    customNameLabel: 'Assignment Name',
+    customDescriptionLabel: 'Description',
+    customDueLabel: 'Due Date',
+    customCancel: 'Cancel',
+    customSave: 'Save',
+    customNameRequired: 'Enter an assignment name',
+    confirmDeleteCustom: 'Delete this custom assignment?',
+    deleteCustomTitle: 'Delete custom assignment',
     themeDark: 'Switch To Dark',
     themeLight: 'Switch To Light',
     languageLabel: 'Language',
@@ -205,6 +319,7 @@ const I18N = {
     langZhCn: 'Simplified Chinese',
     langEn: 'English',
     apiSettings: 'API Settings',
+    menuTutorial: 'Tutorial',
     noDueDate: 'No due date',
     overdue: 'Overdue',
     today: 'Today',
@@ -236,6 +351,8 @@ const I18N = {
     analyzeWeight: 'Analyze Grades',
     updateWeight: 'Update',
     weightNotFound: 'Grade info not found',
+    renameCourse: 'Rename',
+    weightItemName: 'Item name',
     coursePdf: 'Course PDF',
     aiSelectedPdf: 'AI-selected PDF',
     gradeCalcTitle: 'Grade Calculator',
@@ -269,6 +386,41 @@ const I18N = {
     beyond30DaysShort: '30 d+',
     noTasks: 'No pending tasks',
     analysisTitle: 'Assignment Analysis',
+    editWeight: 'Edit',
+    weightEditTitle: 'Edit Grade Weights',
+    weightAddItem: '+ Add Item',
+    weightTotal: 'Total:',
+    unnamedWeight: 'Unnamed',
+    submittedBtn: 'Submitted',
+    wTitle1: 'Welcome to Due',
+    wBody1Intro: 'Due — your assignment tracker ⚡️',
+    wBody1Q1: '"Canvas is a mess — finding one assignment takes forever" — someone',
+    wBody1Q2: '"Wait, the lab is due tomorrow?" — someone else',
+    wTitle2: 'Log in to Canvas (Required)',
+    wBody2: 'Due syncs data using your Canvas login session — no extra setup or tokens needed.',
+    wStep2Li1: 'Log in to <a class="welcome-inline-link" id="welcome-canvas-link">Canvas ↗</a> (click this link for your first sync 😭)',
+    wStep2Li2: 'Due <strong>auto-syncs all your courses and assignments</strong> every time you open Canvas',
+    wStep2Li3: 'Click the toolbar icon or open Dashboard to view your tasks',
+    wTitle3: 'Pin Due to Toolbar',
+    wBody3: 'Pin it and tap the icon to see your 7-day tasks at a glance 😋',
+    wStep3Li1: 'Click the <strong>puzzle icon</strong> (Extensions) in the top-right of your browser',
+    wStep3Li2: 'Find <strong>Due</strong> and click the <strong>pin icon</strong> next to it',
+    wStep3Li3: 'Done when the Due icon appears in your toolbar',
+    wTitle4: 'AI Grade Weights (Optional)',
+    wBody4a: 'Add an API Key and Due will auto-detect grade weights from your course Syllabus.',
+    wBody4b: 'Open a course, then click "Analyze Weights" to run it',
+    wBody4c: 'You can also edit weights manually — no API key needed',
+    wBody4d: 'Not sure what an API is? Skip this step',
+    wTitle5: 'All Set!',
+    wBody5: 'Setup complete. Data syncs automatically after you log in to Canvas. Adjust AI settings anytime.',
+    wDone1: 'Due pinned to browser toolbar',
+    wDone2: 'Canvas login confirmed',
+    wDone3: 'AI analysis feature noted (configure in Settings anytime)',
+    wBtnStart: 'Get Started',
+    wBtnPrev: 'Back',
+    wBtnNext: 'Next',
+    wBtnDone: 'Start Using Due',
+    wApiLink: 'Add an API Key',
   },
 };
 
@@ -276,22 +428,78 @@ function tr(key) {
   return (I18N[_uiLanguage] && I18N[_uiLanguage][key]) || I18N['zh-TW'][key] || key;
 }
 
+function applyWelcomeTranslations() {
+  const setText = (id, key) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = tr(key);
+  };
+  const setHTML = (id, key) => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = tr(key);
+  };
+  setText('wstep-1-title', 'wTitle1');
+  setText('wstep-1-intro', 'wBody1Intro');
+  setText('wstep-1-q1', 'wBody1Q1');
+  setText('wstep-1-q2', 'wBody1Q2');
+  setText('wstep-2-title', 'wTitle2');
+  setText('wstep-2-body', 'wBody2');
+  setHTML('wstep-2-li1', 'wStep2Li1');
+  setHTML('wstep-2-li2', 'wStep2Li2');
+  setText('wstep-2-li3', 'wStep2Li3');
+  setText('wstep-3-title', 'wTitle3');
+  setText('wstep-3-body', 'wBody3');
+  setHTML('wstep-3-li1', 'wStep3Li1');
+  setHTML('wstep-3-li2', 'wStep3Li2');
+  setText('wstep-3-li3', 'wStep3Li3');
+  setText('wstep-4-title', 'wTitle4');
+  setText('welcome-api-link', 'wApiLink');
+  setText('wstep-4-body-a', 'wBody4a');
+  setText('wstep-4-body-b', 'wBody4b');
+  setText('wstep-4-body-c', 'wBody4c');
+  setText('wstep-4-body-d', 'wBody4d');
+  setText('wstep-5-title', 'wTitle5');
+  setText('wstep-5-body', 'wBody5');
+  setText('wstep-5-done1', 'wDone1');
+  setText('wstep-5-done2', 'wDone2');
+  setText('wstep-5-done3', 'wDone3');
+  _welcomeUpdateButtons(_welcomeStep);
+}
+
 function applyUILanguage() {
   const setText = (id, key) => {
     const el = document.getElementById(id);
     if (el) el.textContent = tr(key);
   };
-  setText('label-filter', 'filter');
-  setText('filter-assignment', 'assignment');
-  setText('filter-exam', 'exam');
   setText('label-hide-done', 'hideSubmitted');
   setText('label-courses', 'courses');
   setText('sync-btn', 'sync');
   setText('tab-week', 'tabWeek');
   setText('tab-courses', 'tabCourses');
+  setText('btn-add-assignment', 'addAssignment');
+  setText('btn-show-submitted', 'submittedBtn');
+  setText('detail-back-btn', 'back');
+  setText('custom-assignment-modal-title', 'addAssignmentTitle');
+  setText('custom-assignment-course-label', 'customCourseLabel');
+  setText('custom-assignment-name-label', 'customNameLabel');
+  setText('custom-assignment-description-label', 'customDescriptionLabel');
+  setText('custom-assignment-due-label', 'customDueLabel');
+  setText('custom-assignment-cancel', 'customCancel');
+  setText('custom-assignment-save', 'customSave');
+  setText('weight-edit-title', 'weightEditTitle');
+  setText('weight-edit-add', 'weightAddItem');
+  setText('weight-edit-save', 'customSave');
+  const weightAiBtn = document.getElementById('weight-edit-ai-btn');
+  if (weightAiBtn) {
+    const svg = weightAiBtn.querySelector('svg');
+    weightAiBtn.innerHTML = '';
+    if (svg) weightAiBtn.appendChild(svg);
+    weightAiBtn.appendChild(document.createTextNode(' ' + tr('analyzeBtn')));
+  }
+  applyWelcomeTranslations();
   const apiSettingsBtn = document.getElementById('menu-open-api-settings');
   if (apiSettingsBtn) apiSettingsBtn.innerHTML = `${tr('apiSettings')} <span>↗</span>`;
-  setText('analysis-panel-title', 'analysisTitle');
+  const tutorialBtn = document.getElementById('menu-open-tutorial');
+  if (tutorialBtn) tutorialBtn.innerHTML = `${tr('menuTutorial')} <span>↗</span>`;
   const menuLanguageLabel = document.getElementById('menu-language-label');
   if (menuLanguageLabel) {
     menuLanguageLabel.innerHTML = `${tr('languageLabel')}
@@ -420,12 +628,11 @@ function formatLastSync(iso) {
 function isExam(assignment) {
   if (assignment.is_quiz_assignment) return true;
   if ((assignment.submission_types || []).includes('online_quiz')) return true;
-  const title = (assignment.name || '').toLowerCase();
-  return (
-    title.includes('exam') || title.includes('quiz') ||
-    title.includes('test') || title.includes('midterm') ||
-    title.includes('final')
-  );
+  const lower = (assignment.name || '').toLowerCase();
+  return /\b(exam|quiz|midterm|test)\b/.test(lower)
+    || lower.includes('考試') || lower.includes('考试')
+    || lower.includes('測驗') || lower.includes('测验')
+    || lower.includes('期中');
 }
 
 function isAttendance(assignment) {
@@ -484,8 +691,6 @@ function findGroup(assignment, groups) {
   return null;
 }
 
-// ── 全域 filter 狀態 ──
-let currentFilter = 'assignment';
 let showSubmitted = false;
 
 // ── View 狀態 ──
@@ -495,37 +700,17 @@ let currentPage = 'week';      // 'week' | 'courses'
 const cardPages = {};           // { [courseId]: pageIndex }
 
 function currentItemLabel() {
-  if (currentFilter === 'exam') return tr('exam');
-  if (currentFilter === 'all') return tr('all');
   return tr('assignment');
 }
 
-function currentListLabel() {
-  if (currentFilter === 'exam') return tr('listExam');
-  if (currentFilter === 'all') return tr('listAll');
-  return tr('listAssignment');
-}
-
-function cardEmptyLabel() {
-  if (currentFilter === 'exam') return tr('noPendingExam');
-  if (currentFilter === 'all') return tr('noPendingAll');
-  return tr('noPendingAssignment');
-}
-
-function noItemsLabel() {
-  if (currentFilter === 'exam') return tr('noExam');
-  if (currentFilter === 'all') return tr('noAll');
-  return tr('noAssignment');
-}
+function currentListLabel() { return tr('listAssignment'); }
+function cardEmptyLabel() { return tr('noPendingAssignment'); }
+function noItemsLabel() { return tr('noAssignment'); }
 
 // ── 套用篩選到作業列表 ──
 function applyFilters(asgns) {
-  // 永久排除簽到/出勤/參與類
-  let result = asgns.filter((a) => !isAttendance(a));
-
-  // 類型篩選
-  if (currentFilter === 'assignment') result = result.filter((a) => !isExam(a));
-  else if (currentFilter === 'exam') result = result.filter((a) => isExam(a));
+  // 永久排除簽到/出勤/參與類，以及考試類
+  let result = asgns.filter((a) => !isAttendance(a) && !isExam(a));
 
   // 默認隱藏已繳交；勾選「查看已繳交」後改為只顯示已繳交
   if (showSubmitted) {
@@ -544,6 +729,79 @@ function getCourseName(course) {
   return custom || course.name || '';
 }
 
+function openCustomAssignmentModal(defaultCourseId = currentCourseId) {
+  const courses = _currentData.courses || [];
+  if (!courses.length) return;
+
+  const overlay = document.getElementById('custom-assignment-overlay');
+  const form = document.getElementById('custom-assignment-form');
+  const courseSelect = document.getElementById('custom-assignment-course');
+  const nameInput = document.getElementById('custom-assignment-name');
+  const descInput = document.getElementById('custom-assignment-description');
+  const dueInput = document.getElementById('custom-assignment-due');
+  const errorEl = document.getElementById('custom-assignment-error');
+  if (!overlay || !form || !courseSelect || !nameInput || !descInput || !dueInput) return;
+
+  courseSelect.innerHTML = courses.map((course) => `
+    <option value="${course.id}">${esc(getCourseName(course))}</option>
+  `).join('');
+
+  form.reset();
+  if (defaultCourseId && courses.some((course) => String(course.id) === String(defaultCourseId))) {
+    courseSelect.value = String(defaultCourseId);
+  }
+  dueInput.value = DueCustomAssignments.getDefaultDueLocalValue();
+  if (errorEl) errorEl.textContent = '';
+  overlay.classList.add('open');
+  requestAnimationFrame(() => nameInput.focus());
+}
+
+function closeCustomAssignmentModal() {
+  const overlay = document.getElementById('custom-assignment-overlay');
+  if (overlay) overlay.classList.remove('open');
+}
+
+function saveCustomAssignmentFromForm(e) {
+  e.preventDefault();
+  const courseSelect = document.getElementById('custom-assignment-course');
+  const nameInput = document.getElementById('custom-assignment-name');
+  const descInput = document.getElementById('custom-assignment-description');
+  const dueInput = document.getElementById('custom-assignment-due');
+  const errorEl = document.getElementById('custom-assignment-error');
+
+  try {
+    const assignment = DueCustomAssignments.createCustomAssignment({
+      courseId: courseSelect.value,
+      name: nameInput.value,
+      description: descInput.value,
+      dueLocalValue: dueInput.value,
+    });
+    const key = String(assignment.course_id);
+    chrome.storage.local.get(['customAssignments'], (data) => {
+      const customAssignments = data.customAssignments || {};
+      customAssignments[key] = [assignment, ...(customAssignments[key] || [])];
+      chrome.storage.local.set({ customAssignments }, () => {
+        closeCustomAssignmentModal();
+        loadData();
+      });
+    });
+  } catch (err) {
+    if (errorEl) errorEl.textContent = tr('customNameRequired');
+  }
+}
+
+function deleteCustomAssignment(courseId, assignmentId) {
+  if (!confirm(tr('confirmDeleteCustom'))) return;
+  chrome.storage.local.get(['customAssignments'], (data) => {
+    const customAssignments = data.customAssignments || {};
+    const key = String(courseId);
+    customAssignments[key] = (customAssignments[key] || [])
+      .filter((assignment) => String(assignment.id) !== String(assignmentId));
+    if (!customAssignments[key].length) delete customAssignments[key];
+    chrome.storage.local.set({ customAssignments }, loadData);
+  });
+}
+
 function fitMetaText() {
   const el = document.getElementById('header-meta');
   if (!el) return;
@@ -557,17 +815,26 @@ function fitMetaText() {
 
 // ── 主要渲染 ──
 function render(data) {
-  _currentData = data;
-  const { lastSync, schoolName = 'Canvas', courses = [], assignments = {}, assignmentGroups = {}, scores = {} } = data;
+  const canvasAssignments = data.assignments || {};
+  const customAssignments = data.customAssignments || {};
+  const mergedAssignments = DueCustomAssignments.mergeAssignmentMaps(canvasAssignments, customAssignments);
+  _currentData = {
+    ...data,
+    canvasAssignments,
+    customAssignments: DueCustomAssignments.normalizeCustomAssignmentMap(customAssignments),
+    assignments: mergedAssignments,
+  };
+  const { lastSync, schoolName = 'Canvas', courses = [], assignments = {}, assignmentGroups = {}, scores = {} } = _currentData;
 
   document.getElementById('header-meta').textContent =
-    `${schoolName} · ${courses.length} ${tr('courseCountSuffix')} · ${formatLastSync(lastSync)}`;
+    `${schoolName} · ${formatLastSync(lastSync)}`;
   fitMetaText();
 
   renderNav(courses, assignments);
 
   if (currentView === 'course') {
-    document.getElementById('page-tabs').style.display = 'none';
+    document.getElementById('page-tabs').style.display = '';
+    document.getElementById('page-tabs').classList.add('detail-mode');
     document.getElementById('main-section').style.display = 'none';
     document.getElementById('course-detail-container').style.display = 'flex';
     const course = courses.find((c) => c.id === currentCourseId);
@@ -578,6 +845,7 @@ function render(data) {
     }
   } else {
     document.getElementById('page-tabs').style.display = '';
+    document.getElementById('page-tabs').classList.remove('detail-mode');
     document.getElementById('main-section').style.display = '';
     document.getElementById('course-detail-container').style.display = 'none';
     updateTabs();
@@ -625,8 +893,9 @@ function renderNav(courses, assignments) {
       : 'nav-course-badge is-placeholder';
     const badgeText = hasBadge ? pendingCount : '0';
 
+    const isActive = currentView === 'course' && currentCourseId === c.id;
     return `
-      <button class="nav-course-item" data-target-course="${c.id}">
+      <button class="nav-course-item${isActive ? ' active' : ''}" data-target-course="${c.id}">
         <span class="nav-course-name">${esc(getCourseName(c))}</span>
         <span class="${badgeClass}">${badgeText}</span>
       </button>`;
@@ -969,7 +1238,23 @@ function showCourseDetail(courseId, cardEl) {
   if (!cardEl || !document.startViewTransition) {
     currentView = 'course';
     currentCourseId = courseId;
-    loadData();
+
+    const detailContainer = document.getElementById('course-detail-container');
+    const pageTabs = document.getElementById('page-tabs');
+    const mainSection = document.getElementById('main-section');
+    const detailBackBtn = document.getElementById('detail-back-btn');
+
+    pageTabs.classList.add('detail-mode');
+    if (detailBackBtn) detailBackBtn.style.display = 'inline-flex';
+    mainSection.style.display = 'none';
+    detailContainer.style.display = 'flex';
+
+    const { courses = [], assignments = {}, assignmentGroups = {}, scores = {} } = _currentData;
+    const course = courses.find((c) => c.id === courseId);
+    if (course) {
+      renderNav(courses, assignments);
+      renderCourseDetailSection(course, assignments[course.id] || [], assignmentGroups[course.id] || [], scores);
+    }
     return;
   }
 
@@ -992,8 +1277,11 @@ function showCourseDetail(courseId, cardEl) {
     const detailContainer = document.getElementById('course-detail-container');
     const pageTabs = document.getElementById('page-tabs');
     const mainSection = document.getElementById('main-section');
+    const detailBackBtn = document.getElementById('detail-back-btn');
 
-    pageTabs.style.display = 'none';
+    pageTabs.style.display = '';
+    pageTabs.classList.add('detail-mode');
+    if (detailBackBtn) detailBackBtn.style.display = 'inline-flex';
     mainSection.style.display = 'none';
     detailContainer.style.display = 'flex';
 
@@ -1057,8 +1345,11 @@ function showGridView() {
 
     const pageTabs = document.getElementById('page-tabs');
     const mainSection = document.getElementById('main-section');
+    const detailBackBtn = document.getElementById('detail-back-btn');
 
     pageTabs.style.display = '';
+    pageTabs.classList.remove('detail-mode');
+    if (detailBackBtn) detailBackBtn.style.display = 'none';
     mainSection.style.display = '';
     detailContainer.style.display = 'none';
 
@@ -1181,12 +1472,11 @@ function renderCourseDetailSection(course, asgns, groups, scores) {
     : `<div class="card-badge-urgent is-placeholder" aria-hidden="true">0${tr('urgentItems')}</div>`;
 
   const syllabusData = (_currentData.syllabusAnalysis || {})[course.id] || null;
-  const weightPieHtml = renderWeightPie(groups, syllabusData);
+  const weightPieHtml = renderWeightPie(groups, syllabusData, course.id);
   const gradeCalcHtml = renderGradeCalculator(course, asgns, groups, scores);
   const assignmentRows = filtered.map((a) => renderAssignmentRow(a, groups, course.id)).join('');
 
   el.innerHTML = `
-    <button class="detail-back" id="detail-back-btn">${tr('back')}</button>
     <div class="course-detail-view">
       <div class="detail-card-top">
         <div class="detail-top-row">
@@ -1195,7 +1485,7 @@ function renderCourseDetailSection(course, asgns, groups, scores) {
         </div>
         <div class="detail-name">
           <span class="detail-name-text">${esc(getCourseName(course))}</span>
-          <button class="btn-rename-course" data-course-id="${course.id}" title="重命名"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg></button>
+          <button class="btn-rename-course" data-course-id="${course.id}" title="${tr('renameCourse')}"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg></button>
         </div>
         <div class="detail-meta">${detailMeta}</div>
       </div>
@@ -1235,10 +1525,10 @@ function renderCourseDetailSection(course, asgns, groups, scores) {
     btn.addEventListener('click', () => startCourseRename(parseInt(btn.dataset.courseId, 10)));
   });
 
-  el.querySelectorAll('.btn-analyze').forEach((btn) => {
+  el.querySelectorAll('.btn-delete-custom-assignment').forEach((btn) => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      openAnalysisPanel(parseInt(btn.dataset.assignmentId, 10), parseInt(btn.dataset.courseId, 10));
+      deleteCustomAssignment(btn.dataset.courseId, btn.dataset.assignmentId);
     });
   });
 
@@ -1291,11 +1581,50 @@ function renderCourseDetailSection(course, asgns, groups, scores) {
       });
     });
   });
+
+  el.querySelectorAll('.btn-edit-weights').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      openWeightEditModal(parseInt(btn.dataset.courseId, 10));
+    });
+  });
 }
 
 
 // ── Weight Pie Chart ──
-function renderWeightPie(groups, syllabusData) {
+const EDIT_WEIGHT_BTN = (courseId) => `
+  <button class="btn-edit-weights" data-course-id="${courseId}">
+    <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+    ${tr('editWeight')}
+  </button>`;
+
+function renderWeightPie(groups, syllabusData, courseId) {
+  // Prioritize custom weights
+  const customWeights = courseId && (_currentData.customWeights || {})[courseId];
+  if (customWeights && customWeights.length > 0) {
+    const total = customWeights.reduce((s, c) => s + (c.weight || 0), 0);
+    if (total > 0) {
+      let currentPct = 0;
+      const gradientParts = customWeights.map((c, i) => {
+        const pct = (c.weight / total) * 100;
+        const startPct = currentPct;
+        currentPct += pct;
+        return `${GROUP_COLORS[i % GROUP_COLORS.length]} ${startPct}% ${currentPct}%`;
+      }).join(', ');
+      const legend = customWeights.map((c, i) => `
+        <div class="detail-pie-legend-item">
+          <div class="detail-pie-legend-dot" style="background:${GROUP_COLORS[i % GROUP_COLORS.length]}"></div>
+          <span class="detail-pie-legend-text">${esc(c.name)}</span>
+          <span class="detail-pie-legend-weight">${c.weight}%</span>
+        </div>`).join('');
+      return `
+        <div class="detail-weight-pie-container">
+          <div class="detail-pie" style="background: conic-gradient(${gradientParts});"></div>
+          <div class="detail-pie-legend">${legend}</div>
+          ${courseId ? EDIT_WEIGHT_BTN(courseId) : ''}
+        </div>`;
+    }
+  }
+
   const hasGroupWeights = groups.some((g) => g.group_weight);
   const total = groups.reduce((s, g) => s + (g.group_weight || 0), 0);
 
@@ -1320,6 +1649,7 @@ function renderWeightPie(groups, syllabusData) {
       <div class="detail-weight-pie-container">
         <div class="detail-pie" style="background: conic-gradient(${gradientParts});"></div>
         <div class="detail-pie-legend">${legend}</div>
+        ${courseId ? EDIT_WEIGHT_BTN(courseId) : ''}
       </div>`;
   }
 
@@ -1347,6 +1677,7 @@ function renderWeightPie(groups, syllabusData) {
         <div class="detail-weight-pie-container">
           <div class="detail-pie" style="background: conic-gradient(${gradientParts});"></div>
           <div class="detail-pie-legend">${legend}</div>
+          ${courseId ? EDIT_WEIGHT_BTN(courseId) : ''}
         </div>`;
     }
   }
@@ -1356,38 +1687,13 @@ function renderWeightPie(groups, syllabusData) {
     <div class="detail-weight-pie-container">
       <div class="detail-pie" style="background: var(--border);"></div>
       <div class="detail-pie-label">${tr('noGradeInfo')}</div>
+      ${courseId ? EDIT_WEIGHT_BTN(courseId) : ''}
     </div>`;
 }
 
 // ── Syllabus Section ──
 function renderSyllabusSection(courseId) {
-  const cached = (_currentData.syllabusAnalysis || {})[courseId];
-
-  if (!cached) {
-    return `
-      <div class="syllabus-section" id="syllabus-section-${courseId}">
-        <button class="btn-syllabus-analyze" data-course-id="${courseId}">${tr('analyzeWeight')}</button>
-      </div>`;
-  }
-
-  const sourceLabel = {
-    syllabus_body: 'Syllabus',
-    'syllabus_body+pdf': 'Syllabus PDF',
-    syllabus_page_pdf: 'Syllabus PDF',
-    keyword_pdf: tr('coursePdf'),
-    ai_selected_pdf: tr('aiSelectedPdf'),
-  }[cached.source] || '';
-
-  const notFound = !cached.found || !cached.components || cached.components.length === 0;
-
-  return `
-    <div class="syllabus-section" id="syllabus-section-${courseId}">
-      ${notFound ? `<div class="syllabus-empty">${esc(cached.notes || tr('weightNotFound'))}</div>` : ''}
-      <div class="syllabus-footer">
-        ${sourceLabel ? `<span class="syllabus-source">${sourceLabel}</span>` : ''}
-        <button class="btn-syllabus-analyze" data-course-id="${courseId}" data-force="true">${tr('updateWeight')}</button>
-      </div>
-    </div>`;
+  return `<div class="syllabus-section" id="syllabus-section-${courseId}"></div>`;
 }
 
 // ── Weight Bar ──
@@ -1556,6 +1862,11 @@ function renderAssignmentRow(a, groups, courseId) {
   const uClass = urgencyClass(a.due_at, examFlag, submitted);
   const groupName = findGroupName(a, groups);
   const desc = a.description ? stripHtml(a.description) : tr('noDesc');
+  const isCustom = !!a._isCustom;
+  const titleHtml = isCustom
+    ? `<span>${esc(a.name)}</span>`
+    : `<span class="assignment-title-link" data-assignment-id="${a.id}" data-course-id="${courseId}">${esc(a.name)}</span>`;
+  const customLabel = isCustom ? `<div class="custom-assignment-label">${tr('customAssignment')}</div>` : '';
 
   // 考試成績顯示
   let gradeHtml = '';
@@ -1569,242 +1880,35 @@ function renderAssignmentRow(a, groups, courseId) {
   }
 
   return `
-    <div class="assignment-item${submitted ? ' submitted' : ''}">
+    <div class="assignment-item${submitted ? ' submitted' : ''}${isCustom ? ' custom-assignment' : ''}">
       <div class="assignment-left">
-        <div class="assignment-title"><span class="assignment-title-link" data-assignment-id="${a.id}" data-course-id="${courseId}">${esc(a.name)}</span></div>
+        <div class="assignment-title">${titleHtml}</div>
+        ${customLabel}
         ${groupName ? `<div class="assignment-group">${esc(groupName)}</div>` : ''}
       </div>
       <div class="assignment-right">
         <div class="due-label ${uClass}">${formatDue(a.due_at)}</div>
         ${gradeHtml}
         ${submitted ? `<div class="submitted-badge">${tr('submittedBadge')}</div>` : ''}
-        <button class="btn-analyze" data-assignment-id="${a.id}" data-course-id="${courseId}">${tr('analyzeBtn')}</button>
+        ${isCustom
+          ? `<button class="btn-delete-custom-assignment" title="${tr('deleteCustomTitle')}" data-assignment-id="${esc(String(a.id))}" data-course-id="${courseId}">✕</button>`
+          : ''}
       </div>
     </div>
     <div class="assignment-desc">
-      <div class="assignment-desc-inner">${desc}</div>
+      <div class="assignment-desc-inner">${esc(desc)}</div>
     </div>`;
 }
 
-// ── 分析面板 ──
-function openAnalysisPanel(assignmentId, courseId) {
-  const { assignments = {}, analysis = {}, milestoneChecks = {} } = _currentData;
-  const asgns = assignments[courseId] || [];
-  const assignment = asgns.find((a) => a.id === assignmentId);
-
-  if (!assignment) return;
-
-  // Update panel subtitle
-  document.getElementById('analysis-panel-subtitle').textContent = esc(assignment.name);
-
-  // Show panel
-  document.getElementById('analysis-backdrop').classList.add('open');
-  document.getElementById('analysis-panel').classList.add('open');
-
-  const cachedAnalysis = (analysis[assignmentId] || null);
-
-  if (cachedAnalysis) {
-    renderAnalysisContent(cachedAnalysis.result, assignmentId, assignment, milestoneChecks, cachedAnalysis.timestamp);
-  } else {
-    document.getElementById('analysis-content').innerHTML =
-      `<div class="analysis-loading">${tr('analyzing')}</div>`;
-    fetchAnalysis(assignmentId, courseId, assignment, milestoneChecks);
-  }
-}
-
-function fetchAnalysis(assignmentId, courseId, assignment, milestoneChecks) {
-  chrome.runtime.sendMessage(
-    { type: 'ANALYZE_ASSIGNMENT', assignmentId, courseId },
-    (response) => {
-      if (!response) {
-        showAnalysisError(tr('commError'));
-        return;
-      }
-      if (!response.success) {
-        if (response.error === 'NO_API_KEY' || response.error === 'NO_MODEL_ID') {
-          const setupMsg = response.error === 'NO_MODEL_ID' ? tr('noModelIdMsg') : tr('noApiKeyMsg');
-          document.getElementById('analysis-content').innerHTML = `
-            <div class="analysis-error">
-              ${setupMsg}。<br /><br />
-              ${tr('pleaseGoTo')}
-              <a href="#" id="open-settings-link">${tr('settingsPage')}</a>
-              ${tr('andConfigure')}。
-            </div>`;
-          document.getElementById('open-settings-link').addEventListener('click', (e) => {
-            e.preventDefault();
-            const url = chrome.runtime.getURL('settings.html');
-            chrome.tabs.create({ url });
-          });
-        } else {
-          showAnalysisError(response.error);
-        }
-        return;
-      }
-      // Cache in _currentData
-      if (!_currentData.analysis) _currentData.analysis = {};
-      _currentData.analysis[assignmentId] = {
-        timestamp: new Date().toISOString(),
-        result: response.result,
-      };
-      renderAnalysisContent(response.result, assignmentId, assignment, milestoneChecks, new Date().toISOString());
-    }
-  );
-}
-
-function showAnalysisError(msg) {
-  document.getElementById('analysis-content').innerHTML =
-    `<div class="analysis-error">${esc(msg)}</div>`;
-}
-
-function renderAnalysisContent(result, assignmentId, assignment, milestoneChecks, timestamp) {
-  const timeAgo = formatLastSync(timestamp);
-  const usedModel = _currentData.analysis?.[assignmentId]?.model || '';
-  const modelLabel = {
-    gemini: 'Gemini',
-    anthropic: 'Anthropic',
-    claude: 'Anthropic',
-    openai: 'OpenAI',
-    deepseek: 'DeepSeek',
-    qwen: 'Qwen',
-    moonshot: 'Moonshot',
-    zhipu: 'Zhipu',
-    minimax: 'MiniMax',
-  }[usedModel] || '';
-
-  let html = `<div class="analysis-cached-note">${modelLabel ? `${modelLabel} · ` : ''}${timeAgo} · <button class="btn-reanalyze" id="btn-reanalyze">${tr('reanalyze')}</button></div>`;
-
-  // Summary
-  if (result.summary) {
-    html += `
-      <div class="analysis-section">
-        <div class="analysis-section-label">${tr('summaryLabel')}</div>
-        <div class="analysis-summary">${esc(result.summary)}</div>
-      </div>`;
-  }
-
-  // Estimated hours
-  if (result.estimatedHours) {
-    html += `
-      <div class="analysis-section">
-        <div class="analysis-section-label">${tr('estimatedHoursLabel')}</div>
-        <div class="analysis-hours">${result.estimatedHours} hrs</div>
-      </div>`;
-  }
-
-  // Requirements
-  if (result.requirements && result.requirements.length) {
-    html += `
-      <div class="analysis-section">
-        <div class="analysis-section-label">${tr('requirementsLabel')}</div>
-        <ul class="analysis-list">
-          ${result.requirements.map((r) => `<li>${esc(r)}</li>`).join('')}
-        </ul>
-      </div>`;
-  }
-
-  // Milestones
-  if (result.milestones && result.milestones.length) {
-    const locale = _uiLanguage === 'en' ? 'en-US' : 'zh-TW';
-    const milestoneItems = result.milestones.map((m, i) => {
-      const checkKey = `${assignmentId}_${i}`;
-      const isChecked = milestoneChecks[checkKey] ? 'checked' : '';
-      const checkedClass = milestoneChecks[checkKey] ? 'checked' : '';
-
-      let dateStr = '';
-      if (assignment.due_at && m.daysBeforeDue != null) {
-        const dueDate = new Date(assignment.due_at);
-        const milestoneDate = new Date(dueDate.getTime() - m.daysBeforeDue * 86400000);
-        dateStr = milestoneDate.toLocaleDateString(locale, { month: 'short', day: 'numeric' });
-      } else if (m.daysBeforeDue != null) {
-        dateStr = `${tr('daysBeforeDuePrefix')}${m.daysBeforeDue}${tr('daysBeforeDueSuffix')}`;
-      }
-
-      return `
-        <div class="milestone-item ${checkedClass}" id="milestone-${assignmentId}-${i}">
-          <input type="checkbox" class="milestone-check" ${isChecked}
-            data-assignment-id="${assignmentId}" data-milestone-index="${i}" />
-          <div class="milestone-info">
-            <div class="milestone-title">${esc(m.title)}</div>
-            <div class="milestone-desc">${esc(m.description)}</div>
-            ${dateStr ? `<div class="milestone-date">${dateStr}</div>` : ''}
-          </div>
-        </div>`;
-    }).join('');
-
-    html += `
-      <div class="analysis-section">
-        <div class="analysis-section-label">${tr('milestonesLabel')}</div>
-        ${milestoneItems}
-      </div>`;
-  }
-
-  // Tips
-  if (result.tips && result.tips.length) {
-    html += `
-      <div class="analysis-section">
-        <div class="analysis-section-label">${tr('tipsLabel')}</div>
-        <ul class="analysis-list">
-          ${result.tips.map((t) => `<li>${esc(t)}</li>`).join('')}
-        </ul>
-      </div>`;
-  }
-
-  document.getElementById('analysis-content').innerHTML = html;
-
-  // Re-analyze button
-  document.getElementById('btn-reanalyze').addEventListener('click', () => {
-    const courseId = parseInt(
-      document.querySelector(`[data-assignment-id="${assignmentId}"][data-course-id]`)?.dataset.courseId,
-      10
-    );
-    if (!courseId) return;
-    document.getElementById('analysis-content').innerHTML =
-      `<div class="analysis-loading">${tr('reanalyzing')}</div>`;
-    fetchAnalysis(assignmentId, courseId, assignment, milestoneChecks);
-  });
-
-  // Milestone checkboxes
-  document.querySelectorAll('.milestone-check').forEach((checkbox) => {
-    checkbox.addEventListener('change', () => {
-      const asgId = parseInt(checkbox.dataset.assignmentId, 10);
-      const idx = parseInt(checkbox.dataset.milestoneIndex, 10);
-      const key = `${asgId}_${idx}`;
-      const milestoneEl = document.getElementById(`milestone-${asgId}-${idx}`);
-
-      chrome.storage.local.get(['milestoneChecks'], (data) => {
-        const checks = data.milestoneChecks || {};
-        if (checkbox.checked) {
-          checks[key] = true;
-          milestoneEl && milestoneEl.classList.add('checked');
-        } else {
-          delete checks[key];
-          milestoneEl && milestoneEl.classList.remove('checked');
-        }
-        chrome.storage.local.set({ milestoneChecks: checks });
-        _currentData.milestoneChecks = checks;
-      });
-    });
-  });
-}
-
-// ── 分析面板關閉 ──
-function closeAnalysisPanel() {
-  document.getElementById('analysis-backdrop').classList.remove('open');
-  document.getElementById('analysis-panel').classList.remove('open');
-}
-
-document.getElementById('analysis-close').addEventListener('click', closeAnalysisPanel);
-document.getElementById('analysis-backdrop').addEventListener('click', closeAnalysisPanel);
-
-// ── Filter 按鈕 ──
-document.querySelectorAll('.pill').forEach((btn) => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.pill').forEach((b) => b.classList.remove('active'));
-    btn.classList.add('active');
-    currentFilter = btn.dataset.filter;
-    loadData();
-  });
+document.getElementById('btn-add-assignment')?.addEventListener('click', () => {
+  openCustomAssignmentModal();
 });
+document.getElementById('custom-assignment-close')?.addEventListener('click', closeCustomAssignmentModal);
+document.getElementById('custom-assignment-cancel')?.addEventListener('click', closeCustomAssignmentModal);
+document.getElementById('custom-assignment-overlay')?.addEventListener('click', (e) => {
+  if (e.target === document.getElementById('custom-assignment-overlay')) closeCustomAssignmentModal();
+});
+document.getElementById('custom-assignment-form')?.addEventListener('submit', saveCustomAssignmentFromForm);
 
 // ── 頁面切換 ──
 document.querySelectorAll('.page-tab').forEach((tab) => {
@@ -1814,15 +1918,16 @@ document.querySelectorAll('.page-tab').forEach((tab) => {
 });
 
 // ── 查看已繳交 ──
-document.getElementById('hide-done-cb').addEventListener('change', (e) => {
-  showSubmitted = e.target.checked;
+document.getElementById('btn-show-submitted').addEventListener('click', (e) => {
+  showSubmitted = !showSubmitted;
+  e.currentTarget.classList.toggle('active', showSubmitted);
   loadData();
 });
 
 // ── 同步按鈕 ──
 document.getElementById('sync-btn').addEventListener('click', () => {
   const btn = document.getElementById('sync-btn');
-  btn.textContent = tr('syncing');
+  btn.innerHTML = '<span class="sync-dots"><span></span><span></span><span></span></span>';
   btn.disabled = true;
   chrome.runtime.sendMessage({ type: 'SYNC' }, () => {
     btn.textContent = tr('sync');
@@ -1834,7 +1939,7 @@ document.getElementById('sync-btn').addEventListener('click', () => {
 // ── 讀取資料 ──
 function loadData() {
   chrome.storage.local.get(
-    ['lastSync', 'schoolName', 'canvasBaseUrl', 'courses', 'assignments', 'assignmentGroups', 'scores', 'files', 'analysis', 'milestoneChecks', 'syllabusAnalysis', 'courseNames'],
+    ['lastSync', 'schoolName', 'canvasBaseUrl', 'courses', 'assignments', 'customAssignments', 'assignmentGroups', 'scores', 'files', 'analysis', 'milestoneChecks', 'syllabusAnalysis', 'courseNames', 'customWeights'],
     (data) => {
       if (!data.courses || !data.courses.length) {
         currentView = 'grid';
@@ -1842,9 +1947,11 @@ function loadData() {
         document.getElementById('header-meta').textContent = tr('noDataMeta');
         fitMetaText();
         document.getElementById('course-nav').innerHTML = '';
-        document.getElementById('week-section').style.display = '';
-        document.getElementById('week-section').innerHTML = '';
-        document.getElementById('courses-section').innerHTML = `
+        document.getElementById('page-tabs').classList.remove('detail-mode');
+        document.getElementById('page-tabs').style.display = '';
+        document.getElementById('main-section').style.display = '';
+        document.getElementById('course-detail-container').style.display = 'none';
+        document.getElementById('main-section').innerHTML = `
           <div class="state-msg">
             <div class="big">${tr('noData')}</div>
             <div class="small">${tr('noDataHintSync')}</div>
@@ -1859,6 +1966,7 @@ function loadData() {
         milestoneChecks: data.milestoneChecks || {},
         syllabusAnalysis: data.syllabusAnalysis || {},
         courseNames: data.courseNames || {},
+        customAssignments: data.customAssignments || {},
       });
     }
   );
@@ -1959,16 +2067,16 @@ function _welcomeUpdateButtons(n) {
 
   let html = '';
   if (n === 1) {
-    html = `<button class="welcome-btn" data-wgo="2">開始設定</button>`;
+    html = `<button class="welcome-btn" data-wgo="2">${tr('wBtnStart')}</button>`;
   } else if (n === 5) {
     html = `
-      <button class="welcome-btn sec" data-wgo="4">上一步</button>
-      <button class="welcome-btn ora" id="welcome-done-btn">開始使用</button>
+      <button class="welcome-btn sec" data-wgo="4">${tr('wBtnPrev')}</button>
+      <button class="welcome-btn ora" id="welcome-done-btn">${tr('wBtnDone')}</button>
     `;
   } else {
     html = `
-      <button class="welcome-btn sec" data-wgo="${n - 1}">上一步</button>
-      <button class="welcome-btn" data-wgo="${n + 1}">下一步</button>
+      <button class="welcome-btn sec" data-wgo="${n - 1}">${tr('wBtnPrev')}</button>
+      <button class="welcome-btn" data-wgo="${n + 1}">${tr('wBtnNext')}</button>
     `;
   }
   btnRow.innerHTML = html;
@@ -2033,4 +2141,134 @@ if (new URLSearchParams(location.search).get('welcome') === '1') {
 }
 
 loadData();
+
+// ── Weight Edit Modal ──
+let _weightEditCourseId = null;
+
+function openWeightEditModal(courseId) {
+  _weightEditCourseId = courseId;
+
+  const custom = (_currentData.customWeights || {})[courseId];
+  const groups = (_currentData.assignmentGroups || {})[courseId] || [];
+  const syllabus = (_currentData.syllabusAnalysis || {})[courseId];
+
+  let items = [];
+  if (custom && custom.length > 0) {
+    items = custom.map((c) => ({ name: c.name, weight: c.weight }));
+  } else if (groups.some((g) => g.group_weight)) {
+    items = groups.filter((g) => g.group_weight).map((g) => ({ name: g.name, weight: g.group_weight }));
+  } else if (syllabus && syllabus.found && syllabus.components) {
+    items = syllabus.components.map((c) => ({ name: c.name, weight: c.weight }));
+  }
+
+  renderWeightEditList(items);
+  document.getElementById('weight-edit-overlay').classList.add('open');
+}
+
+function renderWeightEditList(items) {
+  const list = document.getElementById('weight-edit-list');
+  list.innerHTML = items.map((item, i) => `
+    <div class="weight-edit-row" data-index="${i}">
+      <div class="weight-edit-color" style="background:${GROUP_COLORS[i % GROUP_COLORS.length]}"></div>
+      <input class="weight-edit-name" type="text" value="${esc(item.name)}" placeholder="${tr('weightItemName')}">
+      <input class="weight-edit-pct" type="number" value="${item.weight}" min="0" max="100" step="0.1">
+      <button class="weight-edit-del" data-index="${i}">✕</button>
+    </div>`).join('');
+
+  list.querySelectorAll('.weight-edit-del').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      btn.closest('.weight-edit-row').remove();
+      updateWeightTotal();
+      refreshWeightColors();
+    });
+  });
+
+  list.querySelectorAll('.weight-edit-pct').forEach((input) => {
+    input.addEventListener('input', updateWeightTotal);
+  });
+
+  updateWeightTotal();
+}
+
+function refreshWeightColors() {
+  document.querySelectorAll('.weight-edit-row').forEach((row, i) => {
+    const dot = row.querySelector('.weight-edit-color');
+    if (dot) dot.style.background = GROUP_COLORS[i % GROUP_COLORS.length];
+  });
+}
+
+function updateWeightTotal() {
+  const inputs = document.querySelectorAll('.weight-edit-pct');
+  const total = Array.from(inputs).reduce((s, el) => s + (parseFloat(el.value) || 0), 0);
+  const el = document.getElementById('weight-edit-total');
+  el.textContent = `${tr('weightTotal')}${Math.round(total * 10) / 10}%`;
+  el.classList.toggle('over', total > 100.05);
+}
+
+document.getElementById('weight-edit-add').addEventListener('click', () => {
+  const rows = document.querySelectorAll('.weight-edit-row');
+  const i = rows.length;
+  const row = document.createElement('div');
+  row.className = 'weight-edit-row';
+  row.dataset.index = i;
+  row.innerHTML = `
+    <div class="weight-edit-color" style="background:${GROUP_COLORS[i % GROUP_COLORS.length]}"></div>
+    <input class="weight-edit-name" type="text" value="" placeholder="${tr('weightItemName')}">
+    <input class="weight-edit-pct" type="number" value="0" min="0" max="100" step="0.1">
+    <button class="weight-edit-del">✕</button>`;
+  row.querySelector('.weight-edit-del').addEventListener('click', () => {
+    row.remove();
+    updateWeightTotal();
+    refreshWeightColors();
+  });
+  row.querySelector('.weight-edit-pct').addEventListener('input', updateWeightTotal);
+  document.getElementById('weight-edit-list').appendChild(row);
+  row.querySelector('.weight-edit-name').focus();
+  updateWeightTotal();
+});
+
+document.getElementById('weight-edit-save').addEventListener('click', () => {
+  const rows = document.querySelectorAll('.weight-edit-row');
+  const items = Array.from(rows).map((row) => ({
+    name: row.querySelector('.weight-edit-name').value.trim() || tr('unnamedWeight'),
+    weight: parseFloat(row.querySelector('.weight-edit-pct').value) || 0,
+  })).filter((item) => item.weight > 0 || item.name !== tr('unnamedWeight'));
+
+  if (!_currentData.customWeights) _currentData.customWeights = {};
+  _currentData.customWeights[_weightEditCourseId] = items;
+
+  chrome.storage.local.get(['customWeights'], (data) => {
+    const all = data.customWeights || {};
+    all[_weightEditCourseId] = items;
+    chrome.storage.local.set({ customWeights: all });
+  });
+
+  document.getElementById('weight-edit-overlay').classList.remove('open');
+
+  const { courses = [], assignments = {}, assignmentGroups = {}, scores = {} } = _currentData;
+  const course = courses.find((c) => c.id === _weightEditCourseId);
+  if (course) renderCourseDetailSection(course, assignments[course.id] || [], assignmentGroups[course.id] || [], scores);
+});
+
+document.getElementById('weight-edit-ai-btn').addEventListener('click', () => {
+  const btn = document.getElementById('weight-edit-ai-btn');
+  btn.classList.add('loading');
+  btn.innerHTML = `<span class="sync-dots"><span></span><span></span><span></span></span> ${tr('analyzeBtn')}`;
+
+  chrome.runtime.sendMessage({ type: 'ANALYZE_SYLLABUS', courseId: _weightEditCourseId, force: true }, (res) => {
+    btn.classList.remove('loading');
+    btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 8v4l3 3"/><path d="M18 2v4h4"/></svg> ${tr('analyzeBtn')}`;
+
+    if (res && res.success && res.result && res.result.components) {
+      if (!_currentData.syllabusAnalysis) _currentData.syllabusAnalysis = {};
+      _currentData.syllabusAnalysis[_weightEditCourseId] = { timestamp: new Date().toISOString(), ...res.result };
+      const items = res.result.components.map((c) => ({ name: c.name, weight: c.weight }));
+      renderWeightEditList(items);
+    }
+  });
+});
+
+document.getElementById('weight-edit-overlay').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) e.currentTarget.classList.remove('open');
+});
 

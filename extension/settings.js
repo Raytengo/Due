@@ -8,20 +8,6 @@ const PROVIDERS = {
     modelHint: '請自行輸入模型，例如：gemini-2.5-flash',
     baseUrlHint: 'Gemini 通常用預設 base URL。',
   },
-  anthropic: {
-    label: 'Anthropic Claude',
-    keyPlaceholder: 'sk-ant-...',
-    baseUrlDefault: 'https://api.anthropic.com',
-    modelHint: '請自行輸入模型，例如：claude-sonnet-4-5',
-    baseUrlHint: 'Anthropic 通常用預設 base URL。',
-  },
-  openai: {
-    label: 'OpenAI',
-    keyPlaceholder: 'sk-...',
-    baseUrlDefault: 'https://api.openai.com/v1',
-    modelHint: '請自行輸入模型，例如：gpt-5.2',
-    baseUrlHint: 'OpenAI 預設為 https://api.openai.com/v1。',
-  },
   qwen: {
     label: 'Qwen (通義千問)',
     keyPlaceholder: 'sk-...',
@@ -29,12 +15,12 @@ const PROVIDERS = {
     modelHint: '請自行輸入模型，例如：qwen-plus',
     baseUrlHint: 'DashScope 使用 OpenAI 相容 endpoint。',
   },
-  minimax: {
-    label: 'MiniMax',
+  deepseek: {
+    label: 'DeepSeek',
     keyPlaceholder: 'sk-...',
-    baseUrlDefault: 'https://api.minimax.chat/v1',
-    modelHint: '請自行輸入模型，例如：MiniMax-M1',
-    baseUrlHint: 'MiniMax 使用 OpenAI 相容 endpoint。',
+    baseUrlDefault: 'https://api.deepseek.com/v1',
+    modelHint: '請自行輸入模型，例如：deepseek-chat',
+    baseUrlHint: 'DeepSeek 使用 OpenAI 相容 endpoint。',
   },
 };
 
@@ -56,27 +42,27 @@ function setProviderUI(provider, keepCustom = false) {
 }
 
 // ── Load saved settings ──
-chrome.storage.local.get([
-  'aiProvider', 'aiApiKey', 'aiModelId', 'aiBaseUrl',
-  'aiModel', 'geminiApiKey', 'geminiModel', 'claudeApiKey', 'claudeModel',
-], (data) => {
+chrome.storage.local.get(['aiProvider', 'aiApiKey', 'aiModelId', 'aiBaseUrl', 'geminiApiKey', 'geminiModel', 'showClaudeUsageInPopup'], (data) => {
   let provider = data.aiProvider;
-  if (!provider) {
-    provider = data.aiModel === 'claude' ? 'anthropic' : 'gemini';
-  }
-  if (!PROVIDERS[provider]) {
-    provider = 'gemini';
-  }
+  if (!PROVIDERS[provider]) provider = 'gemini';
 
   setProviderUI(provider, true);
 
-  // New unified keys first, then fallback to legacy keys.
-  const legacyKey = provider === 'gemini' ? data.geminiApiKey : provider === 'anthropic' ? data.claudeApiKey : '';
-  const legacyModel = provider === 'gemini' ? data.geminiModel : provider === 'anthropic' ? data.claudeModel : '';
+  const legacyKey = provider === 'gemini' ? data.geminiApiKey : '';
+  const legacyModel = provider === 'gemini' ? data.geminiModel : '';
 
   document.getElementById('provider-key').value = data.aiApiKey || legacyKey || '';
   document.getElementById('provider-model').value = data.aiModelId || legacyModel || '';
   document.getElementById('provider-base-url').value = data.aiBaseUrl || (PROVIDERS[provider]?.baseUrlDefault || '');
+
+  const toggle = document.getElementById('toggle-claude-usage');
+  // default ON if key not yet set
+  toggle.checked = data.showClaudeUsageInPopup !== false;
+});
+
+// ── Claude usage toggle — auto-save immediately ──
+document.getElementById('toggle-claude-usage').addEventListener('change', (e) => {
+  chrome.storage.local.set({ showClaudeUsageInPopup: e.target.checked });
 });
 
 // ── Provider selector ──
@@ -114,22 +100,14 @@ document.getElementById('save-btn').addEventListener('click', () => {
     showStatus('Gemini 金鑰格式通常以 AIza 開頭', 'err');
     return;
   }
-  if (provider === 'anthropic' && !key.startsWith('sk-ant-')) {
-    showStatus('Anthropic 金鑰格式通常以 sk-ant- 開頭', 'err');
-    return;
-  }
 
   const payload = {
     aiProvider: provider,
     aiApiKey: key,
     aiModelId: modelId,
     aiBaseUrl: baseUrl,
-    // legacy compatibility
-    aiModel: provider === 'anthropic' ? 'claude' : 'gemini',
     geminiApiKey: provider === 'gemini' ? key : '',
-    claudeApiKey: provider === 'anthropic' ? key : '',
     geminiModel: provider === 'gemini' ? modelId : '',
-    claudeModel: provider === 'anthropic' ? modelId : '',
   };
 
   chrome.storage.local.set(payload, () => {
