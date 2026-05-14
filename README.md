@@ -18,7 +18,7 @@ Canvas is cluttered. Due strips it down to what matters.
 
 Open the **popup** for a 7-day snapshot of upcoming deadlines. Open the **dashboard** for the full picture — every course, every assignment, color-coded by urgency, with grade weights and a built-in grade calculator.
 
-If you want to go deeper, the **AI analysis** reads assignment descriptions and course files to generate a summary, requirements checklist, estimated hours, and a milestone plan. It also analyzes your syllabus to extract grade weight breakdowns when Canvas doesn't provide them.
+If Canvas doesn't provide grade weights for a course, the optional **AI analysis** can read the course syllabus and automatically extract the grading breakdown for you.
 
 ---
 
@@ -31,8 +31,8 @@ If you want to go deeper, the **AI analysis** reads assignment descriptions and 
 | **Urgency color coding** | Orange ≤7 days · Yellow 8–30 days · Blue 30+ days · Purple for exams |
 | **Grade weights** | Per-course breakdown of assignment groups and their weights |
 | **Grade calculator** | Enter scores to get a live weighted total |
-| **Syllabus analysis** | AI extracts grade components from course syllabi |
-| **AI assignment analysis** | Summary, requirements, time estimate, and milestone checklist |
+| **Syllabus analysis** | AI reads your syllabus and extracts grade weight breakdowns |
+| **Claude usage** | Live usage % and reset countdown shown in the popup |
 | **Smart filtering** | Filter by type (assignment / exam), hide submitted items |
 | **Course renaming** | Set a custom display name for any course — stored locally |
 | **Dark mode** | Persisted across sessions |
@@ -60,10 +60,10 @@ Due uses your browser's existing Canvas login session — no API tokens or accou
 ## AI analysis setup
 
 1. Click the extension icon → settings gear ⚙
-2. Choose a provider and paste your API key
-3. Click **AI Analyze** on any assignment, or **Analyze Grades** on any course
+2. Choose a provider (Gemini, Qwen, or DeepSeek) and paste your API key
+3. Open any course in the dashboard and click **Analyze Weights**
 
-**Supported providers:** Gemini · Claude · OpenAI · DeepSeek · Qwen · Moonshot · Zhipu · MiniMax
+**Supported providers:** Gemini · Qwen · DeepSeek
 
 ---
 
