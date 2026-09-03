@@ -1,0 +1,216 @@
+const assert = require('node:assert/strict');
+const R = require('./gradingRules.js');
+
+function test(name, fn) {
+  try {
+    fn();
+    console.log(`PASS ${name}`);
+  } catch (err) {
+    console.error(`FAIL ${name}`);
+    throw err;
+  }
+}
+
+const DAY = 86400000;
+const HOUR = 3600000;
+const NOW = Date.parse('2026-09-03T00:00:00Z');
+
+// ── resolveConfig ──
+test('resolveConfig: 空／未知 provider → gemini 預設，未設定', () => {
+  const c = R.resolveConfig(undefined);
+  assert.equal(c.provider, 'gemini');
+  assert.equal(c.model, 'gemini-2.5-flash');
+  assert.equal(c.baseUrl, 'https://generativelanguage.googleapis.com/v1beta');
+  assert.equal(c.configured, false);
+  assert.equal(R.resolveConfig({ provider: 'bogus', apiKey: 'k' }).provider, 'gemini');
+});
+
+test('resolveConfig: model/baseUrl 空字串取供應商預設；key 有值即 configured', () => {
+  const c = R.resolveConfig({ provider: 'deepseek', apiKey: ' sk-1 ', model: '  ', baseUrl: '' });
+  assert.equal(c.apiKey, 'sk-1');
+  assert.equal(c.model, 'deepseek-chat');
+  assert.equal(c.baseUrl, 'https://api.deepseek.com/v1');
+  assert.equal(c.configured, true);
+  const q = R.resolveConfig({ provider: 'qwen', apiKey: 'k', model: 'qwen-max', baseUrl: 'https://x.example/v1/' });
+  assert.equal(q.model, 'qwen-max');
+  assert.equal(q.baseUrl, 'https://x.example/v1/');
+});
+
+// ── shouldAnalyze ──
+const base = { courseId: 7, customWeights: {}, groups: [], record: undefined, now: NOW };
+
+test('shouldAnalyze: 已有手動權重 → 不跑', () => {
+  const d = R.shouldAnalyze({ ...base, customWeights: { 7: [{ name: 'HW', weight: 40 }] } });
+  assert.deepEqual(d, { run: false, reason: 'hasCustomWeights' });
+});
+
+test('shouldAnalyze: 手動權重為空陣列 → 視同沒有，照跑', () => {
+  assert.equal(R.shouldAnalyze({ ...base, customWeights: { 7: [] } }).run, true);
+});
+
+test('shouldAnalyze: Canvas 有 group_weight → 不跑', () => {
+  const d = R.shouldAnalyze({ ...base, groups: [{ name: 'A', group_weight: 0 }, { name: 'B', group_weight: 30 }] });
+  assert.deepEqual(d, { run: false, reason: 'hasCanvasWeights' });
+});
+
+test('shouldAnalyze: 全部 group_weight 為 0/null → 照跑', () => {
+  assert.equal(R.shouldAnalyze({ ...base, groups: [{ group_weight: 0 }, { group_weight: null }] }).run, true);
+});
+
+test('shouldAnalyze: 已 done → 永不重跑（即使權重被還原）', () => {
+  const d = R.shouldAnalyze({ ...base, record: { status: 'done', attempts: 1, nextRetryAt: null } });
+  assert.deepEqual(d, { run: false, reason: 'done' });
+});
+
+test('shouldAnalyze: attempts 達 3 → 不跑', () => {
+  const d = R.shouldAnalyze({ ...base, record: { status: 'notFound', attempts: 3, nextRetryAt: new Date(NOW - DAY).toISOString() } });
+  assert.deepEqual(d, { run: false, reason: 'maxAttempts' });
+});
+
+test('shouldAnalyze: 冷卻中 → 不跑；冷卻到期 → retry', () => {
+  const rec = { status: 'notFound', attempts: 1, nextRetryAt: new Date(NOW + HOUR).toISOString() };
+  assert.deepEqual(R.shouldAnalyze({ ...base, record: rec }), { run: false, reason: 'cooldown' });
+  assert.deepEqual(R.shouldAnalyze({ ...base, record: rec, now: NOW + HOUR }), { run: true, reason: 'retry' });
+});
+
+test('shouldAnalyze: 無紀錄 → first', () => {
+  assert.deepEqual(R.shouldAnalyze(base), { run: true, reason: 'first' });
+});
+
+// ── nextRecord ──
+const META = { provider: 'gemini', model: 'gemini-2.5-flash' };
+
+test('nextRecord: done → attempts 累加、nextRetryAt null、保留 components', () => {
+  const r = R.nextRecord({ status: 'notFound', attempts: 1 }, { kind: 'done', source: 'syllabus_pdf', components: [{ name: 'HW', weight: 40, description: '' }] }, NOW, META);
+  assert.equal(r.status, 'done');
+  assert.equal(r.attempts, 2);
+  assert.equal(r.nextRetryAt, null);
+  assert.equal(r.at, '2026-09-03T00:00:00.000Z');
+  assert.equal(r.source, 'syllabus_pdf');
+  assert.equal(r.provider, 'gemini');
+  assert.deepEqual(r.components, [{ name: 'HW', weight: 40, description: '' }]);
+});
+
+test('nextRecord: notFound → 7 天後重試；error → 24 小時後重試、error 截 200 字', () => {
+  const nf = R.nextRecord(undefined, { kind: 'notFound', source: 'none', notes: 'no material' }, NOW, META);
+  assert.equal(nf.attempts, 1);
+  assert.equal(nf.nextRetryAt, new Date(NOW + 7 * DAY).toISOString());
+  assert.equal(nf.notes, 'no material');
+  const er = R.nextRecord(undefined, { kind: 'error', source: 'none', error: 'x'.repeat(500) }, NOW, META);
+  assert.equal(er.nextRetryAt, new Date(NOW + 24 * HOUR).toISOString());
+  assert.equal(er.error.length, 200);
+});
+
+// ── courseStatus ──
+test('courseStatus: done → done；有權重無紀錄 → skipped；無紀錄無權重 → pending；冷卻中 notFound → notFound', () => {
+  assert.equal(R.courseStatus({ ...base, record: { status: 'done', attempts: 1 } }), 'done');
+  assert.equal(R.courseStatus({ ...base, groups: [{ group_weight: 50 }] }), 'skipped');
+  assert.equal(R.courseStatus(base), 'pending');
+  const cooling = { status: 'notFound', attempts: 1, nextRetryAt: new Date(NOW + DAY).toISOString() };
+  assert.equal(R.courseStatus({ ...base, record: cooling }), 'notFound');
+  assert.equal(R.courseStatus({ ...base, record: { ...cooling, nextRetryAt: new Date(NOW - 1).toISOString() } }), 'pending');
+});
+
+// ── findSyllabusByKeyword ──
+test('findSyllabusByKeyword: 強關鍵字命中；rubric 類不命中', () => {
+  const files = [
+    { id: 1, display_name: 'Assessment 1 rubric.pdf' },
+    { id: 2, display_name: 'Grading Rubric HW2.pdf' },
+    { id: 3, display_name: 'COMP1001_Syllabus_2026.pdf' },
+  ];
+  assert.equal(R.findSyllabusByKeyword(files).id, 3);
+  assert.equal(R.findSyllabusByKeyword(files.slice(0, 2)), null);
+  assert.equal(R.findSyllabusByKeyword([{ id: 9, filename: 'grading policy.pdf' }]).id, 9);
+  assert.equal(R.findSyllabusByKeyword([{ id: 8, display_name: 'Course Outline.pdf' }]).id, 8);
+  assert.equal(R.findSyllabusByKeyword(null), null);
+});
+
+// ── extractFileIds ──
+test('extractFileIds: 多種連結格式、去重、保序', () => {
+  const html = '<a href="/courses/1/files/111/download?x=1">a</a> <a href="https://s.instructure.com/files/222/preview">b</a> <a href="/files/111">dup</a>';
+  assert.deepEqual(R.extractFileIds(html), ['111', '222']);
+  assert.deepEqual(R.extractFileIds(''), []);
+});
+
+// ── stripHtml ──
+test('stripHtml: 移除 script/style 內容、解碼實體、壓空白、區塊結尾換行', () => {
+  const html = '<style>.a{color:red}</style><p>Grading &amp; Policy</p><script>var x = 1;</script><div>HW   30%&nbsp;&#65;</div>';
+  const out = R.stripHtml(html);
+  assert.equal(out.includes('color:red'), false);
+  assert.equal(out.includes('var x'), false);
+  assert.equal(out, 'Grading & Policy\nHW 30% A');
+});
+
+// ── parseAnalysisResponse ──
+test('parseAnalysisResponse: 去 ```json 圍欄、"30%" 字串轉數字、過濾無效項', () => {
+  const text = '```json\n{"found":true,"components":[{"name":"Homework","weight":"30%","description":"d"},{"name":"","weight":10},{"name":"Final","weight":0},{"name":"Exam","weight":70}],"notes":"ok"}\n```';
+  const p = R.parseAnalysisResponse(text);
+  assert.equal(p.ok, true);
+  assert.equal(p.found, true);
+  assert.deepEqual(p.components.map((c) => [c.name, c.weight]), [['Homework', 30], ['Exam', 70]]);
+  assert.equal(p.notes, 'ok');
+});
+
+test('parseAnalysisResponse: 非法 JSON → ok:false；components 全無效 → found:false', () => {
+  assert.equal(R.parseAnalysisResponse('Sorry, I cannot').ok, false);
+  const p = R.parseAnalysisResponse('{"found":true,"components":[{"name":"x","weight":null}]}');
+  assert.equal(p.ok, true);
+  assert.equal(p.found, false);
+});
+
+// ── normalizeWeights ──
+test('normalizeWeights: 小數比例 ×100；同名合併；四捨五入一位', () => {
+  const n = R.normalizeWeights([
+    { name: 'HW', weight: 0.3, description: '' },
+    { name: 'hw', weight: 0.1, description: '' },
+    { name: 'Final', weight: 0.6, description: '' },
+  ]);
+  assert.equal(n.ok, true);
+  assert.deepEqual(n.components.map((c) => [c.name, c.weight]), [['HW', 40], ['Final', 60]]);
+  assert.equal(n.total, 100);
+});
+
+test('normalizeWeights: 總和 70 → 不採用；總和 95 → 採用', () => {
+  const bad = R.normalizeWeights([{ name: 'A', weight: 30, description: '' }, { name: 'B', weight: 40, description: '' }]);
+  assert.equal(bad.ok, false);
+  assert.equal(bad.reason, 'weights sum 70');
+  assert.equal(R.normalizeWeights([{ name: 'A', weight: 55.55, description: '' }, { name: 'B', weight: 39.44, description: '' }]).ok, true);
+  assert.equal(R.normalizeWeights([]).ok, false);
+});
+
+test('toCustomWeights: 只留 name/weight', () => {
+  assert.deepEqual(R.toCustomWeights([{ name: 'A', weight: 40, description: 'x' }]), [{ name: 'A', weight: 40 }]);
+});
+
+// ── prompts / file pick ──
+test('prompts: SYSTEM_PROMPT 要求 JSON 與百分比；buildFilePickPrompt 列檔案；parseFilePick 對回檔案', () => {
+  assert.ok(R.SYSTEM_PROMPT.includes('ONLY valid JSON'));
+  assert.ok(R.SYSTEM_PROMPT.includes('percentage'));
+  assert.ok(R.USER_PROMPT.length > 10);
+  const files = [{ id: 5, display_name: 'a.pdf' }, { id: 6, filename: 'b.pdf' }];
+  const prompt = R.buildFilePickPrompt(files);
+  assert.ok(prompt.includes('5: a.pdf'));
+  assert.ok(prompt.includes('6: b.pdf'));
+  assert.equal(R.parseFilePick('6', files).id, 6);
+  assert.equal(R.parseFilePick('```json\n5\n```', files).id, 5);
+  assert.equal(R.parseFilePick('null', files), null);
+  assert.equal(R.parseFilePick('99', files), null);
+});
+
+test('pickSource: 優先序 syllabus_pdf > keyword_pdf > ai_selected_pdf > syllabus_body > none', () => {
+  assert.equal(R.pickSource({ syllabusPdf: true, keywordPdf: true, syllabusText: true }), 'syllabus_pdf');
+  assert.equal(R.pickSource({ keywordPdf: true, syllabusText: true }), 'keyword_pdf');
+  assert.equal(R.pickSource({ aiPdf: true }), 'ai_selected_pdf');
+  assert.equal(R.pickSource({ syllabusText: true }), 'syllabus_body');
+  assert.equal(R.pickSource({}), 'none');
+});
+
+test('constants: 上限值', () => {
+  assert.equal(R.MAX_ATTEMPTS, 3);
+  assert.equal(R.MAX_COURSES_PER_RUN, 10);
+  assert.equal(R.MAX_PDF_BYTES, 10 * 1024 * 1024);
+  assert.equal(R.MAX_TOTAL_PDF_BYTES, 15 * 1024 * 1024);
+  assert.equal(R.PDF_PERMISSION_ORIGIN, 'https://*.canvas-user-content.com/*');
+});
+
+console.log('ALL gradingRules TESTS PASSED');
