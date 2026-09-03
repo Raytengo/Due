@@ -30,13 +30,19 @@ async function aiResolveBaseUrl(baseUrl) {
   return canvasBaseUrl || '';
 }
 
-async function aiHasPdfPermission() {
+// 任意 origin 的權限探測；origin 為空（該供應商不需要額外權限）一律視為已具備
+async function aiHasOrigin(origin) {
   try {
+    if (!origin) return true;
     if (!chrome.permissions || !chrome.permissions.contains) return false;
-    return await chrome.permissions.contains({ origins: [DueGradingRules.PDF_PERMISSION_ORIGIN] });
+    return await chrome.permissions.contains({ origins: [origin] });
   } catch (_) {
     return false;
   }
+}
+
+async function aiHasPdfPermission() {
+  return aiHasOrigin(DueGradingRules.PDF_PERMISSION_ORIGIN);
 }
 
 async function runPendingGradingAnalysis(baseUrlHint) {
@@ -259,6 +265,12 @@ async function tryFetchPdf(url) {
 }
 
 async function callProvider(cfg, parts, systemPrompt, opts) {
+  // 不回 CORS header 的供應商（NVIDIA）非得有 host permission 才呼叫得動；
+  // 先擋下來給明確訊息，否則只會得到與離線無法區分的 CORS TypeError
+  const needOrigin = DueGradingRules.providerHostPermission(cfg.provider);
+  if (needOrigin && !(await aiHasOrigin(needOrigin))) {
+    throw new Error(`${cfg.provider} NO_HOST_PERMISSION: ${needOrigin}`);
+  }
   const req = DueAiProviders.buildRequest(cfg, parts, systemPrompt, opts);
   // MV3 SW 閒置 30 秒會被回收，長 LLM 呼叫期間定期呼叫擴充 API 重置計時器
   const keepAlive = (chrome.runtime && chrome.runtime.getPlatformInfo)
@@ -343,6 +355,8 @@ async function aiGetStatus() {
     provider: cfg.provider,
     model: cfg.model,
     pdfPermission: await aiHasPdfPermission(),
+    // 該供應商自己的端點權限（不需要額外權限的供應商恆為 true）
+    providerPermission: await aiHasOrigin(DueGradingRules.providerHostPermission(cfg.provider)),
     running: _aiAnalyzing,
     lastRunAt,
     courses,

@@ -7,9 +7,6 @@
 (function () {
   'use strict';
 
-  // 與 manifest optional_host_permissions、DueGradingRules.PDF_PERMISSION_ORIGIN 同一字串（單一真相來源在 gradingRules）
-  const PDF_ORIGIN = (typeof DueGradingRules !== 'undefined' && DueGradingRules.PDF_PERMISSION_ORIGIN) || 'https://*.canvas-user-content.com/*';
-
   const STRINGS = {
     'zh-TW': {
       menuItem: 'AI 分析設定',
@@ -23,6 +20,7 @@
       baseUrlLabel: 'Base URL（進階）',
       textOnlyHint: '此供應商只能讀 syllabus 文字；大綱若是 PDF，建議改用 Gemini。',
       pdfHint: '尚未授權存取 canvas-user-content.com，只會分析 syllabus 文字。重新按「儲存」可再次授權。',
+      hostPermHint: '此供應商不允許瀏覽器直接呼叫，需要「存取 {host}」的權限才能運作。請重新按「儲存」並允許。',
       testBtn: '測試連線',
       testing: '測試中…',
       testOk: '✓ 連線正常',
@@ -61,6 +59,7 @@
       baseUrlLabel: 'Base URL（高级）',
       textOnlyHint: '此供应商只能读取 syllabus 文本；大纲若为 PDF，建议改用 Gemini。',
       pdfHint: '尚未授权访问 canvas-user-content.com，只会分析 syllabus 文本。重新点击「保存」可再次授权。',
+      hostPermHint: '此供应商不允许浏览器直接调用，需要「访问 {host}」的权限才能运作。请重新点击「保存」并允许。',
       testBtn: '测试连接',
       testing: '测试中…',
       testOk: '✓ 连接正常',
@@ -99,6 +98,7 @@
       baseUrlLabel: 'Base URL (advanced)',
       textOnlyHint: 'This provider can only read the syllabus text. If your syllabus is a PDF, use Gemini.',
       pdfHint: 'Access to canvas-user-content.com was not granted, so only the syllabus text is analyzed. Press Save again to re-request.',
+      hostPermHint: 'This provider blocks direct browser calls, so Due needs permission to access {host}. Press Save again and allow it.',
       testBtn: 'Test connection',
       testing: 'Testing…',
       testOk: '✓ Connected',
@@ -198,6 +198,24 @@
     $('ai-pdf-hint').hidden = !(p.supportsPdf && _lastStatus && _lastStatus.configured && !_lastStatus.pdfPermission);
   }
 
+  // host permission 字串（'https://integrate.api.nvidia.com/*'）→ 給人看的主機名
+  function hostLabel(origin) {
+    return String(origin || '').replace(/^https?:\/\//, '').replace(/\/\*$/, '');
+  }
+
+  // 「該供應商不回 CORS、需要 host permission 但尚未授權」的提示。
+  // 依「已儲存的設定」判定（providerPermission 由 background 依 aiConfig 算），語言切換時也要能重畫
+  function renderHostPermHint() {
+    const el = $('ai-host-perm-hint');
+    if (!el) return;
+    const st = _lastStatus;
+    const origin = (st && typeof DueGradingRules !== 'undefined' && DueGradingRules.providerHostPermission)
+      ? DueGradingRules.providerHostPermission(st.provider)
+      : null;
+    el.textContent = t('hostPermHint', { host: hostLabel(origin) });
+    el.hidden = !(st && st.configured && st.providerPermission === false);
+  }
+
   function applyStaticText() {
     const menu = $('menu-ai-settings');
     if (menu) menu.textContent = t('menuItem');
@@ -211,6 +229,7 @@
     $('ai-base-url-label').textContent = t('baseUrlLabel');
     $('ai-text-only-hint').textContent = t('textOnlyHint');
     $('ai-pdf-hint').textContent = t('pdfHint');
+    renderHostPermHint();
     $('ai-test-btn').textContent = t('testBtn');
     $('ai-clear-btn').textContent = t('clearBtn');
     $('ai-status-heading').textContent = t('statusHeading');
@@ -246,6 +265,7 @@
       list.innerHTML = '';
       $('ai-reset-btn').disabled = true;
       $('ai-pdf-hint').hidden = true;
+      $('ai-host-perm-hint').hidden = true;
       return;
     }
     _lastStatus = st;
@@ -253,6 +273,7 @@
     // 只有支援 PDF 的供應商才需要那個權限，所以提示也跟著表單上選的供應商走
     const formPdf = !!currentProvider().supportsPdf;
     $('ai-pdf-hint').hidden = !(st.configured && !st.pdfPermission && formPdf);
+    renderHostPermHint();
 
     if (!st.configured) {
       summary.textContent = t('notConfigured');
@@ -359,11 +380,14 @@
     });
 
     $('ai-save-btn').addEventListener('click', () => {
-      // 只有支援 PDF 的供應商才需要 canvas-user-content.com（純文字供應商永遠不會下載 PDF，彈窗只是噪音）。
-      // 供應商查表是同步 DOM 讀取，user gesture 不會斷；權限請求必須是第一個 async 呼叫、前面不能有 await
-      const wantsPdf = !!currentProvider().supportsPdf;
-      const perm = wantsPdf && chrome.permissions?.request
-        ? chrome.permissions.request({ origins: [PDF_ORIGIN] }).catch(() => false)
+      // 供應商自己的 host（NVIDIA 不回 CORS，必須靠 host permission 略過）＋ PDF 下載權限，一次請求完
+      // （不需要的權限不請求，彈窗只是噪音）。供應商查表是同步 DOM 讀取，user gesture 不會斷；
+      // 權限請求必須是第一個 async 呼叫、前面不能有 await
+      const origins = (typeof DueGradingRules !== 'undefined' && DueGradingRules.requiredOrigins)
+        ? DueGradingRules.requiredOrigins($('ai-provider').value)
+        : [];
+      const perm = origins.length && chrome.permissions?.request
+        ? chrome.permissions.request({ origins }).catch(() => false)
         : Promise.resolve(false);
       const config = readForm();
       perm

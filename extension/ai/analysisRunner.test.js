@@ -30,8 +30,13 @@ const WEIGHTS = [{ name: 'Homework', weight: 30 }, { name: 'Midterm', weight: 30
 // ── 可變的測試狀態 ──
 const PDF_HEADERS = { 'content-type': 'application/pdf' };
 // 每次都給全新的陣列：共用同一份物件會讓 llm/fetches 跨測試累積
+const PDF_ORIGIN = 'https://*.canvas-user-content.com/*';
+const NVIDIA_ORIGIN = 'https://integrate.api.nvidia.com/*';
 const defaults = () => ({
   sets: 0, pdfPermission: true, sent: [], fetches: [], llm: [], syllabus: '', files: [],
+  // 已授權的 origin 清單；預設由 pdfPermission 推導（只有 PDF 那個 origin），
+  // 需要驗供應商自己的 host permission 時由測試明確給
+  grantedOrigins: null,
   llmStatus: 200, llmText: LLM_JSON,
   bodyReads: 0,          // arrayBuffer() 被呼叫幾次（驗「下載前就拒絕」時不讀 body）
   pdfHeaders: PDF_HEADERS,
@@ -112,7 +117,12 @@ const sandbox = {
         },
       },
     },
-    permissions: { contains: async () => S.pdfPermission },
+    permissions: {
+      contains: async (q) => {
+        const granted = S.grantedOrigins || (S.pdfPermission ? [PDF_ORIGIN] : []);
+        return ((q && q.origins) || []).every((o) => granted.includes(o));
+      },
+    },
     runtime: {
       sendMessage: async (msg) => {
         S.sent.push(msg);
@@ -360,6 +370,47 @@ const run = (base) => sandbox.runPendingGradingAnalysis(base);
     assert.ok(Math.abs(Date.parse(rec.nextRetryAt) - (before + 24 * 3600000)) < 60000, rec.nextRetryAt);
     assert.deepEqual(S.store.customWeights, {});
     assert.deepEqual(S.sent, []);
+  });
+
+  await test('nvidia 未授權 host permission：直接報 NO_HOST_PERMISSION，零 LLM 呼叫、不動權重', async () => {
+    reset({ aiConfig: { provider: 'nvidia', apiKey: 'nvapi-x' }, courses: [{ id: 951, name: 'C9g' }], customWeights: {} }, {
+      syllabus: SYLLABUS_HTML, grantedOrigins: [PDF_ORIGIN], // 只有 PDF 權限，沒有 NVIDIA 的
+    });
+    await run(BASE);
+    const rec = S.store.gradingAnalysis[951];
+    assert.equal(rec.status, 'error');
+    assert.match(rec.error, /NO_HOST_PERMISSION/);
+    assert.equal(S.llm.length, 0, '沒授權就不該送出請求（省額度、也避免糊成 CORS TypeError）');
+    assert.deepEqual(plain(S.store.customWeights), {});
+  });
+
+  await test('nvidia 已授權：走 OpenAI 相容端點、Bearer 金鑰、寫入權重', async () => {
+    reset({ aiConfig: { provider: 'nvidia', apiKey: 'nvapi-x' }, courses: [{ id: 952, name: 'C9h' }], customWeights: {} }, {
+      syllabus: SYLLABUS_HTML, grantedOrigins: [NVIDIA_ORIGIN],
+    });
+    await run(BASE);
+    assert.equal(S.llm.length, 1);
+    assert.equal(S.llm[0].url, 'https://integrate.api.nvidia.com/v1/chat/completions');
+    assert.equal(S.llm[0].method, 'POST');
+    assert.equal(S.llm[0].headers.Authorization, 'Bearer nvapi-x');
+    assert.equal(S.store.gradingAnalysis[952].status, 'done');
+    assert.deepEqual(plain(S.store.customWeights[952]), WEIGHTS);
+  });
+
+  await test('AI_GET_STATUS：providerPermission 反映該供應商自己的 host 權限', async () => {
+    const status = () => new Promise((resolve) => {
+      const kept = sandbox.handleAiMessage({ type: 'AI_GET_STATUS' }, resolve, BASE);
+      assert.equal(kept, true);
+    });
+    reset({ aiConfig: { provider: 'nvidia', apiKey: 'nvapi-x' }, courses: [] }, { grantedOrigins: [PDF_ORIGIN] });
+    assert.equal((await status()).providerPermission, false);
+    reset({ aiConfig: { provider: 'nvidia', apiKey: 'nvapi-x' }, courses: [] }, { grantedOrigins: [NVIDIA_ORIGIN] });
+    assert.equal((await status()).providerPermission, true);
+    // gemini 不需要額外 origin → 一律 true（PDF 權限另外由 pdfPermission 表示）
+    reset({ aiConfig: { provider: 'gemini', apiKey: 'k' }, courses: [] }, { grantedOrigins: [] });
+    const st = await status();
+    assert.equal(st.providerPermission, true);
+    assert.equal(st.pdfPermission, false);
   });
 
   console.log('ALL analysisRunner TESTS PASSED');
