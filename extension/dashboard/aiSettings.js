@@ -11,7 +11,6 @@
     'zh-TW': {
       menuItem: 'AI 分析設定',
       title: 'AI 分析設定',
-      intro: '同步後自動分析課程大綱、填入手動權重。',
       consent: '同步後自動分析課程大綱、填入分數權重。',
       providerLabel: '供應商',
       apiKeyLabel: 'API key',
@@ -48,7 +47,6 @@
     'zh-CN': {
       menuItem: 'AI 分析设置',
       title: 'AI 分析设置',
-      intro: '同步后自动分析课程大纲、写入手动权重。',
       consent: '同步后自动分析课程大纲、填入分数权重。',
       providerLabel: '供应商',
       apiKeyLabel: 'API key',
@@ -85,7 +83,6 @@
     en: {
       menuItem: 'AI analysis settings',
       title: 'AI analysis settings',
-      intro: 'After sync, Due analyzes the syllabus and fills in the grading weights.',
       consent: 'After sync, Due analyzes the syllabus and fills in the grade weights.',
       providerLabel: 'Provider',
       apiKeyLabel: 'API key',
@@ -214,7 +211,6 @@
     if (menu) menu.textContent = t('menuItem');
     if (!$('ai-settings-overlay')) return;
     $('ai-settings-title').textContent = t('title');
-    $('ai-settings-intro').textContent = t('intro');
     $('ai-settings-consent').textContent = t('consent');
     $('ai-provider-label').textContent = t('providerLabel');
     $('ai-api-key-label').textContent = t('apiKeyLabel');
