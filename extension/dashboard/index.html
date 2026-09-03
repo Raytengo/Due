@@ -3392,7 +3392,7 @@
 
     .ai-settings-hint {
       font-size: 12px;
-      color: var(--warm);
+      color: var(--muted);
       line-height: 1.5;
     }
 
@@ -3463,6 +3463,7 @@
 
     .ai-status-list li {
       display: flex;
+      flex-wrap: wrap;              /* 沒有 wrap，.ai-status-error 的 flex-basis:100% 會把課名擠成 0 寬 */
       align-items: baseline;
       gap: 10px;
       font-size: 12px;
@@ -4111,7 +4112,7 @@
 
         <label class="ai-settings-label" for="ai-api-key" id="ai-api-key-label"></label>
         <div class="ai-settings-keyrow">
-          <input class="ai-settings-input" id="ai-api-key" type="password" autocomplete="off" spellcheck="false">
+          <input class="ai-settings-input" id="ai-api-key" type="password" autocomplete="new-password" spellcheck="false">
           <button type="button" class="ai-settings-eye" id="ai-key-toggle"></button>
         </div>
 
@@ -4128,13 +4129,13 @@
 
         <div class="ai-settings-actions-row">
           <button type="button" class="ai-settings-link" id="ai-test-btn"></button>
-          <span class="ai-settings-test-result" id="ai-test-result"></span>
+          <span class="ai-settings-test-result" id="ai-test-result" role="status"></span>
           <button type="button" class="ai-settings-link" id="ai-clear-btn"></button>
         </div>
 
         <div class="ai-settings-section" id="ai-status-heading"></div>
         <div class="ai-settings-summary" id="ai-status-summary"></div>
-        <ul class="ai-status-list" id="ai-status-list"></ul>
+        <ul class="ai-status-list" id="ai-status-list" aria-live="polite"></ul>
         <div class="ai-settings-actions-row">
           <button type="button" class="ai-settings-link" id="ai-reset-btn"></button>
         </div>

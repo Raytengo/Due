@@ -39,9 +39,9 @@
       stError: '錯誤',
       stSkipped: '已有權重',
       stPending: '待分析',
-      resetBtn: '清除分析紀錄並重新分析',
+      resetBtn: '清除分析紀錄',
       resetConfirmTitle: '清除分析紀錄？',
-      resetConfirmMsg: '所有課程的分析紀錄會清除；下次同步會為「沒有權重」的課程重新分析。已寫入的手動權重不會改動。',
+      resetConfirmMsg: '所有課程的分析紀錄會清除；下次同步會為「目前沒有權重」的課程重新分析。已寫入的權重不會改動——若要重新分析某門課，請先在該課的權重編輯器按「還原 Canvas 權重」。',
       resetConfirmOk: '清除',
       cancel: '取消',
       save: '儲存',
@@ -77,9 +77,9 @@
       stError: '错误',
       stSkipped: '已有权重',
       stPending: '待分析',
-      resetBtn: '清除分析记录并重新分析',
+      resetBtn: '清除分析记录',
       resetConfirmTitle: '清除分析记录？',
-      resetConfirmMsg: '所有课程的分析记录将被清除；下次同步会为「没有权重」的课程重新分析。已写入的手动权重不会改动。',
+      resetConfirmMsg: '所有课程的分析记录将被清除；下次同步会为「目前没有权重」的课程重新分析。已写入的权重不会改动——若要重新分析某门课，请先在该课的权重编辑器点击「还原 Canvas 权重」。',
       resetConfirmOk: '清除',
       cancel: '取消',
       save: '保存',
@@ -115,9 +115,9 @@
       stError: 'Error',
       stSkipped: 'Has weights',
       stPending: 'Pending',
-      resetBtn: 'Clear records and re-analyze',
+      resetBtn: 'Clear analysis records',
       resetConfirmTitle: 'Clear analysis records?',
-      resetConfirmMsg: 'All analysis records are cleared; the next sync re-analyzes courses that have no weights. Manual weights already written are left untouched.',
+      resetConfirmMsg: 'All analysis records are cleared; the next sync re-analyzes courses that currently have no weights. Weights already written are left untouched — to re-analyze a course, first press "Reset to Canvas weights" in that course\'s weight editor.',
       resetConfirmOk: 'Clear',
       cancel: 'Cancel',
       save: 'Save',
@@ -130,11 +130,13 @@
 
   let _lang = 'zh-TW';
   let _keyVisible = false;
+  let _lastStatus = null;   // 最近一次 AI_GET_STATUS 結果，供 updateProviderUi 重算 PDF 提示
 
   function t(key, vars) {
     const table = STRINGS[_lang] || STRINGS['zh-TW'];
     let s = table[key] || STRINGS['zh-TW'][key] || key;
-    if (vars) for (const k of Object.keys(vars)) s = s.replace(`{${k}}`, String(vars[k]));
+    // 用 function replacer：供應商錯誤訊息裡的 $& / $` 不會被當成替換樣式而糊掉輸出
+    if (vars) for (const k of Object.keys(vars)) s = s.replace(`{${k}}`, () => String(vars[k]));
     return s;
   }
 
@@ -165,11 +167,13 @@
   }
 
   function readForm() {
+    const p = providers()[$('ai-provider').value] || {};
     return {
       provider: $('ai-provider').value,
       apiKey: $('ai-api-key').value.trim(),
       model: $('ai-model').value.trim(),
-      baseUrl: $('ai-base-url').value.trim(),
+      // 支援 PDF 的供應商（Gemini）不顯示 base URL 欄位，就別把隱藏欄位的殘值存進去
+      baseUrl: p.supportsPdf ? '' : $('ai-base-url').value.trim(),
       consentedAt: new Date().toISOString(),
     };
   }
@@ -182,6 +186,9 @@
     $('ai-base-url').placeholder = p.baseUrl || '';
     $('ai-base-url-wrap').hidden = !!p.supportsPdf;      // Gemini 不需要 base URL
     $('ai-text-only-hint').hidden = !!p.supportsPdf;
+    // 純文字供應商不會下載 PDF → 未授權提示無意義；用上次 AI_GET_STATUS 的快取重算，
+    // 切回 Gemini 時不必再送一次訊息就能把提示放回來
+    $('ai-pdf-hint').hidden = !(p.supportsPdf && _lastStatus && _lastStatus.configured && !_lastStatus.pdfPermission);
   }
 
   function applyStaticText() {
@@ -226,9 +233,19 @@
     const st = await sendMsg({ type: 'AI_GET_STATUS' });
     const summary = $('ai-status-summary');
     const list = $('ai-status-list');
-    if (!st || st.error) { summary.textContent = ''; list.innerHTML = ''; return; }
+    if (!st || st.error) {
+      _lastStatus = null;
+      summary.textContent = '';
+      list.innerHTML = '';
+      $('ai-reset-btn').disabled = true;
+      $('ai-pdf-hint').hidden = true;
+      return;
+    }
+    _lastStatus = st;
 
-    $('ai-pdf-hint').hidden = !(st.configured && !st.pdfPermission);
+    // 只有支援 PDF 的供應商才需要那個權限，所以提示也跟著表單上選的供應商走
+    const formPdf = !!(providers()[$('ai-provider').value] || {}).supportsPdf;
+    $('ai-pdf-hint').hidden = !(st.configured && !st.pdfPermission && formPdf);
 
     if (!st.configured) {
       summary.textContent = t('notConfigured');
@@ -246,12 +263,15 @@
 
     if (!st.courses.length) { list.innerHTML = `<li><span class="ai-status-name">${escapeHtml(t('noCourses'))}</span></li>`; return; }
     const label = { done: 'stDone', notFound: 'stNotFound', error: 'stError', skipped: 'stSkipped', pending: 'stPending' };
-    list.innerHTML = st.courses.map((c) => `
+    list.innerHTML = st.courses.map((c) => {
+      const name = escapeHtml(courseName(c.courseId));
+      return `
       <li>
-        <span class="ai-status-name" title="${escapeHtml(courseName(c.courseId))}">${escapeHtml(courseName(c.courseId))}</span>
+        <span class="ai-status-name" title="${name}">${name}</span>
         <span class="ai-status-state ${escapeHtml(c.status)}">${escapeHtml(t(label[c.status] || 'stPending'))}</span>
         ${c.status === 'error' && c.error ? `<span class="ai-status-error">${escapeHtml(c.error)}</span>` : ''}
-      </li>`).join('');
+      </li>`;
+    }).join('');
   }
 
   function loadConfigIntoForm() {
@@ -308,6 +328,7 @@
       const res = await sendMsg({ type: 'AI_TEST_CONNECTION', config: readForm() });
       if (res && res.success) { out.textContent = t('testOk'); out.classList.add('ok'); }
       else { out.textContent = t('testFail', { error: (res && res.error) || 'no response' }); out.classList.add('fail'); }
+      out.title = out.textContent;   // 這一行會 ellipsis 截斷，hover 才看得到完整錯誤
     });
 
     $('ai-clear-btn').addEventListener('click', () => {
@@ -329,14 +350,17 @@
     });
 
     $('ai-save-btn').addEventListener('click', () => {
-      // 權限請求必須在 user gesture 內、且在任何 await 之前呼叫，Chrome 才會顯示對話框；已授權時直接回 true
-      const perm = chrome.permissions?.request
+      // 只有支援 PDF 的供應商才需要 canvas-user-content.com（純文字供應商永遠不會下載 PDF，彈窗只是噪音）。
+      // 供應商查表是同步 DOM 讀取，user gesture 不會斷；權限請求必須是第一個 async 呼叫、前面不能有 await
+      const wantsPdf = !!(providers()[$('ai-provider').value] || {}).supportsPdf;
+      const perm = wantsPdf && chrome.permissions?.request
         ? chrome.permissions.request({ origins: [PDF_ORIGIN] }).catch(() => false)
         : Promise.resolve(false);
       const config = readForm();
       perm
         .then(() => (chrome.storage?.local?.set ? chrome.storage.local.set({ aiConfig: config }) : null))
         .then(() => sendMsg({ type: 'AI_RUN_NOW' }))
+        .catch(() => { })
         .finally(close);
     });
 
