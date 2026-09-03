@@ -23,13 +23,18 @@
 cc/
 ├── CLAUDE.md
 └── extension/
-    ├── manifest.json              ← 擴充功能設定（Manifest V3）
-    ├── background.js              ← Service worker：Canvas API 同步 + Claude 用量
+    ├── manifest.json              ← 擴充功能設定（Manifest V3；LLM 不佔必要權限，PDF 下載走 optional_host_permissions）
+    ├── background.js              ← Service worker：Canvas API 同步 + Claude 用量；importScripts 載入 ai/ 三檔
+    ├── ai/
+    │   ├── gradingRules.js        ← AI 評分比重分析純規則：設定解析、只跑一次規則、重試狀態機、回應解析、權重正規化（含測試）
+    │   ├── providers.js           ← LLM 供應商請求層：Gemini 原生／OpenAI 相容（含測試）
+    │   └── analysisRunner.js      ← service worker 側編排：同步後排程、Canvas 材料蒐集、PDF 下載、呼叫供應商、寫 customWeights、AI_* 訊息
     ├── popup.html                 ← 點擊擴充功能圖示的小視窗
     ├── popup.js                   ← popup 的邏輯
     └── dashboard/
         ├── index.html             ← Dashboard 頁面（CSS + HTML 骨架）
         ├── dashboard.js           ← 所有 Dashboard 渲染邏輯和事件綁定
+        ├── aiSettings.js          ← AI 分析設定 modal（自帶三語字串；只寫 aiConfig）
         ├── taskRules.js           ← 共用規則：考試/簽到判定、緊急度色階、逾期窗（含測試，popup 共用）
         ├── completion.js          ← 完成標記單一真相來源：isDone / toggleManualDone（含測試）
         ├── customAssignments.js   ← 自訂作業建立與合併（含測試）
@@ -45,6 +50,7 @@ cc/
 - **Manifest Version**：3（必須用 V3）
 - **Permissions**：`storage`、`tabs`、`webNavigation`、`scripting`
 - **Host Permissions**：`https://*.instructure.com/*`、`https://claude.ai/*`（後者供 popup 的 Claude 用量顯示與 content script）
+- **Optional Host Permissions**：`https://*.canvas-user-content.com/*`（僅 AI 分析下載 Canvas PDF 用，儲存 AI 設定時請求；LLM 端點靠供應商 CORS，不佔必要權限）
 - **背景執行**：Service Worker（background.js），不能用 `window` 或 `document`
 
 ### Canvas API 端點
@@ -69,9 +75,9 @@ GET /api/v1/courses/:id/assignment_groups?include[]=assignments&include[]=group_
 ```json
 {
   "lastSync": "2026-03-06T10:00:00Z",
-  "courses": [...],
-  "assignments": { "courseId": [...] },
-  "assignmentGroups": { "courseId": [...] },
+  "courses": [],
+  "assignments": { "courseId": [] },
+  "assignmentGroups": { "courseId": [] },
   "scores": { "assignmentId": 85.5 },
   "manualDone": { "assignmentId": true },
   "manualUndone": { "assignmentId": true },
@@ -81,7 +87,9 @@ GET /api/v1/courses/:id/assignment_groups?include[]=assignments&include[]=group_
   "courseNames": { "courseId": "自訂名稱" },
   "uiLanguage": "zh-TW",
   "showClaudeUsageInPopup": true,
-  "claudeUsage": { "usedPercent": 0, "resetAt": "..." }
+  "claudeUsage": { "usedPercent": 0, "resetAt": "..." },
+  "aiConfig": { "provider": "gemini", "apiKey": "…", "model": "", "baseUrl": "", "consentedAt": "…" },
+  "gradingAnalysis": { "courseId": { "status": "done", "attempts": 1, "at": "…", "nextRetryAt": null, "source": "syllabus_pdf", "provider": "gemini", "model": "gemini-2.5-flash", "components": [] } }
 }
 ```
 
@@ -150,8 +158,22 @@ GET /api/v1/courses/:id/assignment_groups?include[]=assignments&include[]=group_
 - `syncAll()`：並行拉取所有課程的作業與評分分組（courses / assignments / assignmentGroups）
 - `fetchSchoolName()`：自動偵測學校名稱（優先 Canvas API → hostname 解析）
 - `fetchClaudeUsageDirect()`：popup 的 Claude 用量 chip — 找開著的 `claude.ai` 分頁，借該分頁登入狀態讀 `/api/organizations/:id/usage`，**不呼叫任何 LLM**；結果存 `claudeUsage`。搭配注入 claude.ai 的 `claude_injected.js` / `claude_content.js`
+- `importScripts('ai/gradingRules.js', 'ai/providers.js', 'ai/analysisRunner.js')`：AI 評分比重分析（見下節）；`syncAll` 成功寫入 storage 後呼叫 `scheduleGradingAnalysis(BASE_URL)`（`setTimeout` 排程，不 await、不阻塞 SYNC 回應、不持有 `_syncing`）；`AI_*` 訊息轉交 `handleAiMessage`
+- 啟動時 `chrome.storage.local.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' })`：API key 只讓擴充功能自身頁面讀得到
 
-> 註：逐作業 AI 分析與 syllabus 評分比重 AI 分析已於 2026-07 移除（見 `docs/superpowers/specs/2026-07-21-remove-ai-analysis-design.md`）。
+### AI 評分比重分析（`extension/ai/`，spec `docs/superpowers/specs/2026-09-03-ai-grading-weights-restore-design.md`）
+
+- **定位**：AI 只負責「產生課程權重」並寫進現有 `customWeights[courseId]`；圓餅圖／權重編輯器／「還原 Canvas 權重」原樣呈現，**前端顯示邏輯零改動**。沒填 API key 時整個功能沉默，行為與未加此功能完全相同
+- **觸發**：每次同步完成後自動、序列、每輪最多 10 門；全域鎖 `_aiAnalyzing` 防疊跑
+- **只跑一次**（`DueGradingRules.shouldAnalyze`）：有手動權重／Canvas `group_weight`／已 `done` → 跳過；`notFound` 7 天冷卻、`error` 24 小時冷卻、最多 3 次。成功後即使按「還原 Canvas 權重」也不重跑；要重跑用 modal 的「清除分析紀錄並重新分析」
+- **材料**（`analyzeCourse`）：API `syllabus_body` 文字（`stripHtml`）→ syllabus 內連結 PDF → 課程 PDF 檔案（強關鍵字 → AI 挑檔）；PDF 只在有 optional 權限且供應商支援 PDF（Gemini）時下載；`parts` 為空不呼叫 LLM。Content-Type／`%PDF-` 檢查，單檔 10MB、累計 15MB
+- **供應商**（`DueAiProviders`）：Gemini 原生（key 走 `x-goog-api-key` header；base URL 固定 Google，不吃使用者輸入）；Qwen／DeepSeek 走 OpenAI 相容 `/chat/completions`（純文字，可自訂 base URL）。只送供應商需要的 header
+- **回應**：`parseAnalysisResponse`（去 ``` 圍欄；解析失敗再取第一個 `{` 到最後一個 `}`）→ `normalizeWeights`（小數比例 ×100、同名合併、總和須在 [80,120] 且為有限數）→ `toCustomWeights`。寫入前重新讀 storage；若使用者已手動填權重則不覆蓋。寫入後送 `GRADING_WEIGHTS_UPDATED` 給 dashboard
+- **設定 modal**（`dashboard/aiSettings.js`，設定選單「AI 分析設定」）：供應商／key／模型／base URL、測試連線、清除金鑰、分析狀態列、清除紀錄。「儲存」在 user gesture 內先 `chrome.permissions.request` PDF 權限再寫 `aiConfig`。字串自帶三語，`applyUILanguage` 末尾呼叫 `DueAiSettings.applyLanguage`
+- **訊息**：`AI_GET_STATUS`／`AI_TEST_CONNECTION`／`AI_RUN_NOW`／`AI_RESET_ANALYSIS`（dashboard → bg）、`GRADING_WEIGHTS_UPDATED`（bg → dashboard）
+- 逐作業 AI 分析（A）仍為移除狀態，不在此功能範圍
+
+> 註：舊版（1.5.0）的 `aiProvider`／`aiApiKey`／`syllabusAnalysis` 等 key 不復用、不讀取；殘留無害。
 
 ### popup.html / popup.js
 
@@ -265,7 +287,7 @@ sidebar（300px）+ main-content（flex:1）
 ## 資料儲存
 
 見上方「技術規格 → 資料儲存」的 `chrome.storage.local` 格式。
-（AI 相關 key：`analysis`、`syllabusAnalysis`、`milestoneChecks`、`aiModel`、`geminiApiKey`、`geminiModel`、`claudeApiKey` 已隨 AI 分析移除；舊資料殘留無害，不主動清除。）
+（1.5.0 時代的 AI key：`analysis`、`syllabusAnalysis`、`milestoneChecks`、`aiModel`、`aiProvider`、`aiApiKey`、`geminiApiKey`、`geminiModel`、`claudeApiKey` 已不再讀寫；2.1.0 起改用 `aiConfig`／`gradingAnalysis`。舊資料殘留無害，不主動清除。）
 
 ---
 
@@ -280,6 +302,7 @@ sidebar（300px）+ main-content（flex:1）
 7. `courseNames` 只影響顯示層，Canvas API 呼叫仍使用原始 `course.id`，不受自訂名稱影響
 8. `field-sizing: content`（Chrome 123+）用於 inline 重命名輸入框自動縮放
 9. 完成標記動畫：勾選後不立即重繪，該列跑 1.5 秒撤銷窗口＋碎點爆才移除（`COMPLETE_DELAY_MS = 1500`）；`dashboard.js` 唯一的 `storage.onChanged` 監聽器只在「登入 Canvas 自動跳回」武裝期間反應 `lastSync`（不碰 `manualDone` 等 key），故寫入 `manualDone` 不會打斷動畫（見 `completion.js`）
+10. AI 分析結果寫入 `customWeights` 後由 background 送 `GRADING_WEIGHTS_UPDATED` 訊息刷新 `_currentData`，**不**走 `storage.onChanged`（第 9 條的限制不變）；監聽器只在「正開著該課詳情且無拖曳／完成動畫」時重繪。AI 邏輯一律放 `extension/ai/`，`dashboard.js` 只保留五個接點（選單 click、`applyUILanguage` 一行、Esc closers、a11y 陣列、訊息監聽）
 
 ---
 

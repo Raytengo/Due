@@ -99,7 +99,7 @@ UMD 包裝沿用 `taskRules.js` 樣式：Node 下 `module.exports`，瀏覽器�
   consentedAt: string,     // ISO；按「儲存」即視為同意送出課程資料
 }
 ```
-`resolveConfig(stored)` → `{ provider, apiKey, model, baseUrl, configured: boolean }`；`configured = apiKey.trim() !== ''`。供應商預設：
+`resolveConfig(stored)` → `{ provider, apiKey, model, baseUrl, configured: boolean }`；`configured = apiKey.trim() !== ''`。`provider === 'gemini'` 時 `resolveConfig` **忽略**儲存的 `baseUrl`，一律用 Google 預設（避免切換供應商後殘留的其他家 URL 把 Gemini key 送錯地方）。供應商預設：
 
 | provider | baseUrl 預設 | model 預設 | 支援 PDF |
 |---|---|---|---|
@@ -191,7 +191,7 @@ UMD 包裝沿用 `taskRules.js` 樣式：Node 下 `module.exports`，瀏覽器�
 
 **Step 3 — 課程檔案**（僅當 `pdfAllowed && supportsPdf(provider)`）：`GET /api/v1/courses/:id/files?per_page=50&content_types[]=application/pdf`（用現有 `fetchAllPages`；401/403 視為空陣列）。排除 Step 2 已抓過的 id。
 - `findSyllabusByKeyword(files)`：檔名（`display_name || filename`，小寫）含任一**強關鍵字**：`syllabus`, `course outline`, `course_outline`, `course-outline`, `course info`, `courseinfo`, `course guide`, `unit guide`, `course description`, `grading policy`, `grading scheme`, `assessment scheme`, `assessment policy`；**不再**用裸的 `grading`／`assessment`（舊版會把 `Assessment 1 rubric.pdf` 當大綱）。回第一個命中。
-- 沒命中且 `files.length > 0` → `selectSyllabusPdfWithAI(files.slice(0, 60), cfg)`：一次 LLM 呼叫（temperature 0，`maxTokens 16`），prompt 見 §6.3；回傳合法檔案 id 才算。
+- 沒命中且 `files.length > 0` → `selectSyllabusPdfWithAI(files.slice(0, 60), cfg)`：一次 LLM 呼叫（temperature 0，`maxTokens 512`），prompt 見 §6.3；回傳合法檔案 id 才算。
 - 命中的檔案 → `tryFetchPdf(file.url)`；失敗則 `GET /api/v1/files/:id` 取新 `url` 再試一次。
 
 **`tryFetchPdf(url)`**：`fetch(url, {credentials:'include'})`；`res.ok` 且（`Content-Type` 含 `pdf` **或** 前 5 bytes 為 `%PDF-`）才接受；單檔 ≤ `MAX_PDF_BYTES` 10MB；**累計** ≤ `MAX_TOTAL_PDF_BYTES` 15MB，超過的略過（Gemini inline 上限約 20MB）。不合格回 `null`。
@@ -199,9 +199,9 @@ UMD 包裝沿用 `taskRules.js` 樣式：Node 下 `module.exports`，瀏覽器�
 **Step 4 — 判定**：`parts` 為空 → outcome `notFound`，`source:'none'`，**不呼叫 LLM**。
 
 ### 6.2 呼叫與解析
-- push 使用者指令文字（§6.3），`callProvider(cfg, parts, SYSTEM_PROMPT, { temperature: 0, maxTokens: 2048 })`。
-- `parseAnalysisResponse(text)`（純函式）：去 ``` 圍欄 → `JSON.parse`（失敗 → `{ok:false}`）→ 驗 `components` 為陣列 → 逐項：`name` 為非空字串（trim、截 60 字）；`weight` 接受 number 或可轉數字的字串（去 `%`），需有限且 > 0 → 過濾後為空 → `{ok:true, found:false}`。
-- `normalizeWeights(components)`（純函式）：全部 ≤ 1 且總和 ≤ 1.05 → 視為小數比例，×100；四捨五入到 1 位小數；總和落在 **[80, 120]** 之外 → 視為 `notFound`（notes 記 `weights sum {total}`）。同名合併（後者權重加到前者）。
+- push 使用者指令文字（§6.3），`callProvider(cfg, parts, SYSTEM_PROMPT, { temperature: 0, maxTokens: 8192 })`。
+- `parseAnalysisResponse(text)`（純函式）：去 ``` 圍欄 → `JSON.parse`（失敗時再取第一個 `{` 到最後一個 `}` 重試；模型在 JSON 前後多講話不算錯誤；仍失敗 → `{ok:false}`）→ 驗 `components` 為陣列 → 逐項：`name` 為非空字串（trim、截 60 字）；`weight` 接受 number 或可轉數字的字串（去 `%`），需有限且 > 0 → 過濾後為空 → `{ok:true, found:false}`。
+- `normalizeWeights(components)`（純函式）：全部 ≤ 1 且總和 ≤ 1.05 → 視為小數比例，×100；四捨五入到 1 位小數；總和非有限數或落在 **[80, 120]** 之外 → 視為 `notFound`（notes 記 `weights sum {total}`）。同名合併（後者權重加到前者）。
 - 成功 → `toCustomWeights(components)` → `[{name, weight}]` → 寫 `customWeights`（§4.3）、記 `done`、`sendMessage(GRADING_WEIGHTS_UPDATED)`。
 - 供應商 HTTP 非 2xx／網路錯誤／回應無文字 → outcome `error`（訊息含狀態碼，截 200 字）。
 
@@ -229,9 +229,9 @@ Which single file most likely contains the course syllabus or grading policy? Re
 ## 7. 供應商層 `providers.js`（純函式，有測試）
 
 - `buildRequest(cfg, parts, systemPrompt, { temperature, maxTokens })` → `{ url, headers, body }`（`body` 為物件，呼叫端 `JSON.stringify`）
-  - **gemini**：`url = `${baseUrl}/models/${model}:generateContent``；headers `{'Content-Type':'application/json', 'x-goog-api-key': apiKey}`（**key 不進 URL**）；body `{ systemInstruction:{parts:[{text}]}, contents:[{parts: [...]}], generationConfig:{ maxOutputTokens, temperature } }`；pdf part → `{ inlineData:{ mimeType, data: base64 } }`。
+  - **gemini**：`url = `${baseUrl}/models/${model}:generateContent``；headers `{'Content-Type':'application/json', 'x-goog-api-key': apiKey}`（**key 不進 URL**）；body `{ systemInstruction:{parts:[{text}]}, contents:[{parts: [...]}], generationConfig:{ maxOutputTokens, temperature } }`；pdf part → `{ inlineData:{ mimeType, data: base64 } }`。model id 若帶 `models/` 前綴會先去掉。
   - **qwen / deepseek**（OpenAI 相容）：`url = `${normalizeBaseUrl(baseUrl)}/chat/completions``；headers `{'Content-Type':'application/json', Authorization:`Bearer ${apiKey}`}`；body `{ model, messages:[{role:'system',content},{role:'user',content: 文字 parts 以 \n\n 串接}], max_tokens, temperature }`；PDF parts **丟棄**（呼叫端在 §6.1 已不會為這兩家下載 PDF，這裡只是防禦）。
-- `extractText(provider, json)`：gemini 讀 `candidates[0].content.parts[].text` 串接；OpenAI 相容讀 `choices[0].message.content`；缺 → throw `Empty response`。
+- `extractText(provider, json)`：gemini 讀 `candidates[0].content.parts[].text` 串接；OpenAI 相容讀 `choices[0].message.content`；缺 → throw `Empty response (finishReason 或 blockReason)`，便於在 modal 狀態列判讀 MAX_TOKENS／SAFETY。
 - `normalizeBaseUrl(url)`：去尾端 `/`。
 - `supportsPdf(provider)`：只有 `gemini` 為 true。
 - 送出的 header 只有上面列的（Gemini 對 preflight 帶未知 header 會回 403）。
@@ -270,7 +270,7 @@ Which single file most likely contains the course syllabus or grading policy? Re
 2. **同意聲明**（醒目但不刺眼，`--muted`）：「啟用後，課程大綱與相關 PDF 會直接從你的瀏覽器送到你選的供應商；開發者不會收到任何資料。」
 3. 欄位：供應商 `<select>`（Gemini／Qwen／DeepSeek）；API key（`type=password`＋顯示切換）；模型 ID（placeholder 顯示該供應商預設，留空即用預設）；Base URL（進階，可折疊，只在 Qwen／DeepSeek 顯示，placeholder 為預設）。切換供應商只更新 placeholder，不清空使用者已輸入的模型。
 4. 供應商為 Qwen／DeepSeek 時顯示提示：「此供應商只能讀 syllabus 文字，大綱若是 PDF 建議用 Gemini」。
-5. 按鈕列：`測試連線`（送 `AI_TEST_CONNECTION` 帶表單值，顯示 ✓／錯誤訊息）、`清除金鑰`（清 `aiConfig`，不動 `gradingAnalysis`／`customWeights`）、`取消`、`儲存`（§8.2 流程 → 寫 `aiConfig`（含 `consentedAt`）→ 送 `AI_RUN_NOW` → 關閉）。
+5. 按鈕列：`測試連線`（送 `AI_TEST_CONNECTION` 帶表單值，`maxTokens 512`，顯示 ✓／錯誤訊息）、`清除金鑰`（清 `aiConfig`，不動 `gradingAnalysis`／`customWeights`）、`取消`、`儲存`（§8.2 流程 → 寫 `aiConfig`（含 `consentedAt`）→ 送 `AI_RUN_NOW` → 關閉）。
 6. **分析狀態區**（開啟時與每次操作後送 `AI_GET_STATUS` 刷新）：摘要一行「已分析 N · 找不到大綱 M · 錯誤 K · 待分析 P · 上次執行 {時間}」＋每門課一行（課名用 `courseNames` 自訂名優先；狀態字；error 顯示截短訊息）。底部 `清除分析紀錄並重新分析` 按鈕（走現有 `showConfirmDialog` 確認後送 `AI_RESET_ANALYSIS`）。
 7. 未授權 PDF 時顯示一行提示（§8.2）。
 
