@@ -55,7 +55,11 @@
     const def = PROVIDERS[provider];
     const apiKey = typeof s.apiKey === 'string' ? s.apiKey.trim() : '';
     const model = (typeof s.model === 'string' && s.model.trim()) || def.defaultModel;
-    const baseUrl = (typeof s.baseUrl === 'string' && s.baseUrl.trim()) || def.baseUrl;
+    // baseUrl 只有 OpenAI 相容路徑會用到（spec §4.1）；gemini 一律用官方端點，
+    // 免得切換供應商後殘留的自訂 baseUrl 把 Gemini key 送去別家。
+    const baseUrl = provider === 'gemini'
+      ? def.baseUrl
+      : ((typeof s.baseUrl === 'string' && s.baseUrl.trim()) || def.baseUrl);
     return { provider, apiKey, model, baseUrl, configured: apiKey !== '' };
   }
 
@@ -81,8 +85,10 @@
   // outcome: { kind: 'done'|'notFound'|'error', source, components?, notes?, error? }
   function nextRecord(prev, outcome, now, meta) {
     const attempts = ((prev && prev.attempts) || 0) + 1;
+    // status 只會是這三個值；未知 kind 一律當 error（下方 else 分支已套用 error 的重試時間）
+    const kind = outcome.kind === 'done' || outcome.kind === 'notFound' ? outcome.kind : 'error';
     const rec = {
-      status: outcome.kind,
+      status: kind,
       attempts,
       at: new Date(now).toISOString(),
       nextRetryAt: null,
@@ -90,9 +96,9 @@
       provider: meta && meta.provider,
       model: meta && meta.model,
     };
-    if (outcome.kind === 'done') {
+    if (kind === 'done') {
       rec.components = outcome.components;
-    } else if (outcome.kind === 'notFound') {
+    } else if (kind === 'notFound') {
       rec.nextRetryAt = new Date(now + RETRY_NOT_FOUND_MS).toISOString();
       if (outcome.notes) rec.notes = String(outcome.notes).slice(0, 200);
     } else {
@@ -140,6 +146,12 @@
     return ids;
   }
 
+  // 數值實體 → 字元；超出 Unicode 範圍時原樣保留（String.fromCodePoint 會丟 RangeError）
+  function codePointChar(code, raw) {
+    if (!Number.isInteger(code) || code < 0 || code > 0x10ffff) return raw;
+    return String.fromCodePoint(code);
+  }
+
   function stripHtml(html) {
     return String(html || '')
       .replace(/<script[\s\S]*?<\/script>/gi, ' ')
@@ -152,8 +164,8 @@
       .replace(/&lt;/g, '<')
       .replace(/&gt;/g, '>')
       .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'")
-      .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
+      .replace(/&#(\d+);/g, (m, n) => codePointChar(Number(n), m))
+      .replace(/&#x([0-9a-f]+);/gi, (m, h) => codePointChar(parseInt(h, 16), m))
       .replace(/[ \t\f\v]+/g, ' ')
       .replace(/ *\n */g, '\n')
       .replace(/\n{2,}/g, '\n')
@@ -175,11 +187,20 @@
   }
 
   function parseAnalysisResponse(text) {
+    const cleaned = stripFences(text);
     let parsed;
     try {
-      parsed = JSON.parse(stripFences(text));
+      parsed = JSON.parse(cleaned);
     } catch (_) {
-      return { ok: false, error: 'invalid JSON' };
+      // 模型常在 JSON 前後多寫一句話（或用 ```javascript 圍欄）：退一步取第一個 { 到最後一個 }
+      const start = cleaned.indexOf('{');
+      const end = cleaned.lastIndexOf('}');
+      if (start === -1 || end <= start) return { ok: false, error: 'invalid JSON' };
+      try {
+        parsed = JSON.parse(cleaned.slice(start, end + 1));
+      } catch (__) {
+        return { ok: false, error: 'invalid JSON' };
+      }
     }
     if (!parsed || typeof parsed !== 'object') return { ok: false, error: 'not an object' };
     const raw = Array.isArray(parsed.components) ? parsed.components : [];
@@ -209,13 +230,14 @@
     const merged = [];
     const index = new Map();
     for (const c of items) {
-      const key = c.name.toLowerCase();
+      const key = String(c.name || '').toLowerCase();
       if (index.has(key)) merged[index.get(key)].weight += c.weight;
       else { index.set(key, merged.length); merged.push({ ...c }); }
     }
     for (const c of merged) c.weight = Math.round(c.weight * 10) / 10;
     const total = Math.round(merged.reduce((s, c) => s + c.weight, 0) * 10) / 10;
-    if (total < WEIGHT_SUM_MIN || total > WEIGHT_SUM_MAX) {
+    // NaN（權重缺漏／非數字）兩邊比較都是 false，會漏過關卡 → 明確要求有限數
+    if (!Number.isFinite(total) || total < WEIGHT_SUM_MIN || total > WEIGHT_SUM_MAX) {
       return { ok: false, reason: `weights sum ${total}`, components: merged, total };
     }
     return { ok: true, components: merged, total };

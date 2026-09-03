@@ -36,6 +36,11 @@ test('resolveConfig: model/baseUrl 空字串取供應商預設；key 有值即 c
   assert.equal(q.baseUrl, 'https://x.example/v1/');
 });
 
+test('resolveConfig: gemini 忽略殘留的 baseUrl（避免把 Gemini key 送到別家）', () => {
+  const c = R.resolveConfig({ provider: 'gemini', apiKey: 'k', baseUrl: 'https://api.deepseek.com/v1' });
+  assert.equal(c.baseUrl, 'https://generativelanguage.googleapis.com/v1beta');
+});
+
 // ── shouldAnalyze ──
 const base = { courseId: 7, customWeights: {}, groups: [], record: undefined, now: NOW };
 
@@ -77,6 +82,12 @@ test('shouldAnalyze: 無紀錄 → first', () => {
   assert.deepEqual(R.shouldAnalyze(base), { run: true, reason: 'first' });
 });
 
+test('shouldAnalyze: nextRetryAt 壞字串 → 失效開放（照跑），attempts 上限仍保護', () => {
+  const rec = { status: 'notFound', attempts: 1, nextRetryAt: 'garbage' };
+  assert.deepEqual(R.shouldAnalyze({ ...base, record: rec }), { run: true, reason: 'retry' });
+  assert.deepEqual(R.shouldAnalyze({ ...base, record: { ...rec, attempts: 3 } }), { run: false, reason: 'maxAttempts' });
+});
+
 // ── nextRecord ──
 const META = { provider: 'gemini', model: 'gemini-2.5-flash' };
 
@@ -101,6 +112,12 @@ test('nextRecord: notFound → 7 天後重試；error → 24 小時後重試、e
   assert.equal(er.error.length, 200);
 });
 
+test('nextRecord: 未知 kind → status 收斂為 error（與 error 的重試時間一致）', () => {
+  const r = R.nextRecord(undefined, { kind: 'weird', source: 'none' }, NOW, META);
+  assert.equal(r.status, 'error');
+  assert.equal(r.nextRetryAt, new Date(NOW + 24 * HOUR).toISOString());
+});
+
 // ── courseStatus ──
 test('courseStatus: done → done；有權重無紀錄 → skipped；無紀錄無權重 → pending；冷卻中 notFound → notFound', () => {
   assert.equal(R.courseStatus({ ...base, record: { status: 'done', attempts: 1 } }), 'done');
@@ -109,6 +126,12 @@ test('courseStatus: done → done；有權重無紀錄 → skipped；無紀錄�
   const cooling = { status: 'notFound', attempts: 1, nextRetryAt: new Date(NOW + DAY).toISOString() };
   assert.equal(R.courseStatus({ ...base, record: cooling }), 'notFound');
   assert.equal(R.courseStatus({ ...base, record: { ...cooling, nextRetryAt: new Date(NOW - 1).toISOString() } }), 'pending');
+});
+
+test('courseStatus: error 冷卻中／attempts 用盡 → 都顯示 error', () => {
+  const rec = { status: 'error', attempts: 1, nextRetryAt: new Date(NOW + DAY).toISOString() };
+  assert.equal(R.courseStatus({ ...base, record: rec }), 'error');
+  assert.equal(R.courseStatus({ ...base, record: { ...rec, attempts: 3 } }), 'error');
 });
 
 // ── findSyllabusByKeyword ──
@@ -141,6 +164,10 @@ test('stripHtml: 移除 script/style 內容、解碼實體、壓空白、區塊�
   assert.equal(out, 'Grading & Policy\nHW 30% A');
 });
 
+test('stripHtml: 十六進位實體與四位元組字元（emoji）', () => {
+  assert.equal(R.stripHtml('<p>&#x41;&#66;&#128512;</p>'), 'AB😀');
+});
+
 // ── parseAnalysisResponse ──
 test('parseAnalysisResponse: 去 ```json 圍欄、"30%" 字串轉數字、過濾無效項', () => {
   const text = '```json\n{"found":true,"components":[{"name":"Homework","weight":"30%","description":"d"},{"name":"","weight":10},{"name":"Final","weight":0},{"name":"Exam","weight":70}],"notes":"ok"}\n```';
@@ -156,6 +183,26 @@ test('parseAnalysisResponse: 非法 JSON → ok:false；components 全無效 →
   const p = R.parseAnalysisResponse('{"found":true,"components":[{"name":"x","weight":null}]}');
   assert.equal(p.ok, true);
   assert.equal(p.found, false);
+});
+
+test('parseAnalysisResponse: components 不是陣列 → ok:true, found:false', () => {
+  const p = R.parseAnalysisResponse('{"found":true,"components":"nope"}');
+  assert.equal(p.ok, true);
+  assert.equal(p.found, false);
+});
+
+test('parseAnalysisResponse: 容忍 JSON 前後的贅字與非 json 圍欄標籤', () => {
+  const json = '{"found":true,"components":[{"name":"Exam","weight":100,"description":""}],"notes":""}';
+  const after = R.parseAnalysisResponse('```json\n' + json + '\n```\nHope this helps!');
+  assert.equal(after.ok, true);
+  assert.equal(after.found, true);
+  assert.deepEqual(after.components.map((c) => [c.name, c.weight]), [['Exam', 100]]);
+  const before = R.parseAnalysisResponse('Sure! Here you go:\n```json\n' + json + '\n```');
+  assert.equal(before.ok, true);
+  assert.equal(before.found, true);
+  const tagged = R.parseAnalysisResponse('```javascript\n' + json + '\n```');
+  assert.equal(tagged.ok, true);
+  assert.equal(tagged.found, true);
 });
 
 // ── normalizeWeights ──
@@ -176,6 +223,12 @@ test('normalizeWeights: 總和 70 → 不採用；總和 95 → 採用', () => {
   assert.equal(bad.reason, 'weights sum 70');
   assert.equal(R.normalizeWeights([{ name: 'A', weight: 55.55, description: '' }, { name: 'B', weight: 39.44, description: '' }]).ok, true);
   assert.equal(R.normalizeWeights([]).ok, false);
+});
+
+test('normalizeWeights: 權重缺漏／非數字（總和 NaN）→ 不採用', () => {
+  const n = R.normalizeWeights([{ name: 'A' }, { name: 'B' }]);
+  assert.equal(n.ok, false);
+  assert.ok(n.reason.startsWith('weights sum'), `reason=${n.reason}`);
 });
 
 test('toCustomWeights: 只留 name/weight', () => {
