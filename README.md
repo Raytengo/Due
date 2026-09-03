@@ -51,7 +51,7 @@ there's nothing to configure. Log in to Canvas once and it syncs automatically.
 
 ## Works with any Canvas school
 
-Due never asks for an API token or a password. It uses the Canvas session
+Due never asks for a Canvas API token or a password. It uses the Canvas session
 already in your browser, so any school running Canvas works out of the box —
 just be logged in. The only key Due ever asks for is optional: your own
 Gemini / Qwen / DeepSeek API key, if you turn on AI grading-weight analysis

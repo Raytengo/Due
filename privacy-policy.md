@@ -41,7 +41,7 @@ The AI grading-weight analysis is **off by default** and only runs after you ent
 - Syllabus-related PDF files from the course (only if you granted access to `canvas-user-content.com` and the provider supports PDF input)
 - A list of the course's PDF file names, when the Extension needs help choosing which file is the syllabus
 
-Each course is analyzed once; the result (grading components and weights) is stored locally as that course's manual weights.
+Each course is analyzed once (a failed attempt is retried at most twice, after a cooling-off period); the result (grading components and weights) is stored locally as that course's manual weights.
 
 **The extension developer does not receive, process, store, or have access to this data.** The transmission happens entirely between your browser and the AI provider you configured, under that provider's terms.
 
@@ -57,6 +57,7 @@ You are responsible for reviewing the privacy policy of your chosen AI provider:
 - `https://*.instructure.com/*` — read your Canvas data with your existing login
 - `https://claude.ai/*` — read your own Claude usage for the optional popup chip
 - Optional, requested only when you save AI analysis settings: `https://*.canvas-user-content.com/*` — download syllabus PDFs from Canvas's file host. You can decline; the analysis then uses syllabus text only.
+- `storage`, `tabs`, `webNavigation`, `scripting` — save data locally, detect when you visit Canvas, and open the dashboard tab.
 
 Calls to the AI providers use their public HTTPS APIs and do not require additional permissions.
 

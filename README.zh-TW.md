@@ -51,7 +51,7 @@ Due 以「你」的身分登入：它借用瀏覽器裡現成的 Canvas 登入�
 
 ## 適用任何 Canvas 學校
 
-Due 從不要求 API token 或密碼。它使用瀏覽器裡既有的 Canvas 登入狀態，所以任何
+Due 從不要求 Canvas API token 或密碼。它使用瀏覽器裡既有的 Canvas 登入狀態，所以任何
 使用 Canvas 的學校都能直接用——只要你已經登入。Due 唯一會問你要的 key 是選用
 的：開啟 AI 評分比重分析時，你自己的 Gemini／Qwen／DeepSeek API key（見下方）。
 
