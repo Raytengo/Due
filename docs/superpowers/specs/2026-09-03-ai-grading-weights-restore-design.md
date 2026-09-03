@@ -120,6 +120,7 @@ UMD 包裝沿用 `taskRules.js` 樣式：Node 下 `module.exports`，瀏覽器�
     source: 'syllabus_body' | 'syllabus_pdf' | 'keyword_pdf' | 'ai_selected_pdf' | 'none',
     provider: string, model: string,
     components?: [{ name: string, weight: number, description: string }],  // done 才有，稽核用
+    notes?: string,            // notFound 才有（如 'no syllabus material'、'weights sum 70'），截 200 字
     error?: string,            // error 才有，截 200 字
   }
 }
