@@ -9,6 +9,11 @@
 
 let _aiAnalyzing = false; // 全域鎖：新手教學期間連續多次 SYNC 不會疊跑
 
+// Gemini 2.5 的 thinking token 也算進 maxOutputTokens，額度太小會只回 finishReason:MAX_TOKENS 沒有正文
+const AI_MAX_TOKENS_MAIN = 8192;  // 主分析：要留得下 thinking ＋ 完整 JSON
+const AI_MAX_TOKENS_SMALL = 512;  // 測試連線／挑檔：正文極短，但仍要留 thinking 空間
+const MAX_LINKED_PDFS = 5;        // 大綱頁可能連結很多檔案，位元組上限只擋使用不擋下載
+
 // 同步完成後由 syncAll 呼叫：不 await、不阻塞 SYNC 回應、不持有 _syncing
 function scheduleGradingAnalysis(baseUrl) {
   setTimeout(() => {
@@ -34,14 +39,15 @@ async function aiHasPdfPermission() {
 
 async function runPendingGradingAnalysis(baseUrlHint) {
   if (_aiAnalyzing) return;
-  const { aiConfig } = await chrome.storage.local.get(['aiConfig']);
-  const cfg = DueGradingRules.resolveConfig(aiConfig);
-  if (!cfg.configured) return; // 沒 key：整個功能沉默
-  const baseUrl = await aiResolveBaseUrl(baseUrlHint);
-  if (!baseUrl) return;
-
+  // 旗標必須在守衛之後「同步」設定：中間若有 await，同一個 tick 內的兩次觸發會雙雙通過守衛而疊跑
   _aiAnalyzing = true;
   try {
+    const { aiConfig } = await chrome.storage.local.get(['aiConfig']);
+    const cfg = DueGradingRules.resolveConfig(aiConfig);
+    if (!cfg.configured) return; // 沒 key：整個功能沉默
+    const baseUrl = await aiResolveBaseUrl(baseUrlHint);
+    if (!baseUrl) return;
+
     const data = await chrome.storage.local.get(['courses', 'customWeights', 'assignmentGroups', 'gradingAnalysis']);
     const courses = Array.isArray(data.courses) ? data.courses : [];
     const now = Date.now();
@@ -128,7 +134,8 @@ async function analyzeCourse(course, cfg, ctx) {
   if (syllabusBody.trim()) {
     // Step 2：syllabus 內連結的 PDF
     if (wantPdf) {
-      for (const fid of R.extractFileIds(syllabusBody)) {
+      // 只試前 MAX_LINKED_PDFS 個：未嘗試的 id 不進 fetchedIds，Step 3 仍可考慮
+      for (const fid of R.extractFileIds(syllabusBody).slice(0, MAX_LINKED_PDFS)) {
         fetchedIds.add(String(fid));
         const pdf = await tryFetchPdf(`${ctx.baseUrl}/courses/${course.id}/files/${fid}/download?download_frd=1`);
         if (pushPdf(pdf)) flags.syllabusPdf = true;
@@ -178,7 +185,13 @@ async function analyzeCourse(course, cfg, ctx) {
   if (!parts.length) return { kind: 'notFound', source: 'none', notes: 'no syllabus material' };
 
   parts.push({ type: 'text', text: R.USER_PROMPT });
-  const raw = await callProvider(cfg, parts, R.SYSTEM_PROMPT, { temperature: 0, maxTokens: 2048 });
+  // 供應商 HTTP／網路錯誤在這裡收斂成 outcome，才留得住 source（丟到外層 catch 會退化成 'none'）
+  let raw;
+  try {
+    raw = await callProvider(cfg, parts, R.SYSTEM_PROMPT, { temperature: 0, maxTokens: AI_MAX_TOKENS_MAIN });
+  } catch (err) {
+    return { kind: 'error', source, error: err && err.message ? err.message : String(err) };
+  }
   const parsed = R.parseAnalysisResponse(raw);
   if (!parsed.ok) return { kind: 'error', source, error: `bad response: ${parsed.error}` };
   if (!parsed.found) return { kind: 'notFound', source, notes: parsed.notes || 'no grading breakdown found' };
@@ -193,7 +206,7 @@ async function selectSyllabusPdfWithAI(files, cfg) {
       cfg,
       [{ type: 'text', text: DueGradingRules.buildFilePickPrompt(files) }],
       'Return only valid JSON, no explanation.',
-      { temperature: 0, maxTokens: 16 }
+      { temperature: 0, maxTokens: AI_MAX_TOKENS_SMALL }
     );
     return DueGradingRules.parseFilePick(raw, files);
   } catch (_) {
@@ -297,7 +310,7 @@ async function aiTestConnection(rawConfig) {
   const cfg = DueGradingRules.resolveConfig(rawConfig);
   if (!cfg.configured) return { success: false, error: 'NO_API_KEY' };
   try {
-    await callProvider(cfg, [{ type: 'text', text: 'Reply with the single word OK.' }], '', { maxTokens: 8 });
+    await callProvider(cfg, [{ type: 'text', text: 'Reply with the single word OK.' }], '', { maxTokens: AI_MAX_TOKENS_SMALL });
     return { success: true };
   } catch (err) {
     return { success: false, error: String((err && err.message) || err).slice(0, 200) };
