@@ -105,7 +105,7 @@ UMD 包裝沿用 `taskRules.js` 樣式：Node 下 `module.exports`，瀏覽器�
 |---|---|---|---|
 | gemini | `https://generativelanguage.googleapis.com/v1beta` | `gemini-2.5-flash` | 是 |
 | qwen | `https://dashscope.aliyuncs.com/compatible-mode/v1` | `qwen-plus` | 否 |
-| deepseek | `https://api.deepseek.com/v1` | `deepseek-chat` | 否 |
+| deepseek | `https://api.deepseek.com/v1` | `deepseek-v4-flash` | 否 |（`deepseek-chat`／`deepseek-reasoner` 舊別名已於 2026-07-24 停用）
 | nvidia | `https://integrate.api.nvidia.com/v1` | `deepseek-ai/deepseek-v4-flash-0731` | 否 |
 
 未知 provider 一律視為 `gemini`。`nvidia` 與其他非 gemini 供應商一樣吃「自訂 `baseUrl` 只收 `https://`，否則退回預設」的規則。

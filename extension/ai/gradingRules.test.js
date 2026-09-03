@@ -28,7 +28,7 @@ test('resolveConfig: 空／未知 provider → gemini 預設，未設定', () =>
 test('resolveConfig: model/baseUrl 空字串取供應商預設；key 有值即 configured', () => {
   const c = R.resolveConfig({ provider: 'deepseek', apiKey: ' sk-1 ', model: '  ', baseUrl: '' });
   assert.equal(c.apiKey, 'sk-1');
-  assert.equal(c.model, 'deepseek-chat');
+  assert.equal(c.model, 'deepseek-v4-flash');
   assert.equal(c.baseUrl, 'https://api.deepseek.com/v1');
   assert.equal(c.configured, true);
   const q = R.resolveConfig({ provider: 'qwen', apiKey: 'k', model: 'qwen-max', baseUrl: 'https://x.example/v1/' });

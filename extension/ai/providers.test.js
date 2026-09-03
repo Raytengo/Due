@@ -13,7 +13,7 @@ function test(name, fn) {
 }
 
 const GEMINI = { provider: 'gemini', apiKey: 'AIza-secret', model: 'gemini-2.5-flash', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/' };
-const DEEPSEEK = { provider: 'deepseek', apiKey: 'sk-secret', model: 'deepseek-chat', baseUrl: 'https://api.deepseek.com/v1/' };
+const DEEPSEEK = { provider: 'deepseek', apiKey: 'sk-secret', model: 'deepseek-v4-flash', baseUrl: 'https://api.deepseek.com/v1/' };
 const PARTS = [
   { type: 'pdf', base64: 'QUJD', mimeType: 'application/pdf', bytes: 3 },
   { type: 'text', text: 'Course Syllabus:\nHW 30%' },
@@ -94,7 +94,7 @@ test('buildRequest OpenAI 相容: /chat/completions、Bearer、PDF 丟棄、文�
   const req = P.buildRequest(DEEPSEEK, PARTS, 'SYS', { temperature: 0, maxTokens: 2048 });
   assert.equal(req.url, 'https://api.deepseek.com/v1/chat/completions');
   assert.equal(req.headers.Authorization, 'Bearer sk-secret');
-  assert.equal(req.body.model, 'deepseek-chat');
+  assert.equal(req.body.model, 'deepseek-v4-flash');
   assert.deepEqual(req.body.messages[0], { role: 'system', content: 'SYS' });
   assert.deepEqual(req.body.messages[1], { role: 'user', content: 'Course Syllabus:\nHW 30%\n\nExtract it.' });
   assert.equal(req.body.max_tokens, 2048);

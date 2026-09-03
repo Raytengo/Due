@@ -45,7 +45,8 @@
     deepseek: {
       label: 'DeepSeek',
       baseUrl: 'https://api.deepseek.com/v1',
-      defaultModel: 'deepseek-chat',
+      // deepseek-chat／deepseek-reasoner 是舊別名，官方公告 2026-07-24 停用，改用 v4 名稱
+      defaultModel: 'deepseek-v4-flash',
       supportsPdf: false,
       keyPlaceholder: 'sk-...',
     },
