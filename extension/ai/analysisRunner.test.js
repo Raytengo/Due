@@ -28,12 +28,20 @@ const LLM_JSON =
 const WEIGHTS = [{ name: 'Homework', weight: 30 }, { name: 'Midterm', weight: 30 }, { name: 'Final Exam', weight: 40 }];
 
 // ── 可變的測試狀態 ──
-const S = {
-  store: {}, sets: 0, pdfPermission: true, sent: [], fetches: [], llm: [],
-  syllabus: '', files: [], llmStatus: 200, llmText: LLM_JSON,
-};
+const PDF_HEADERS = { 'content-type': 'application/pdf' };
+// 每次都給全新的陣列：共用同一份物件會讓 llm/fetches 跨測試累積
+const defaults = () => ({
+  sets: 0, pdfPermission: true, sent: [], fetches: [], llm: [], syllabus: '', files: [],
+  llmStatus: 200, llmText: LLM_JSON,
+  bodyReads: 0,          // arrayBuffer() 被呼叫幾次（驗「下載前就拒絕」時不讀 body）
+  pdfHeaders: PDF_HEADERS,
+  llmGate: null,         // 設成 promise 可把 LLM 回應卡住，模擬「分析途中」
+  platformInfo: 0,       // keepalive 呼叫 chrome.runtime.getPlatformInfo 的次數
+  failNextSet: false,    // 下一次 storage.local.set 丟錯
+});
+const S = { store: {}, ...defaults() };
 function reset(store, over) {
-  Object.assign(S, { store, sets: 0, pdfPermission: true, sent: [], fetches: [], llm: [], syllabus: '', files: [], llmStatus: 200, llmText: LLM_JSON }, over || {});
+  Object.assign(S, { store }, defaults(), over || {});
 }
 const res = (status, body, headers) => ({
   ok: status >= 200 && status < 300,
@@ -41,7 +49,7 @@ const res = (status, body, headers) => ({
   headers: { get: (k) => (headers || {})[String(k).toLowerCase()] || null },
   json: async () => body,
   text: async () => (typeof body === 'string' ? body : JSON.stringify(body)),
-  arrayBuffer: async () => body,
+  arrayBuffer: async () => { S.bodyReads++; return body; },
 });
 
 async function fakeFetch(url, init) {
@@ -49,6 +57,7 @@ async function fakeFetch(url, init) {
   S.fetches.push({ url: u, init: init || {} });
   if (u.includes(':generateContent') || u.includes('/chat/completions')) {
     S.llm.push({ url: u, method: (init || {}).method, headers: (init || {}).headers, body: JSON.parse((init || {}).body) });
+    if (S.llmGate) await S.llmGate; // 手動放行：測試「分析途中」的行為
     if (S.llmStatus !== 200) return res(S.llmStatus, 'provider exploded');
     return res(200, u.includes(':generateContent')
       ? { candidates: [{ content: { parts: [{ text: S.llmText }] } }] }
@@ -58,7 +67,7 @@ async function fakeFetch(url, init) {
   if (u.includes('/files?')) return res(200, S.files, { link: '' });
   if (u.includes('/files/')) {
     const pdf = Buffer.concat([Buffer.from('%PDF-1.4\n'), Buffer.alloc(64, 0x41)]);
-    return res(200, pdf.buffer.slice(pdf.byteOffset, pdf.byteOffset + pdf.byteLength), { 'content-type': 'application/pdf' });
+    return res(200, pdf.buffer.slice(pdf.byteOffset, pdf.byteOffset + pdf.byteLength), S.pdfHeaders);
   }
   return res(404, {});
 }
@@ -90,7 +99,11 @@ const sandbox = {
           for (const k of (Array.isArray(keys) ? keys : [keys])) if (k in S.store) out[k] = S.store[k];
           return out;
         },
-        set: async (obj) => { S.sets++; Object.assign(S.store, obj); },
+        set: async (obj) => {
+          if (S.failNextSet) { S.failNextSet = false; throw new Error('QUOTA_BYTES quota exceeded'); }
+          S.sets++;
+          Object.assign(S.store, obj);
+        },
       },
     },
     permissions: { contains: async () => S.pdfPermission },
@@ -99,6 +112,8 @@ const sandbox = {
         S.sent.push(msg);
         throw new Error('Could not establish connection. Receiving end does not exist.'); // dashboard 沒開是常態
       },
+      // keepalive 用；被呼叫代表 20 秒的 interval 真的跑過一次
+      getPlatformInfo: (cb) => { S.platformInfo++; if (cb) cb({ os: 'mac' }); },
     },
   },
   fetch: fakeFetch,
@@ -107,6 +122,8 @@ const sandbox = {
   btoa: (s) => Buffer.from(s, 'binary').toString('base64'),
   console: { log() { }, warn() { }, error() { } },
   setTimeout,
+  setInterval,
+  clearInterval,
   Date,
 };
 const ctx = vm.createContext(sandbox);
@@ -190,6 +207,64 @@ const run = (base) => sandbox.runPendingGradingAnalysis(base);
     const got = S.fetches.map((f) => (f.url.match(/\/files\/(\d+)\/download/) || [])[1]).filter(Boolean);
     assert.deepEqual(got, ['1', '2', '3', '4', '5', '8']); // 6、7 從未下載；8 沒被 fetchedIds 吃掉
     assert.equal(S.store.gradingAnalysis[505].source, 'syllabus_pdf');
+    assert.ok(S.bodyReads > 0); // 合格的 PDF 仍會讀 body
+    assert.ok(JSON.stringify(S.llm[0].body).includes('inlineData'));
+  });
+
+  await test('PDF 下載前先看 Content-Length：宣告 50MB → 不讀 body、不附 PDF', async () => {
+    reset({ aiConfig: { provider: 'gemini', apiKey: 'k' }, courses: [{ id: 707, name: 'C7' }], customWeights: {} }, {
+      syllabus: '<a href="/courses/707/files/3/download">f3</a>' + SYLLABUS_HTML,
+      pdfHeaders: { 'content-type': 'application/pdf', 'content-length': '50000000' },
+    });
+    await run(BASE);
+    assert.equal(S.bodyReads, 0, '宣告超上限就不該把 body 讀進記憶體');
+    assert.equal(S.llm.length, 1);
+    assert.equal(JSON.stringify(S.llm[0].body).includes('inlineData'), false);
+    assert.equal(S.store.gradingAnalysis[707].source, 'syllabus_body');
+  });
+
+  await test('PDF 下載前先看 Content-Type：text/html（未登入的登入頁）→ 不讀 body', async () => {
+    reset({ aiConfig: { provider: 'gemini', apiKey: 'k' }, courses: [{ id: 717, name: 'C7b' }], customWeights: {} }, {
+      syllabus: '<a href="/courses/717/files/3/download">f3</a>' + SYLLABUS_HTML,
+      pdfHeaders: { 'content-type': 'text/html; charset=utf-8' },
+    });
+    await run(BASE);
+    assert.equal(S.bodyReads, 0);
+    assert.equal(JSON.stringify(S.llm[0].body).includes('inlineData'), false);
+  });
+
+  await test('LLM 呼叫期間有 keepalive：快回應時不會真的 ping（證明 clearInterval 有跑，行程能自行結束）', async () => {
+    reset({ aiConfig: { provider: 'gemini', apiKey: 'k' }, courses: [{ id: 808, name: 'C8' }], customWeights: {} }, { syllabus: SYLLABUS_HTML });
+    await run(BASE);
+    assert.equal(S.llm.length, 1);
+    assert.equal(S.store.gradingAnalysis[808].status, 'done');
+    assert.equal(S.platformInfo, 0); // 20 秒才會第一次觸發；沒清掉的話行程也不會結束
+  });
+
+  await test('AI_RESET_ANALYSIS：storage 寫入失敗仍會回覆（dashboard 不會卡住）', async () => {
+    reset({ aiConfig: { provider: 'gemini', apiKey: 'k' }, courses: [], customWeights: {} }, { failNextSet: true });
+    const resp = await new Promise((resolve) => {
+      const kept = sandbox.handleAiMessage({ type: 'AI_RESET_ANALYSIS' }, resolve, BASE);
+      assert.equal(kept, true);
+    });
+    assert.equal(resp.success, false);
+    assert.ok(resp.error);
+  });
+
+  await test('分析途中重置：in-flight 的結果不寫回剛清空的紀錄（epoch 守衛）', async () => {
+    reset({ aiConfig: { provider: 'gemini', apiKey: 'k' }, courses: [{ id: 909, name: 'C9' }], customWeights: {} }, { syllabus: SYLLABUS_HTML });
+    let release;
+    S.llmGate = new Promise((r) => { release = r; });
+    const p = run(BASE);
+    while (!S.llm.length) await new Promise((r) => setTimeout(r, 0)); // 等到 LLM 請求已送出
+    sandbox.handleAiMessage({ type: 'AI_RESET_ANALYSIS' }, () => { }, BASE);
+    await new Promise((r) => setTimeout(r, 0)); // 讓 reset 的 storage.set 落地
+    S.store.courses = []; // reset 會再排一輪；本測試只驗舊 run 的寫入被擋掉，讓新一輪無事可做
+    release();
+    await p;
+    assert.deepEqual(plain(S.store.gradingAnalysis), {}); // 舊 run 沒把 done 寫回來
+    assert.deepEqual(plain(S.store.customWeights), {});
+    assert.deepEqual(plain(S.sent), []); // 也不會通知 dashboard 更新權重
   });
 
   await test('供應商 500：記 error/attempts 1/24 小時後重試，source 保留 syllabus_body，不動 customWeights', async () => {

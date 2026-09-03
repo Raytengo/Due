@@ -8,6 +8,8 @@
 // ═══════════════════════════════════════════════════════════════
 
 let _aiAnalyzing = false; // 全域鎖：新手教學期間連續多次 SYNC 不會疊跑
+// AI_RESET_ANALYSIS 會遞增：分析途中被重置時，in-flight 那輪的結果不得寫回剛清空的 map
+let _aiResetEpoch = 0;
 
 // Gemini 2.5 的 thinking token 也算進 maxOutputTokens，額度太小會只回 finishReason:MAX_TOKENS 沒有正文
 const AI_MAX_TOKENS_MAIN = 8192;  // 主分析：要留得下 thinking ＋ 完整 JSON
@@ -41,6 +43,7 @@ async function runPendingGradingAnalysis(baseUrlHint) {
   if (_aiAnalyzing) return;
   // 旗標必須在守衛之後「同步」設定：中間若有 await，同一個 tick 內的兩次觸發會雙雙通過守衛而疊跑
   _aiAnalyzing = true;
+  const epoch = _aiResetEpoch; // 這輪開始時的世代；使用者中途重置就作廢
   try {
     const { aiConfig } = await chrome.storage.local.get(['aiConfig']);
     const cfg = DueGradingRules.resolveConfig(aiConfig);
@@ -72,15 +75,22 @@ async function runPendingGradingAnalysis(baseUrlHint) {
       } catch (err) {
         outcome = { kind: 'error', source: 'none', error: err && err.message ? err.message : String(err) };
       }
-      await recordOutcome(course.id, outcome, cfg);
+      await recordOutcome(course.id, outcome, cfg, epoch);
     }
   } finally {
     _aiAnalyzing = false;
   }
 }
 
-// 每門課寫入前重新讀 storage（舊版一次讀整個 map 再寫回，多課會互相覆蓋）
-async function recordOutcome(courseId, outcome, cfg) {
+// 每門課寫入前重新讀 storage（舊版一次讀整個 map 再寫回，多課會互相覆蓋）。
+// 這個逐課重讀是刻意的：chrome.storage 沒有交易，get 與 set 之間仍留有次毫秒的窗口——
+// 恰好同時發生的權重編輯器存檔仍可能被蓋掉。已知且接受的取捨，別為了「優化」把重讀改回一次性讀取。
+async function recordOutcome(courseId, outcome, cfg, epoch) {
+  // 這輪跑到一半使用者按了「重新分析」→ 紀錄已清空，舊結果不該寫回去
+  if (epoch !== undefined && epoch !== _aiResetEpoch) {
+    console.log(`[Due][AI] 課程 ${courseId}: 略過寫入（分析期間使用者已重置紀錄）`);
+    return;
+  }
   const data = await chrome.storage.local.get(['gradingAnalysis', 'customWeights']);
   const all = data.gradingAnalysis || {};
   all[courseId] = DueGradingRules.nextRecord(all[courseId], outcome, Date.now(), { provider: cfg.provider, model: cfg.model });
@@ -214,41 +224,45 @@ async function selectSyllabusPdfWithAI(files, cfg) {
   }
 }
 
-// 只接受真的 PDF：Content-Type 含 pdf 或前 5 bytes 為 %PDF-；單檔 ≤ MAX_PDF_BYTES
+// 只接受真的 PDF：Content-Type 含 pdf 或前 5 bytes 為 %PDF-；單檔 ≤ MAX_PDF_BYTES（判準見 gradingRules）
 async function tryFetchPdf(url) {
+  const R = DueGradingRules;
   try {
     const res = await fetch(url, { credentials: 'include' });
     if (!res.ok) return null;
+    const contentType = res.headers.get('Content-Type');
+    // 先看 header：宣告長度已超上限、或根本是網頁／JSON（未登入時 Canvas 會回登入頁）就別把 body 讀進記憶體
+    if (R.rejectBeforeDownload({
+      contentType,
+      contentLength: res.headers.get('Content-Length'),
+      maxBytes: R.MAX_PDF_BYTES,
+    })) return null;
     const buf = await res.arrayBuffer();
-    if (buf.byteLength === 0 || buf.byteLength > DueGradingRules.MAX_PDF_BYTES) return null;
-    const ct = (res.headers.get('Content-Type') || '').toLowerCase();
     const head = String.fromCharCode(...new Uint8Array(buf.slice(0, 5)));
-    if (!ct.includes('pdf') && head !== '%PDF-') return null;
-    return { type: 'pdf', base64: arrayBufferToBase64(buf), mimeType: 'application/pdf', bytes: buf.byteLength };
+    if (!R.acceptPdf({ ok: true, contentType, byteLength: buf.byteLength, head, maxBytes: R.MAX_PDF_BYTES })) return null;
+    return { type: 'pdf', base64: R.arrayBufferToBase64(buf), mimeType: 'application/pdf', bytes: buf.byteLength };
   } catch (_) {
     return null;
   }
 }
 
-function arrayBufferToBase64(buffer) {
-  const bytes = new Uint8Array(buffer);
-  let binary = '';
-  const chunk = 8192;
-  for (let i = 0; i < bytes.length; i += chunk) {
-    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
-  }
-  return btoa(binary);
-}
-
 async function callProvider(cfg, parts, systemPrompt, opts) {
   const req = DueAiProviders.buildRequest(cfg, parts, systemPrompt, opts);
-  const res = await fetch(req.url, { method: 'POST', headers: req.headers, body: JSON.stringify(req.body) });
-  if (!res.ok) {
-    const t = await res.text().catch(() => '');
-    throw new Error(`${cfg.provider} API ${res.status}: ${t.slice(0, 160)}`);
+  // MV3 SW 閒置 30 秒會被回收，長 LLM 呼叫期間定期呼叫擴充 API 重置計時器
+  const keepAlive = (chrome.runtime && chrome.runtime.getPlatformInfo)
+    ? setInterval(() => { try { chrome.runtime.getPlatformInfo(() => { }); } catch (_) { } }, 20000)
+    : null;
+  try {
+    const res = await fetch(req.url, { method: 'POST', headers: req.headers, body: JSON.stringify(req.body) });
+    if (!res.ok) {
+      const t = await res.text().catch(() => '');
+      throw new Error(`${cfg.provider} API ${res.status}: ${t.slice(0, 160)}`);
+    }
+    const json = await res.json();
+    return DueAiProviders.extractText(cfg.provider, json);
+  } finally {
+    clearInterval(keepAlive);
   }
-  const json = await res.json();
-  return DueAiProviders.extractText(cfg.provider, json);
 }
 
 // ── AI_* 訊息（由 background.js 的 onMessage 轉交；回傳值即 onMessage 的回傳值）──
@@ -258,7 +272,10 @@ function handleAiMessage(message, sendResponse, baseUrl) {
     return true;
   }
   if (message.type === 'AI_TEST_CONNECTION') {
-    aiTestConnection(message.config).then(sendResponse);
+    // 一定要回覆：漏掉 sendResponse 會讓 modal 的「測試連線」永遠轉圈
+    aiTestConnection(message.config)
+      .then(sendResponse)
+      .catch(() => sendResponse({ success: false, error: 'internal error' }));
     return true;
   }
   if (message.type === 'AI_RUN_NOW') {
@@ -267,11 +284,15 @@ function handleAiMessage(message, sendResponse, baseUrl) {
     return false;
   }
   if (message.type === 'AI_RESET_ANALYSIS') {
+    // 世代先加：正在跑的那輪之後就不會把結果寫回這裡清空的 map
+    _aiResetEpoch++;
     // 只清分析紀錄；不動 customWeights（使用者要還原權重走編輯器的「還原 Canvas 權重」）
-    chrome.storage.local.set({ gradingAnalysis: {} }).then(() => {
-      scheduleGradingAnalysis(baseUrl);
-      sendResponse({ success: true });
-    });
+    chrome.storage.local.set({ gradingAnalysis: {} })
+      .then(() => {
+        scheduleGradingAnalysis(baseUrl);
+        sendResponse({ success: true });
+      })
+      .catch(() => sendResponse({ success: false, error: 'internal error' }));
     return true;
   }
   return false;

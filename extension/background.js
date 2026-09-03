@@ -20,11 +20,6 @@ chrome.storage.local.get(['canvasBaseUrl', 'lastSync'], (data) => {
   }
 });
 
-// API key 存在 storage.local：鎖成只有擴充功能自身頁面可讀（claude.ai 的 content script 讀不到）
-if (chrome.storage.local.setAccessLevel) {
-  chrome.storage.local.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' }).catch(() => { });
-}
-
 // 首次安裝時開啟教學頁面
 chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason === 'install') {
@@ -126,6 +121,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 });
+
+// API key 存在 storage.local：鎖成只有擴充功能自身頁面可讀（claude.ai 的 content script 讀不到）
+// 必須放在所有 listener 註冊「之後」並包 try：舊版 Chrome 不支援限制 storage.local 時這行會同步丟錯，
+// 擺在最前面會讓整支 script 中斷，onInstalled／onCompleted／onMessage 全都註冊不到。
+try {
+  if (chrome.storage.local.setAccessLevel) {
+    chrome.storage.local.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' }).catch(() => { });
+  }
+} catch (_) { }
 
 async function fetchJSON(url) {
   const res = await fetch(url, { credentials: 'include' });
