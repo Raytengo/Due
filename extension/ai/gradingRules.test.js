@@ -11,8 +11,6 @@ function test(name, fn) {
   }
 }
 
-const DAY = 86400000;
-const HOUR = 3600000;
 const NOW = Date.parse('2026-09-03T00:00:00Z');
 
 // ── resolveConfig ──
@@ -107,80 +105,62 @@ test('shouldAnalyze: 全部 group_weight 為 0/null → 照跑', () => {
 });
 
 test('shouldAnalyze: 已 done → 永不重跑（即使權重被還原）', () => {
-  const d = R.shouldAnalyze({ ...base, record: { status: 'done', attempts: 1, nextRetryAt: null } });
+  const d = R.shouldAnalyze({ ...base, record: { status: 'done', attempts: 1 } });
   assert.deepEqual(d, { run: false, reason: 'done' });
 });
 
-test('shouldAnalyze: attempts 達 3 → 不跑', () => {
-  const d = R.shouldAnalyze({ ...base, record: { status: 'notFound', attempts: 3, nextRetryAt: new Date(NOW - DAY).toISOString() } });
-  assert.deepEqual(d, { run: false, reason: 'maxAttempts' });
-});
-
-test('shouldAnalyze: 冷卻中 → 不跑；冷卻到期 → retry', () => {
-  const rec = { status: 'notFound', attempts: 1, nextRetryAt: new Date(NOW + HOUR).toISOString() };
-  assert.deepEqual(R.shouldAnalyze({ ...base, record: rec }), { run: false, reason: 'cooldown' });
-  assert.deepEqual(R.shouldAnalyze({ ...base, record: rec, now: NOW + HOUR }), { run: true, reason: 'retry' });
+test('shouldAnalyze: 無冷卻期／無次數上限——notFound／error 紀錄一律照跑', () => {
+  assert.deepEqual(R.shouldAnalyze({ ...base, record: { status: 'notFound', attempts: 3 } }), { run: true, reason: 'retry' });
+  assert.deepEqual(R.shouldAnalyze({ ...base, record: { status: 'error', attempts: 99 } }), { run: true, reason: 'retry' });
 });
 
 test('shouldAnalyze: 無紀錄 → first', () => {
   assert.deepEqual(R.shouldAnalyze(base), { run: true, reason: 'first' });
 });
 
-test('shouldAnalyze: nextRetryAt 壞字串 → 失效開放（照跑），attempts 上限仍保護', () => {
-  const rec = { status: 'notFound', attempts: 1, nextRetryAt: 'garbage' };
-  assert.deepEqual(R.shouldAnalyze({ ...base, record: rec }), { run: true, reason: 'retry' });
-  assert.deepEqual(R.shouldAnalyze({ ...base, record: { ...rec, attempts: 3 } }), { run: false, reason: 'maxAttempts' });
-});
-
 // ── nextRecord ──
 const META = { provider: 'gemini', model: 'gemini-2.5-flash' };
 
-test('nextRecord: done → attempts 累加、nextRetryAt null、保留 components', () => {
+test('nextRecord: done → attempts 累加、保留 components', () => {
   const r = R.nextRecord({ status: 'notFound', attempts: 1 }, { kind: 'done', source: 'syllabus_pdf', components: [{ name: 'HW', weight: 40, description: '' }] }, NOW, META);
   assert.equal(r.status, 'done');
   assert.equal(r.attempts, 2);
-  assert.equal(r.nextRetryAt, null);
   assert.equal(r.at, '2026-09-03T00:00:00.000Z');
   assert.equal(r.source, 'syllabus_pdf');
   assert.equal(r.provider, 'gemini');
   assert.deepEqual(r.components, [{ name: 'HW', weight: 40, description: '' }]);
 });
 
-test('nextRecord: notFound → 7 天後重試；error → 24 小時後重試、error 截 200 字', () => {
+test('nextRecord: notFound → 記錄 notes；error → error 截 200 字（都不設下次重試時間）', () => {
   const nf = R.nextRecord(undefined, { kind: 'notFound', source: 'none', notes: 'no material' }, NOW, META);
   assert.equal(nf.attempts, 1);
-  assert.equal(nf.nextRetryAt, new Date(NOW + 7 * DAY).toISOString());
   assert.equal(nf.notes, 'no material');
   const er = R.nextRecord(undefined, { kind: 'error', source: 'none', error: 'x'.repeat(500) }, NOW, META);
-  assert.equal(er.nextRetryAt, new Date(NOW + 24 * HOUR).toISOString());
   assert.equal(er.error.length, 200);
 });
 
-test('nextRecord: 未知 kind → status 收斂為 error（與 error 的重試時間一致）', () => {
+test('nextRecord: 未知 kind → status 收斂為 error', () => {
   const r = R.nextRecord(undefined, { kind: 'weird', source: 'none' }, NOW, META);
   assert.equal(r.status, 'error');
-  assert.equal(r.nextRetryAt, new Date(NOW + 24 * HOUR).toISOString());
 });
 
 // ── courseStatus ──
-test('courseStatus: done → done；有權重無紀錄 → skipped；無紀錄無權重 → pending；冷卻中 notFound → notFound', () => {
+test('courseStatus: done → done；有權重無紀錄 → skipped；無紀錄無權重 → pending；notFound/error 紀錄照樣顯示（即使還會再跑）', () => {
   assert.equal(R.courseStatus({ ...base, record: { status: 'done', attempts: 1 } }), 'done');
   assert.equal(R.courseStatus({ ...base, groups: [{ group_weight: 50 }] }), 'skipped');
   assert.equal(R.courseStatus(base), 'pending');
-  const cooling = { status: 'notFound', attempts: 1, nextRetryAt: new Date(NOW + DAY).toISOString() };
-  assert.equal(R.courseStatus({ ...base, record: cooling }), 'notFound');
-  assert.equal(R.courseStatus({ ...base, record: { ...cooling, nextRetryAt: new Date(NOW - 1).toISOString() } }), 'pending');
-});
-
-test('courseStatus: error 冷卻中／attempts 用盡 → 都顯示 error', () => {
-  const rec = { status: 'error', attempts: 1, nextRetryAt: new Date(NOW + DAY).toISOString() };
-  assert.equal(R.courseStatus({ ...base, record: rec }), 'error');
-  assert.equal(R.courseStatus({ ...base, record: { ...rec, attempts: 3 } }), 'error');
+  assert.equal(R.courseStatus({ ...base, record: { status: 'notFound', attempts: 1 } }), 'notFound');
+  assert.equal(R.courseStatus({ ...base, record: { status: 'error', attempts: 5 } }), 'error');
 });
 
 test('courseStatus: 未知 status 的髒紀錄 → 收斂為 skipped（modal 只認得固定幾種）', () => {
-  const rec = { status: 'weird', attempts: 1, nextRetryAt: new Date(NOW + DAY).toISOString() };
+  const rec = { status: 'weird', attempts: 1 };
   assert.equal(R.courseStatus({ ...base, record: rec }), 'skipped');
+});
+
+test('courseStatus: done 記錄要優先於 customWeights 判斷——AI 分析成功後權重就寫進 customWeights，不能顯示成 skipped', () => {
+  const d = R.courseStatus({ ...base, customWeights: { 7: [{ name: 'HW', weight: 40 }] }, record: { status: 'done', attempts: 1 } });
+  assert.equal(d, 'done');
 });
 
 // ── findSyllabusByKeyword ──
@@ -341,7 +321,6 @@ test('arrayBufferToBase64: 二進位往返正確；2 萬 bytes（跨 8192 chunk�
 });
 
 test('constants: 上限值', () => {
-  assert.equal(R.MAX_ATTEMPTS, 3);
   assert.equal(R.MAX_COURSES_PER_RUN, 10);
   assert.equal(R.MAX_PDF_BYTES, 10 * 1024 * 1024);
   assert.equal(R.MAX_TOTAL_PDF_BYTES, 12 * 1024 * 1024);

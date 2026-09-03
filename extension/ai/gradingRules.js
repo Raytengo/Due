@@ -12,9 +12,6 @@
   // ═══════════════════════════════════════════════════════════════
 
   const DAY_MS = 86400000;
-  const MAX_ATTEMPTS = 3;                       // 每門課最多嘗試次數（done 之後不再增加）
-  const RETRY_NOT_FOUND_MS = 7 * DAY_MS;        // 找不到大綱 → 7 天後再試
-  const RETRY_ERROR_MS = 24 * 3600000;          // 供應商／網路錯誤 → 24 小時後再試
   const MAX_COURSES_PER_RUN = 10;               // 每輪最多處理幾門課
   const MAX_PDF_BYTES = 10 * 1024 * 1024;       // 單檔上限
   // 累計上限：base64 膨脹 4/3 → 約 16MB，加上文字與 JSON 包裝仍低於 Gemini 20MB 請求上限（15MB 會剛好撞頂）
@@ -102,30 +99,25 @@
     return Array.isArray(groups) && groups.some((g) => g && Number(g.group_weight) > 0);
   }
 
-  function shouldAnalyze({ courseId, customWeights, groups, record, now }) {
+  // 沒有冷卻期、沒有次數上限：只要這門課還沒成功（done）就每次同步都試
+  // （使用者 2026-09-03 要求：notFound／error 都不設冷卻，一直試到抓到或課程被刪除為止）
+  function shouldAnalyze({ courseId, customWeights, groups, record }) {
     const cw = customWeights && customWeights[courseId];
     if (Array.isArray(cw) && cw.length > 0) return { run: false, reason: 'hasCustomWeights' };
     if (hasCanvasWeights(groups)) return { run: false, reason: 'hasCanvasWeights' };
-    if (record) {
-      if (record.status === 'done') return { run: false, reason: 'done' };
-      if ((record.attempts || 0) >= MAX_ATTEMPTS) return { run: false, reason: 'maxAttempts' };
-      const retryAt = record.nextRetryAt ? Date.parse(record.nextRetryAt) : NaN;
-      if (Number.isFinite(retryAt) && now < retryAt) return { run: false, reason: 'cooldown' };
-      return { run: true, reason: 'retry' };
-    }
-    return { run: true, reason: 'first' };
+    if (record && record.status === 'done') return { run: false, reason: 'done' };
+    return { run: true, reason: record ? 'retry' : 'first' };
   }
 
   // outcome: { kind: 'done'|'notFound'|'error', source, components?, notes?, error? }
   function nextRecord(prev, outcome, now, meta) {
-    const attempts = ((prev && prev.attempts) || 0) + 1;
-    // status 只會是這三個值；未知 kind 一律當 error（下方 else 分支已套用 error 的重試時間）
+    const attempts = ((prev && prev.attempts) || 0) + 1; // 純資訊用途（modal 不顯示），不再拿來擋重試
+    // status 只會是這三個值；未知 kind 一律當 error
     const kind = outcome.kind === 'done' || outcome.kind === 'notFound' ? outcome.kind : 'error';
     const rec = {
       status: kind,
       attempts,
       at: new Date(now).toISOString(),
-      nextRetryAt: null,
       source: outcome.source || 'none',
       provider: meta && meta.provider,
       model: meta && meta.model,
@@ -133,24 +125,26 @@
     if (kind === 'done') {
       rec.components = outcome.components;
     } else if (kind === 'notFound') {
-      rec.nextRetryAt = new Date(now + RETRY_NOT_FOUND_MS).toISOString();
       if (outcome.notes) rec.notes = String(outcome.notes).slice(0, 200);
     } else {
-      rec.nextRetryAt = new Date(now + RETRY_ERROR_MS).toISOString();
       rec.error = String(outcome.error || 'unknown error').slice(0, 200);
     }
     return rec;
   }
 
   // modal 狀態列用：done | notFound | error | skipped | pending
-  function courseStatus({ courseId, customWeights, groups, record, now }) {
+  // 「還會不會再跑」跟「上次結果是什麼」是兩件事——沒有冷卻期後 shouldAnalyze 對任何未 done
+  // 的紀錄都回 run:true，所以這裡不能再借用它的結果來判斷顯示，直接看 record 本身
+  function courseStatus({ courseId, customWeights, groups, record }) {
+    // done 要最先判斷：AI 分析成功後權重就寫進 customWeights，這門課從此也會落入下面的
+    // hasCustomWeights 分支，先判斷 record.status 才不會把「AI 分析完成」誤顯示成「使用者手動設定」
     if (record && record.status === 'done') return 'done';
-    const d = shouldAnalyze({ courseId, customWeights, groups, record, now });
-    if (d.run) return 'pending';
-    if (d.reason === 'hasCustomWeights' || d.reason === 'hasCanvasWeights') return 'skipped';
-    // cooldown / maxAttempts → 顯示最後結果；髒紀錄（未知 status）收斂成 skipped，modal 只認得固定幾種
-    if (record && (record.status === 'notFound' || record.status === 'error')) return record.status;
-    return 'skipped';
+    const cw = customWeights && customWeights[courseId];
+    if (Array.isArray(cw) && cw.length > 0) return 'skipped';
+    if (hasCanvasWeights(groups)) return 'skipped';
+    if (!record) return 'pending';
+    if (record.status === 'notFound' || record.status === 'error') return record.status;
+    return 'skipped'; // 髒紀錄（未知 status）：modal 只認得固定幾種
   }
 
   // ── 材料搜尋 ──
@@ -355,7 +349,6 @@
 
   return {
     PROVIDERS,
-    MAX_ATTEMPTS,
     MAX_COURSES_PER_RUN,
     MAX_PDF_BYTES,
     MAX_TOTAL_PDF_BYTES,

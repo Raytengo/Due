@@ -4,7 +4,7 @@
 //   - 依賴 DueGradingRules / DueAiProviders（先 importScripts）
 //   - 直接呼叫 background.js 的 fetchJSON(url) / fetchAllPages(url)（帶 cookie 的 Canvas fetch）
 //   - BASE_URL 由呼叫端傳入，這裡不讀 background.js 的變數
-// 只跑一次規則、重試冷卻、寫入 customWeights 的邏輯見 DueGradingRules 與 spec §5–§6
+// 只跑一次規則（done 才停）、寫入 customWeights 的邏輯見 DueGradingRules 與 spec §5–§6
 // ═══════════════════════════════════════════════════════════════
 
 let _aiAnalyzing = false; // 全域鎖：新手教學期間連續多次 SYNC 不會疊跑

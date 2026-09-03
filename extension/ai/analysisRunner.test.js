@@ -453,16 +453,14 @@ const run = (base) => sandbox.runPendingGradingAnalysis(base);
     assert.equal(S.llm.length, 1);
   });
 
-  await test('供應商 500：記 error/attempts 1/24 小時後重試，source 保留 syllabus_body，不動 customWeights', async () => {
+  await test('供應商 500：記 error/attempts 1，source 保留 syllabus_body，不動 customWeights（沒有冷卻期，下次同步就會再試）', async () => {
     reset({ aiConfig: { provider: 'gemini', apiKey: 'k' }, courses: [{ id: 303, name: 'C3' }], customWeights: {} }, { syllabus: SYLLABUS_HTML, llmStatus: 500 });
-    const before = Date.now();
     await run(BASE);
     const rec = S.store.gradingAnalysis[303];
     assert.equal(rec.status, 'error');
     assert.equal(rec.attempts, 1);
     assert.match(rec.error, /gemini API 500/);
     assert.equal(rec.source, 'syllabus_body'); // 不是 'none'
-    assert.ok(Math.abs(Date.parse(rec.nextRetryAt) - (before + 24 * 3600000)) < 60000, rec.nextRetryAt);
     assert.deepEqual(S.store.customWeights, {});
     assert.deepEqual(S.sent, []);
   });

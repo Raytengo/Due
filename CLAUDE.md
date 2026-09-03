@@ -26,7 +26,7 @@ cc/
     ├── manifest.json              ← 擴充功能設定（Manifest V3；LLM 不佔必要權限，PDF 下載走 optional_host_permissions）
     ├── background.js              ← Service worker：Canvas API 同步 + Claude 用量；importScripts 載入 ai/ 三檔
     ├── ai/
-    │   ├── gradingRules.js        ← AI 評分比重分析純規則：設定解析、只跑一次規則、重試狀態機、回應解析、權重正規化（含測試）
+    │   ├── gradingRules.js        ← AI 評分比重分析純規則：設定解析、只跑一次規則、回應解析、權重正規化（含測試）
     │   ├── providers.js           ← LLM 供應商請求層：Gemini 原生／OpenAI 相容（含測試）
     │   ├── pdfText.js             ← PDF 抽字：bytes → text（包 vendor pdf.js；純函式，含測試）
     │   ├── vendor/                ← pdfjs-dist 3.11.174 legacy build（載入順序：worker → lib，見 vendor/README.md）
@@ -91,7 +91,7 @@ GET /api/v1/courses/:id/assignment_groups?include[]=assignments&include[]=group_
   "showClaudeUsageInPopup": true,
   "claudeUsage": { "usedPercent": 0, "resetAt": "..." },
   "aiConfig": { "provider": "gemini | qwen | deepseek | nvidia", "apiKey": "…", "model": "", "baseUrl": "", "consentedAt": "…" },
-  "gradingAnalysis": { "courseId": { "status": "done", "attempts": 1, "at": "…", "nextRetryAt": null, "source": "syllabus_pdf", "provider": "gemini", "model": "gemini-2.5-flash", "components": [] } }
+  "gradingAnalysis": { "courseId": { "status": "done", "attempts": 1, "at": "…", "source": "syllabus_pdf", "provider": "gemini", "model": "gemini-2.5-flash", "components": [] } }
 }
 ```
 
@@ -167,7 +167,7 @@ GET /api/v1/courses/:id/assignment_groups?include[]=assignments&include[]=group_
 
 - **定位**：AI 只負責「產生課程權重」並寫進現有 `customWeights[courseId]`；圓餅圖／權重編輯器／「還原 Canvas 權重」原樣呈現，**前端顯示邏輯零改動**。沒填 API key 時整個功能沉默，行為與未加此功能完全相同
 - **觸發**：每次同步完成後自動、序列、每輪最多 10 門；全域鎖 `_aiAnalyzing`（進函式即同步設定）防疊跑；LLM 呼叫期間每 20 秒 `getPlatformInfo` keepalive 防 SW 回收；`AI_RESET_ANALYSIS` 遞增 `_aiResetEpoch`，進行中的分析發現 epoch 變了就不寫回
-- **只跑一次**（`DueGradingRules.shouldAnalyze`）：有手動權重／Canvas `group_weight`／已 `done` → 跳過；`notFound` 7 天冷卻、`error` 24 小時冷卻、最多 3 次。成功後即使按「還原 Canvas 權重」也不重跑；要重跑某課：先在該課權重編輯器按「還原 Canvas 權重」，再用 modal 的「清除分析紀錄」（只清紀錄、不動權重，只為目前沒權重的課重跑）
+- **只跑一次**（`DueGradingRules.shouldAnalyze`）：有手動權重／Canvas `group_weight`／已 `done` → 跳過。`notFound`／`error` **沒有冷卻期、沒有次數上限**（2026-09-03 起）：只要這門課還沒成功，每次同步都會再試一次，直到成功、或使用者手動設定權重／Canvas 補上 `group_weight`。成功（`done`）後即使按「還原 Canvas 權重」也不重跑；要重跑已 done 的課：先在該課權重編輯器按「還原 Canvas 權重」，再用 modal 的「清除分析紀錄」（只清紀錄、不動權重，只為目前沒權重的課重跑）
 - **材料**（`analyzeCourse`）：API `syllabus_body` 文字（`stripHtml`）→ syllabus 內連結 PDF → 課程 PDF 檔案（強關鍵字 → AI 挑檔）；PDF 只要有 optional 權限就下載，**所有供應商都適用**（AI 挑檔亦然）——Gemini 送原始 bytes（`inlineData`，自帶 OCR），其餘供應商用 `ai/pdfText.js`（vendor pdf.js）抽字後送純文字 part，截斷至 `MAX_EXTRACTED_TEXT_CHARS`（30000）、短於 `MIN_SYLLABUS_TEXT_CHARS` 視同這個檔案沒材料（掃描／圖片型 PDF 仍只有 Gemini 讀得到，其餘落到 `notFound`）；`parts` 為空不呼叫 LLM。下載前先看 `Content-Length`／`Content-Type`，下載後 `%PDF-`／Content-Type 檢查，單檔 10MB、累計 12MB（base64 膨脹後仍低於 Gemini 20MB 請求上限），大綱內連結檔最多試 5 個
 - **供應商**（`DueAiProviders`）：Gemini 原生（key 走 `x-goog-api-key` header；base URL 固定 Google，不吃使用者輸入）；Qwen／DeepSeek／NVIDIA NIM 走 OpenAI 相容 `/chat/completions`（純文字，可自訂 base URL，僅接受 `https://`）。**NVIDIA NIM 需要 host permission**：該端點完全不回 `Access-Control-Allow-*` header（實測連一般網頁來源也不回），純 fetch 必被瀏覽器擋掉，靠 `optional_host_permissions` 的 `https://integrate.api.nvidia.com/*` 讓 Chrome 略過 CORS；`PROVIDERS[].hostPermission` 為單一真相來源，`requiredOrigins()` 決定儲存時請求哪些 origin，未授權時 `callProvider` 直接丟 `NO_HOST_PERMISSION`（不送請求、不花額度），modal 顯示 `#ai-host-perm-hint`。只送供應商需要的 header。Gemini 2.5 的 thinking token 計入輸出上限，主分析 `maxTokens 8192`、挑檔／測試連線 512
 - **回應**：`parseAnalysisResponse`（去 ``` 圍欄；解析失敗再取第一個 `{` 到最後一個 `}`）→ `normalizeWeights`（小數比例 ×100、同名合併、總和須在 [80,120] 且為有限數）→ `toCustomWeights`。寫入前重新讀 storage；若使用者已手動填權重則不覆蓋。寫入後送 `GRADING_WEIGHTS_UPDATED` 給 dashboard
