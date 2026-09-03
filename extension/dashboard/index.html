@@ -3458,12 +3458,12 @@
       list-style: none;
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 8px;
     }
 
     .ai-status-list li {
       display: flex;
-      flex-wrap: wrap;              /* 沒有 wrap，.ai-status-error 的 flex-basis:100% 會把課名擠成 0 寬 */
+      flex-wrap: wrap;              /* 沒有 wrap，.ai-status-note 的 flex-basis:100% 會把課名擠成 0 寬 */
       align-items: baseline;
       gap: 2px 10px;
       font-size: 12px;
@@ -3490,12 +3490,15 @@
     .ai-status-state.error { color: var(--overdue); }
     .ai-status-state.notFound { color: var(--warm); }
 
-    .ai-status-error {
+    .ai-status-note {
       flex-basis: 100%;
-      font-family: 'DM Mono', monospace;
-      font-size: 10px;
-      color: var(--muted);
-      padding-left: 2px;
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 300;
+      font-size: 11px;
+      line-height: 1.4;
+      color: var(--mid);
+      padding-left: 10px;
+      border-left: 2px solid var(--border);
     }
 
     .ai-settings-footer {
@@ -4125,7 +4128,6 @@
           <input class="ai-settings-input" id="ai-base-url" type="text" autocomplete="off" spellcheck="false">
         </div>
 
-        <p class="ai-settings-hint" id="ai-text-only-hint" hidden></p>
         <p class="ai-settings-hint" id="ai-pdf-hint" hidden></p>
         <p class="ai-settings-hint" id="ai-host-perm-hint" hidden></p>
 

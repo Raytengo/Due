@@ -11,14 +11,13 @@
     'zh-TW': {
       menuItem: 'AI 分析設定',
       title: 'AI 分析設定',
-      intro: '同步後自動從課程大綱抓出評分比重，寫進「手動權重」。每門課成功一次後不再重跑；沒填 API key 就不會啟用。',
-      consent: '啟用後，課程大綱與相關 PDF 會直接從你的瀏覽器送到你選的供應商；開發者不會收到任何資料。按「儲存」即表示同意。',
+      intro: '同步後自動分析課程大綱、填入手動權重。',
+      consent: '大綱與 PDF 會送到你選的供應商，開發者看不到。按「儲存」即同意。',
       providerLabel: '供應商',
       apiKeyLabel: 'API key',
       modelLabel: '模型 ID',
       modelPlaceholder: '留空使用預設：{model}',
       baseUrlLabel: 'Base URL（進階）',
-      textOnlyHint: 'PDF 大綱會自動轉成文字讀取；掃描／圖片型的 PDF 讀不到（只有 Gemini 讀得到）。',
       pdfHint: '尚未授權存取 canvas-user-content.com，只會分析 syllabus 文字。重新按「儲存」可再次授權。',
       hostPermHint: '此供應商不允許瀏覽器直接呼叫，需要「存取 {host}」的權限才能運作。請重新按「儲存」並允許。',
       testBtn: '測試連線',
@@ -38,6 +37,10 @@
       stError: '錯誤',
       stSkipped: '已有權重',
       stPending: '待分析',
+      noteNoMaterial: '找不到大綱文字或 PDF',
+      noteNoBreakdown: '文件中沒有評分比重資訊',
+      noteEmptyWeights: '沒有解析出任何權重項目',
+      noteWeightsSum: '權重總和 {total}%，超出合理範圍',
       resetBtn: '清除分析紀錄',
       resetConfirmTitle: '清除分析紀錄？',
       resetConfirmMsg: '所有課程的分析紀錄會清除，並立即為「目前沒有權重」的課程重新分析（會使用你的 API 額度）。已寫入的權重不會改動——若要重新分析某門課，請先在該課的權重編輯器按「還原 Canvas 權重」。',
@@ -50,14 +53,13 @@
     'zh-CN': {
       menuItem: 'AI 分析设置',
       title: 'AI 分析设置',
-      intro: '同步后自动从课程大纲提取评分比重，写入「手动权重」。每门课成功一次后不再重跑；未填 API key 不会启用。',
-      consent: '启用后，课程大纲与相关 PDF 会直接从你的浏览器发送到你选择的供应商；开发者不会收到任何数据。点击「保存」即表示同意。',
+      intro: '同步后自动分析课程大纲、写入手动权重。',
+      consent: '大纲与 PDF 会发送到你选择的供应商，开发者看不到。点击「保存」即同意。',
       providerLabel: '供应商',
       apiKeyLabel: 'API key',
       modelLabel: '模型 ID',
       modelPlaceholder: '留空使用默认：{model}',
       baseUrlLabel: 'Base URL（高级）',
-      textOnlyHint: 'PDF 大纲会自动转成文本读取；扫描／图片型的 PDF 读不到（只有 Gemini 读得到）。',
       pdfHint: '尚未授权访问 canvas-user-content.com，只会分析 syllabus 文本。重新点击「保存」可再次授权。',
       hostPermHint: '此供应商不允许浏览器直接调用，需要「访问 {host}」的权限才能运作。请重新点击「保存」并允许。',
       testBtn: '测试连接',
@@ -77,6 +79,10 @@
       stError: '错误',
       stSkipped: '已有权重',
       stPending: '待分析',
+      noteNoMaterial: '未找到大纲文本或 PDF',
+      noteNoBreakdown: '文件中没有评分比重信息',
+      noteEmptyWeights: '未解析出任何权重项目',
+      noteWeightsSum: '权重总和 {total}%，超出合理范围',
       resetBtn: '清除分析记录',
       resetConfirmTitle: '清除分析记录？',
       resetConfirmMsg: '所有课程的分析记录将被清除，并立即为「目前没有权重」的课程重新分析（会使用你的 API 额度）。已写入的权重不会改动——若要重新分析某门课，请先在该课的权重编辑器点击「还原 Canvas 权重」。',
@@ -89,14 +95,13 @@
     en: {
       menuItem: 'AI analysis settings',
       title: 'AI analysis settings',
-      intro: 'After each sync, Due reads the course syllabus and writes the grading weights into "manual weights". Each course is analyzed once; nothing runs until you add an API key.',
-      consent: 'When enabled, the syllabus and related PDFs go straight from your browser to the provider you choose. The developer never receives any of it. Saving means you agree.',
+      intro: 'After sync, Due analyzes the syllabus and fills in the grading weights.',
+      consent: 'The syllabus and PDFs go to your chosen provider — the developer never sees them. Saving means you agree.',
       providerLabel: 'Provider',
       apiKeyLabel: 'API key',
       modelLabel: 'Model ID',
       modelPlaceholder: 'Leave blank for default: {model}',
       baseUrlLabel: 'Base URL (advanced)',
-      textOnlyHint: 'PDF syllabi are converted to text automatically. Scanned or image-only PDFs cannot be read (only Gemini can).',
       pdfHint: 'Access to canvas-user-content.com was not granted, so only the syllabus text is analyzed. Press Save again to re-request.',
       hostPermHint: 'This provider blocks direct browser calls, so Due needs permission to access {host}. Press Save again and allow it.',
       testBtn: 'Test connection',
@@ -116,6 +121,10 @@
       stError: 'Error',
       stSkipped: 'Has weights',
       stPending: 'Pending',
+      noteNoMaterial: 'No syllabus text or PDF found',
+      noteNoBreakdown: 'No grading breakdown found in the document',
+      noteEmptyWeights: 'No weight items were parsed',
+      noteWeightsSum: 'Weights sum to {total}%, outside the expected range',
       resetBtn: 'Clear analysis records',
       resetConfirmTitle: 'Clear analysis records?',
       resetConfirmMsg: 'All analysis records are cleared and courses that currently have no weights are re-analyzed right away (this uses your API quota). Weights already written are left untouched — to re-analyze a course, first press "Reset to Canvas weights" in that course\'s weight editor.',
@@ -192,8 +201,6 @@
     $('ai-api-key').placeholder = p.keyPlaceholder || '';
     $('ai-base-url').placeholder = p.baseUrl || '';
     $('ai-base-url-wrap').hidden = !!p.supportsPdf;      // Gemini 不需要 base URL
-    // 純文字供應商的 PDF 大綱走 pdf.js 抽字（掃描件除外）；只有這一點差異值得提示
-    $('ai-text-only-hint').hidden = !!p.supportsPdf;
     // 所有供應商都會下載 PDF 大綱 → 未授權提示與供應商無關；用上次 AI_GET_STATUS 的快取重算，
     // 切換供應商時不必再送一次訊息就能把提示放回來
     $('ai-pdf-hint').hidden = !(_lastStatus && _lastStatus.configured && !_lastStatus.pdfPermission);
@@ -228,7 +235,6 @@
     $('ai-api-key-label').textContent = t('apiKeyLabel');
     $('ai-model-label').textContent = t('modelLabel');
     $('ai-base-url-label').textContent = t('baseUrlLabel');
-    $('ai-text-only-hint').textContent = t('textOnlyHint');
     $('ai-pdf-hint').textContent = t('pdfHint');
     renderHostPermHint();
     $('ai-test-btn').textContent = t('testBtn');
@@ -293,14 +299,25 @@
     const label = { done: 'stDone', notFound: 'stNotFound', error: 'stError', skipped: 'stSkipped', pending: 'stPending' };
     list.innerHTML = st.courses.map((c) => {
       const name = escapeHtml(courseName(c.courseId));
+      const note = c.status === 'error' ? c.error : (c.status === 'notFound' ? c.notes : '');
       return `
       <li>
         <span class="ai-status-name" title="${name}">${name}</span>
         <span class="ai-status-state ${escapeHtml(c.status)}">${escapeHtml(t(label[c.status] || 'stPending'))}</span>
-        ${c.status === 'error' && c.error ? `<span class="ai-status-error">${escapeHtml(c.error)}</span>` : ''}
-        ${c.status === 'notFound' && c.notes ? `<span class="ai-status-error">${escapeHtml(c.notes)}</span>` : ''}
+        ${note ? `<span class="ai-status-note">${escapeHtml(noteLabel(note))}</span>` : ''}
       </li>`;
     }).join('');
+  }
+
+  // 把幾種固定的內部 notes/reason 字串換成看得懂的話；其餘（多半是 LLM 自己回的說明文字）原樣顯示
+  function noteLabel(raw) {
+    const s = String(raw || '');
+    if (s === 'no syllabus material') return t('noteNoMaterial');
+    if (s === 'no grading breakdown found') return t('noteNoBreakdown');
+    if (s === 'empty') return t('noteEmptyWeights');
+    const sumMatch = s.match(/^weights sum (.+)$/);
+    if (sumMatch) return t('noteWeightsSum', { total: sumMatch[1] });
+    return s;
   }
 
   function loadConfigIntoForm() {
