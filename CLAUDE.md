@@ -179,7 +179,7 @@ GET /api/v1/courses/:id/assignment_groups?include[]=assignments&include[]=group_
 
 ### popup.html / popup.js
 
-- 7 天待辦快速預覽：顯示所有 7 天內到期的未繳作業清單
+- 7 天待辦快速預覽：顯示所有 7 天內到期的未繳作業清單（含自訂作業——`loadData()` 用 `DueCustomAssignments.mergeAssignmentMaps` 合併 `assignments`／`customAssignments`，跟 dashboard 共用同一份合併邏輯）
 - 每筆任務顯示：緊急程度色點、作業名稱、**課程名稱**（支援自訂名稱）、剩餘時間
 - 置頂「已逾期」區（30 天窗內逾期未繳；緊急度色階與 dashboard 統一，皆走 `taskRules.urgency`）
 - 每筆可勾完成（1.5 秒撤銷窗口，寫入 `manualDone`／`manualUndone`，與 dashboard 同步）

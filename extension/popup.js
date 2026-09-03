@@ -451,10 +451,12 @@ function applyClaudeRefreshCopy() {
 }
 
 function loadData() {
-  chrome.storage.local.get(['courses', 'assignments', 'courseNames', 'claudeUsage', 'manualDone', 'manualUndone', 'manualShown', 'manualHidden'], (data) => {
+  chrome.storage.local.get(['courses', 'assignments', 'customAssignments', 'courseNames', 'claudeUsage', 'manualDone', 'manualUndone', 'manualShown', 'manualHidden'], (data) => {
     _manualDone = data.manualDone || {};   // 記住最新值供勾選/撤銷即時寫回
     const courseMap = buildCourseMap(data.courses);
-    const groups = getTasks(data.assignments || {}, courseMap, _manualDone, data.manualUndone || {}, data.manualShown || {}, data.manualHidden || {});
+    // 自訂作業跟 dashboard 共用同一份合併邏輯，才不會 dashboard 加的作業 popup 看不到
+    const assignments = DueCustomAssignments.mergeAssignmentMaps(data.assignments || {}, data.customAssignments || {});
+    const groups = getTasks(assignments, courseMap, _manualDone, data.manualUndone || {}, data.manualShown || {}, data.manualHidden || {});
     renderTasks(groups, data.courseNames || {});
     renderClaudeUsage(data.claudeUsage || null);
   });
