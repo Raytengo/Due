@@ -165,11 +165,11 @@ GET /api/v1/courses/:id/assignment_groups?include[]=assignments&include[]=group_
 
 - **定位**：AI 只負責「產生課程權重」並寫進現有 `customWeights[courseId]`；圓餅圖／權重編輯器／「還原 Canvas 權重」原樣呈現，**前端顯示邏輯零改動**。沒填 API key 時整個功能沉默，行為與未加此功能完全相同
 - **觸發**：每次同步完成後自動、序列、每輪最多 10 門；全域鎖 `_aiAnalyzing`（進函式即同步設定）防疊跑；LLM 呼叫期間每 20 秒 `getPlatformInfo` keepalive 防 SW 回收；`AI_RESET_ANALYSIS` 遞增 `_aiResetEpoch`，進行中的分析發現 epoch 變了就不寫回
-- **只跑一次**（`DueGradingRules.shouldAnalyze`）：有手動權重／Canvas `group_weight`／已 `done` → 跳過；`notFound` 7 天冷卻、`error` 24 小時冷卻、最多 3 次。成功後即使按「還原 Canvas 權重」也不重跑；要重跑用 modal 的「清除分析紀錄並重新分析」
+- **只跑一次**（`DueGradingRules.shouldAnalyze`）：有手動權重／Canvas `group_weight`／已 `done` → 跳過；`notFound` 7 天冷卻、`error` 24 小時冷卻、最多 3 次。成功後即使按「還原 Canvas 權重」也不重跑；要重跑某課：先在該課權重編輯器按「還原 Canvas 權重」，再用 modal 的「清除分析紀錄」（只清紀錄、不動權重，只為目前沒權重的課重跑）
 - **材料**（`analyzeCourse`）：API `syllabus_body` 文字（`stripHtml`）→ syllabus 內連結 PDF → 課程 PDF 檔案（強關鍵字 → AI 挑檔）；PDF 只在有 optional 權限且供應商支援 PDF（Gemini）時下載；`parts` 為空不呼叫 LLM。下載前先看 `Content-Length`／`Content-Type`，下載後 `%PDF-`／Content-Type 檢查，單檔 10MB、累計 12MB（base64 膨脹後仍低於 Gemini 20MB 請求上限），大綱內連結檔最多試 5 個
 - **供應商**（`DueAiProviders`）：Gemini 原生（key 走 `x-goog-api-key` header；base URL 固定 Google，不吃使用者輸入）；Qwen／DeepSeek 走 OpenAI 相容 `/chat/completions`（純文字，可自訂 base URL，僅接受 `https://`）。只送供應商需要的 header。Gemini 2.5 的 thinking token 計入輸出上限，主分析 `maxTokens 8192`、挑檔／測試連線 512
 - **回應**：`parseAnalysisResponse`（去 ``` 圍欄；解析失敗再取第一個 `{` 到最後一個 `}`）→ `normalizeWeights`（小數比例 ×100、同名合併、總和須在 [80,120] 且為有限數）→ `toCustomWeights`。寫入前重新讀 storage；若使用者已手動填權重則不覆蓋。寫入後送 `GRADING_WEIGHTS_UPDATED` 給 dashboard
-- **設定 modal**（`dashboard/aiSettings.js`，設定選單「AI 分析設定」）：供應商／key／模型／base URL、測試連線、清除金鑰、分析狀態列、清除紀錄。「儲存」在 user gesture 內先 `chrome.permissions.request` PDF 權限再寫 `aiConfig`。字串自帶三語，`applyUILanguage` 末尾呼叫 `DueAiSettings.applyLanguage`
+- **設定 modal**（`dashboard/aiSettings.js`，設定選單「AI 分析設定」）：供應商／key／模型／base URL、測試連線、清除金鑰、分析狀態列、清除紀錄。「儲存」在 user gesture 內先 `chrome.permissions.request` PDF 權限（只有支援 PDF 的供應商才請求）再寫 `aiConfig`（Gemini 不存隱藏的 base URL）。字串自帶三語，`applyUILanguage` 末尾呼叫 `DueAiSettings.applyLanguage`
 - **訊息**：`AI_GET_STATUS`／`AI_TEST_CONNECTION`／`AI_RUN_NOW`／`AI_RESET_ANALYSIS`（dashboard → bg）、`GRADING_WEIGHTS_UPDATED`（bg → dashboard）
 - 逐作業 AI 分析（A）仍為移除狀態，不在此功能範圍
 

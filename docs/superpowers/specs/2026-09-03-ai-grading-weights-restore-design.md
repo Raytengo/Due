@@ -254,7 +254,7 @@ Which single file most likely contains the course syllabus or grading policy? Re
 `host_permissions`、`permissions`、`content_scripts` **不變**。加 optional 權限的更新**不會**讓現有使用者的擴充功能被停用；LLM 端點靠 CORS（三家目前皆對 `chrome-extension://` 來源回正確 CORS header，已實測）。若日後某家收緊 CORS，再把該 host 加進 `optional_host_permissions` 並在儲存時一併請求即可，不需改必要權限。
 
 ### 8.2 請求時機
-`aiSettings.js` 的「儲存」click handler **第一行**就呼叫 `chrome.permissions.request({ origins: ['https://*.canvas-user-content.com/*'] })`（必須在 user gesture 內、且在任何 `await` 之前；已授權時 Chrome 直接回 true 不彈窗），之後才寫 storage。使用者拒絕 → 照常儲存設定，modal 顯示一行「未授權 PDF 存取，只會分析 syllabus 文字」（`AI_GET_STATUS.pdfPermission`）。
+`aiSettings.js` 的「儲存」click handler **第一個非同步呼叫**就是 `chrome.permissions.request({ origins: ['https://*.canvas-user-content.com/*'] })`（必須在 user gesture 內、且在任何 `await` 之前；已授權時 Chrome 直接回 true 不彈窗），之後才寫 storage。**只有所選供應商支援 PDF（目前僅 Gemini）才請求**——純文字供應商永遠不會下載 PDF，不該讓使用者看到用不到的權限對話框（供應商查表是同步 DOM 讀取，不影響 gesture）。同理 `readForm()` 對支援 PDF 的供應商把隱藏的 base URL 欄位存為空字串。使用者拒絕 → 照常儲存設定，modal 顯示一行「未授權 PDF 存取，只會分析 syllabus 文字」（`AI_GET_STATUS.pdfPermission`）。
 
 ### 8.3 API key 存放
 明文存 `aiConfig.apiKey`（與舊版相同，Web Store 上 BYOK 擴充常見作法），但：
@@ -275,7 +275,7 @@ Which single file most likely contains the course syllabus or grading policy? Re
 3. 欄位：供應商 `<select>`（Gemini／Qwen／DeepSeek）；API key（`type=password`＋顯示切換）；模型 ID（placeholder 顯示該供應商預設，留空即用預設）；Base URL（進階，可折疊，只在 Qwen／DeepSeek 顯示，placeholder 為預設）。切換供應商只更新 placeholder，不清空使用者已輸入的模型。
 4. 供應商為 Qwen／DeepSeek 時顯示提示：「此供應商只能讀 syllabus 文字，大綱若是 PDF 建議用 Gemini」。
 5. 按鈕列：`測試連線`（送 `AI_TEST_CONNECTION` 帶表單值，`maxTokens 512`，顯示 ✓／錯誤訊息）、`清除金鑰`（清 `aiConfig`，不動 `gradingAnalysis`／`customWeights`）、`取消`、`儲存`（§8.2 流程 → 寫 `aiConfig`（含 `consentedAt`）→ 送 `AI_RUN_NOW` → 關閉）。
-6. **分析狀態區**（開啟時與每次操作後送 `AI_GET_STATUS` 刷新）：摘要一行「已分析 N · 找不到大綱 M · 錯誤 K · 待分析 P · 上次執行 {時間}」＋每門課一行（課名用 `courseNames` 自訂名優先；狀態字；error 顯示截短訊息）。底部 `清除分析紀錄並重新分析` 按鈕（走現有 `showConfirmDialog` 確認後送 `AI_RESET_ANALYSIS`）。
+6. **分析狀態區**（開啟時與每次操作後送 `AI_GET_STATUS` 刷新）：摘要一行「已分析 N · 找不到大綱 M · 錯誤 K · 待分析 P · 上次執行 {時間}」＋每門課一行（課名用 `courseNames` 自訂名優先；狀態字；error 顯示截短訊息）。底部 `清除分析紀錄` 按鈕（走現有 `openConfirmDialog` 確認後送 `AI_RESET_ANALYSIS`；確認文案明講：紀錄清除後只會為「目前沒有權重」的課重新分析，已寫入的權重不動，要重分析某課請先在該課權重編輯器按「還原 Canvas 權重」）。
 7. 未授權 PDF 時顯示一行提示（§8.2）。
 
 ### 9.3 i18n
@@ -375,7 +375,7 @@ chrome.runtime?.onMessage?.addListener((msg) => {
 2. 打開 modal → 填 Gemini key → 測試連線 ✓ → 儲存 → 出現 PDF 權限提示 → 允許。
 3. 按同步 → SYNC 回應不變慢；稍後 modal 狀態區出現各課結果；有大綱的課圓餅出現權重、編輯器可改、「還原 Canvas 權重」出現。
 4. 再按同步 → 狀態不變、供應商後台無新請求（只跑一次）。
-5. 「還原 Canvas 權重」→ 圓餅回到無資訊；再同步不重跑。「清除分析紀錄並重新分析」→ 重跑。
+5. 「還原 Canvas 權重」→ 圓餅回到無資訊；再同步不重跑。「清除分析紀錄」→ 該課（此時已無權重）重跑。
 6. 清除金鑰 → 之後同步完全沉默。
 
 ---
