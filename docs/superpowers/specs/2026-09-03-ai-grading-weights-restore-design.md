@@ -14,11 +14,11 @@
 | 範圍 | 只做 B（課程評分比重）。A（逐作業分析）不做 |
 | 觸發 | 每次同步完成後**自動**在背景跑，**不阻塞**同步；每門課成功一次後**永不再跑** |
 | 資料來源 | 與舊版相同：Canvas syllabus 文字、syllabus 內連結的 PDF、課程檔案（關鍵字比對 → AI 挑檔） |
-| 供應商 | Gemini（原生 API，支援 PDF）、Qwen、DeepSeek（OpenAI 相容，可自訂 base URL，純文字） |
+| 供應商 | Gemini（原生 API，支援 PDF）、Qwen、DeepSeek、NVIDIA NIM（OpenAI 相容，可自訂 base URL，純文字）。NVIDIA 端點不回 CORS header，需要 optional host permission（見 §8.1） |
 | 結果去向 | 直接寫入 `customWeights[courseId]`（現有「手動權重」），由現有圓餅圖／權重編輯器／「還原 Canvas 權重」原樣呈現與操作 |
 | 前端 | 不新增任何顯示邏輯。僅新增：設定選單一個項目＋一個設定 modal；以及一段「資料刷新」訊息監聽（無 UI） |
 | 設定位置 | dashboard 內 modal（設定選單 →「AI 分析設定」），不做獨立 `settings.html` |
-| 權限策略 | LLM 呼叫**不加任何必要 host permission**（靠供應商的 CORS）；PDF 下載所需的 `https://*.canvas-user-content.com/*` 放 `optional_host_permissions`，儲存設定時請求一次 |
+| 權限策略 | LLM 呼叫**不加任何必要 host permission**（靠供應商的 CORS）；PDF 下載所需的 `https://*.canvas-user-content.com/*` 與 NVIDIA 端點 `https://integrate.api.nvidia.com/*` 放 `optional_host_permissions`，儲存設定時一次請求該供應商用得到的那幾個 |
 | 儲存 key | 全新：`aiConfig`、`gradingAnalysis`。不沿用 1.5.0 的 `aiProvider`/`aiApiKey`/`syllabusAnalysis` 等舊 key（殘留不讀不清） |
 | 文件 | README（EN／繁中）、privacy-policy.md、CLAUDE.md、AGENTS.md 同步更新 |
 | 版本 | manifest `2.1.0` |
@@ -106,8 +106,13 @@ UMD 包裝沿用 `taskRules.js` 樣式：Node 下 `module.exports`，瀏覽器�
 | gemini | `https://generativelanguage.googleapis.com/v1beta` | `gemini-2.5-flash` | 是 |
 | qwen | `https://dashscope.aliyuncs.com/compatible-mode/v1` | `qwen-plus` | 否 |
 | deepseek | `https://api.deepseek.com/v1` | `deepseek-chat` | 否 |
+| nvidia | `https://integrate.api.nvidia.com/v1` | `deepseek-ai/deepseek-v4-flash-0731` | 否 |
 
-未知 provider 一律視為 `gemini`。
+未知 provider 一律視為 `gemini`。`nvidia` 與其他非 gemini 供應商一樣吃「自訂 `baseUrl` 只收 `https://`，否則退回預設」的規則。
+
+`PROVIDERS` 另有選填欄位 `hostPermission`：該供應商端點不回 CORS header、必須靠 Chrome host permission 才呼叫得動時才有值（目前只有 `nvidia`：`https://integrate.api.nvidia.com/*`）。兩個純函式對外：
+- `providerHostPermission(provider)` → 該供應商的 host permission 字串，或 `null`（含未知 provider）。
+- `requiredOrigins(provider)` → 儲存設定時要一次請求的 origins：供應商 host（若需要）＋ `PDF_PERMISSION_ORIGIN`（若該供應商支援 PDF）。`gemini`／未知 → `[PDF_PERMISSION_ORIGIN]`；`qwen`／`deepseek` → `[]`；`nvidia` → `['https://integrate.api.nvidia.com/*']`。
 
 ### 4.2 `chrome.storage.local.gradingAnalysis`
 ```js
@@ -234,13 +239,15 @@ Which single file most likely contains the course syllabus or grading policy? Re
 
 - `buildRequest(cfg, parts, systemPrompt, { temperature, maxTokens })` → `{ url, headers, body }`（`body` 為物件，呼叫端 `JSON.stringify`）
   - **gemini**：`url = `${baseUrl}/models/${model}:generateContent``；headers `{'Content-Type':'application/json', 'x-goog-api-key': apiKey}`（**key 不進 URL**）；body `{ systemInstruction:{parts:[{text}]}, contents:[{parts: [...]}], generationConfig:{ maxOutputTokens, temperature } }`；pdf part → `{ inlineData:{ mimeType, data: base64 } }`。model id 若帶 `models/` 前綴會先去掉。
-  - **qwen / deepseek**（OpenAI 相容）：`url = `${normalizeBaseUrl(baseUrl)}/chat/completions``；headers `{'Content-Type':'application/json', Authorization:`Bearer ${apiKey}`}`；body `{ model, messages:[{role:'system',content},{role:'user',content: 文字 parts 以 \n\n 串接}], max_tokens, temperature }`；PDF parts **丟棄**（呼叫端在 §6.1 已不會為這兩家下載 PDF，這裡只是防禦）。
+  - **qwen / deepseek / nvidia**（OpenAI 相容）：`url = `${normalizeBaseUrl(baseUrl)}/chat/completions``；headers `{'Content-Type':'application/json', Authorization:`Bearer ${apiKey}`}`；body `{ model, messages:[{role:'system',content},{role:'user',content: 文字 parts 以 \n\n 串接}], max_tokens, temperature }`；PDF parts **丟棄**（呼叫端在 §6.1 已不會為這兩家下載 PDF，這裡只是防禦）。
 - `extractText(provider, json)`：gemini 讀 `candidates[0].content.parts[].text` 串接；OpenAI 相容讀 `choices[0].message.content`；缺 → throw `Empty response (finishReason 或 blockReason)`，便於在 modal 狀態列判讀 MAX_TOKENS／SAFETY。
 - `normalizeBaseUrl(url)`：去尾端 `/`。
-- `supportsPdf(provider)`：只有 `gemini` 為 true。
+- `supportsPdf(provider)`：只有 `gemini` 為 true（`nvidia` 因此自動走 OpenAI 相容路徑，`providers.js` 不需為它加任何分支；model id 含斜線（`deepseek-ai/...`）只出現在 JSON body，不進 URL path，不會被百分號編碼）。
 - 送出的 header 只有上面列的（Gemini 對 preflight 帶未知 header 會回 403）。
 
-`analysisRunner.js` 的 `callProvider` 即 `buildRequest → fetch → res.ok 檢查 → json → extractText`。
+`analysisRunner.js` 的 `callProvider` 即 `buildRequest → fetch → res.ok 檢查 → json → extractText`，但在 `buildRequest` **之前**先擋一道：`providerHostPermission(cfg.provider)` 有值而 `chrome.permissions.contains` 說沒授權時，直接丟 `"<provider> NO_HOST_PERMISSION: <origin>"`，不送請求也不花額度。否則 NVIDIA 未授權時只會得到與離線同形、無從判讀的 CORS `TypeError`。
+
+**NVIDIA NIM 的 CORS（實測）**：`https://integrate.api.nvidia.com/v1/chat/completions` 的 preflight 回 200，但**完全沒有任何 `Access-Control-Allow-*` header**（連一般網頁來源也不回），所以純 fetch 一定被瀏覽器擋成 `TypeError: Failed to fetch`；端點本身正常（亂填 key 會乾淨地回 `403 {"status":403,"title":"Forbidden","detail":"Authorization failed"}`）。Chrome 的 host permission 會讓該來源的請求完全略過 CORS 檢查，因此宣告 host 即可運作。
 
 ---
 
@@ -249,12 +256,17 @@ Which single file most likely contains the course syllabus or grading policy? Re
 ### 8.1 manifest.json
 ```json
 "version": "2.1.0",
-"optional_host_permissions": ["https://*.canvas-user-content.com/*"]
+"optional_host_permissions": [
+  "https://*.canvas-user-content.com/*",
+  "https://integrate.api.nvidia.com/*"
+]
 ```
-`host_permissions`、`permissions`、`content_scripts` **不變**。加 optional 權限的更新**不會**讓現有使用者的擴充功能被停用；LLM 端點靠 CORS（三家目前皆對 `chrome-extension://` 來源回正確 CORS header，已實測）。若日後某家收緊 CORS，再把該 host 加進 `optional_host_permissions` 並在儲存時一併請求即可，不需改必要權限。
+`host_permissions`、`permissions`、`content_scripts` **不變**。加 optional 權限的更新**不會**讓現有使用者的擴充功能被停用。
+
+LLM 端點**原則上不需要任何權限**——Gemini／Qwen／DeepSeek 都對 `chrome-extension://` 來源回正確 CORS header（已實測），純 fetch 即可。**NVIDIA NIM 是例外**：它一個 `Access-Control-Allow-*` header 都不回（§7），只能靠 host permission 讓 Chrome 略過 CORS，所以 `https://integrate.api.nvidia.com/*` 進 `optional_host_permissions`——沒選 NVIDIA 的使用者永遠不會看到這個權限。日後若某家收緊 CORS，比照辦理：加進 `optional_host_permissions`、在 `PROVIDERS` 該筆補 `hostPermission`，其餘（請求時機、未授權提示、fail-fast）自動生效，不需改必要權限。
 
 ### 8.2 請求時機
-`aiSettings.js` 的「儲存」click handler **第一個非同步呼叫**就是 `chrome.permissions.request({ origins: ['https://*.canvas-user-content.com/*'] })`（必須在 user gesture 內、且在任何 `await` 之前；已授權時 Chrome 直接回 true 不彈窗），之後才寫 storage。**只有所選供應商支援 PDF（目前僅 Gemini）才請求**——純文字供應商永遠不會下載 PDF，不該讓使用者看到用不到的權限對話框（供應商查表是同步 DOM 讀取，不影響 gesture）。同理 `readForm()` 對支援 PDF 的供應商把隱藏的 base URL 欄位存為空字串。使用者拒絕 → 照常儲存設定，modal 顯示一行「未授權 PDF 存取，只會分析 syllabus 文字」（`AI_GET_STATUS.pdfPermission`）。
+`aiSettings.js` 的「儲存」click handler **第一個非同步呼叫**就是 `chrome.permissions.request({ origins })`，其中 `origins = DueGradingRules.requiredOrigins(表單上的 provider)`（§4.1）——供應商自己的 host 與 PDF 下載權限**併成一次請求**，只跳一個對話框（必須在 user gesture 內、且在任何 `await` 之前；已授權時 Chrome 直接回 true 不彈窗），之後才寫 storage。**用不到的權限一律不請求**：純文字供應商永遠不會下載 PDF，Gemini／Qwen／DeepSeek 也不需要端點權限，不該讓使用者看到用不到的權限對話框（供應商查表是同步 DOM 讀取，不影響 gesture；`origins` 為空時直接跳過請求）。同理 `readForm()` 對支援 PDF 的供應商把隱藏的 base URL 欄位存為空字串。使用者拒絕 → 照常儲存設定，modal 顯示對應提示：PDF 權限缺 → 「未授權 PDF 存取，只會分析 syllabus 文字」（`AI_GET_STATUS.pdfPermission`）；供應商端點權限缺 → §9.2 的 host 權限提示（`AI_GET_STATUS.providerPermission`），此時該供應商完全無法運作，分析會記 `NO_HOST_PERMISSION` 錯誤。
 
 ### 8.3 API key 存放
 明文存 `aiConfig.apiKey`（與舊版相同，Web Store 上 BYOK 擴充常見作法），但：
@@ -272,11 +284,12 @@ Which single file most likely contains the course syllabus or grading policy? Re
 ### 9.2 內容（overlay id `ai-settings-overlay`，樣式沿用 `.weight-edit-overlay/.weight-edit-modal` 的視覺語言：1px 邊框、8px 圓角、DM Sans 300、Section 標題 DM Mono 小字大寫）
 1. 標題「AI 分析設定」＋一句說明：「自動從課程大綱抓出評分比重，寫進手動權重。沒填 key 就不會啟用。」
 2. **同意聲明**（醒目但不刺眼，`--muted`）：「啟用後，課程大綱與相關 PDF 會直接從你的瀏覽器送到你選的供應商；開發者不會收到任何資料。」
-3. 欄位：供應商 `<select>`（Gemini／Qwen／DeepSeek）；API key（`type=password`＋顯示切換）；模型 ID（placeholder 顯示該供應商預設，留空即用預設）；Base URL（進階，可折疊，只在 Qwen／DeepSeek 顯示，placeholder 為預設）。切換供應商只更新 placeholder，不清空使用者已輸入的模型。
-4. 供應商為 Qwen／DeepSeek 時顯示提示：「此供應商只能讀 syllabus 文字，大綱若是 PDF 建議用 Gemini」。
+3. 欄位：供應商 `<select>`（Gemini／Qwen／DeepSeek／NVIDIA NIM）；API key（`type=password`＋顯示切換）；模型 ID（placeholder 顯示該供應商預設，留空即用預設）；Base URL（進階，可折疊，只在 Qwen／DeepSeek 顯示，placeholder 為預設）。切換供應商只更新 placeholder，不清空使用者已輸入的模型。
+4. 供應商為 Qwen／DeepSeek／NVIDIA 時顯示提示：「此供應商只能讀 syllabus 文字，大綱若是 PDF 建議用 Gemini」。
 5. 按鈕列：`測試連線`（送 `AI_TEST_CONNECTION` 帶表單值，`maxTokens 512`，顯示 ✓／錯誤訊息）、`清除金鑰`（清 `aiConfig`，不動 `gradingAnalysis`／`customWeights`）、`取消`、`儲存`（§8.2 流程 → 寫 `aiConfig`（含 `consentedAt`）→ 送 `AI_RUN_NOW` → 關閉）。
 6. **分析狀態區**（開啟時與每次操作後送 `AI_GET_STATUS` 刷新）：摘要一行「已分析 N · 找不到大綱 M · 錯誤 K · 待分析 P · 上次執行 {時間}」＋每門課一行（課名用 `courseNames` 自訂名優先；狀態字；error 顯示截短訊息）。底部 `清除分析紀錄` 按鈕（走現有 `openConfirmDialog` 確認後送 `AI_RESET_ANALYSIS`；確認文案明講：紀錄清除後只會為「目前沒有權重」的課重新分析，已寫入的權重不動，要重分析某課請先在該課權重編輯器按「還原 Canvas 權重」）。
 7. 未授權 PDF 時顯示一行提示（§8.2）。
+8. **供應商端點權限缺席提示**（`#ai-host-perm-hint`，i18n key `hostPermHint`，三語齊備）：`AI_GET_STATUS` 回 `configured && providerPermission === false` 時顯示「此供應商不允許瀏覽器直接呼叫，需要『存取 {host}』的權限才能運作。請重新按『儲存』並允許。」；`{host}` 由 `providerHostPermission(已儲存的 provider)` 去掉 scheme 與結尾 `/*` 而來（`integrate.api.nvidia.com`）。判定依**已儲存**的供應商（狀態由 background 依 `aiConfig` 算），語言切換時一併重畫。
 
 ### 9.3 i18n
 `aiSettings.js` 內建 `STRINGS = { 'zh-TW': {...}, 'zh-CN': {...}, en: {...} }`，`DueAiSettings.applyLanguage(lang)` 由 `dashboard.js` 的 `applyUILanguage()` 末尾呼叫（一行），負責 modal 全部文字**與** `#menu-ai-settings` 的選單文字。三語言必須齊備（測試不驗，實作者自檢 key 集合相等）。
@@ -341,7 +354,8 @@ chrome.runtime?.onMessage?.addListener((msg) => {
 
 ### 13.1 單元測試（node，沿用 `node:assert/strict` ＋ 本地 `test()` 樣式）
 `extension/ai/gradingRules.test.js`：
-- `resolveConfig`：空／未知 provider → gemini 預設；model/baseUrl 空字串取預設；`configured` 判定
+- `resolveConfig`：空／未知 provider → gemini 預設；model/baseUrl 空字串取預設；`configured` 判定；`nvidia` 預設 model／baseUrl 與 https-only 規則
+- `providerHostPermission`／`requiredOrigins`：只有 nvidia 有 host permission；三種供應商各自的 origins 聯集（未知 → 比照 gemini）
 - `shouldAnalyze`：六條規則各一例；`nextRetryAt` 到期前後
 - `nextRecord`：attempts 累加；done/notFound/error 的 `nextRetryAt`
 - `findSyllabusByKeyword`：`Syllabus_2026.pdf` 命中；`Assessment 1 rubric.pdf`、`Grading Rubric HW2.pdf` **不**命中；`grading policy.pdf` 命中
@@ -353,11 +367,11 @@ chrome.runtime?.onMessage?.addListener((msg) => {
 
 `extension/ai/providers.test.js`：
 - gemini request：url、`x-goog-api-key` header、key 不在 url、pdf → inlineData、systemInstruction
-- OpenAI 相容 request：`/chat/completions`、Bearer、PDF 被丟棄、base URL 尾斜線正規化
+- OpenAI 相容 request：`/chat/completions`、Bearer、PDF 被丟棄、base URL 尾斜線正規化；`nvidia` 走同一路徑且含斜線的 model id 不被 URL 編碼
 - `extractText` 兩家正常／空回應 throw
 - `supportsPdf`
 
-`extension/ai/analysisRunner.test.js`（`node:vm` 載入三個 ai/ 檔＋stub `chrome`／`fetch`）：沒 key 零請求；成功寫入 `customWeights`＋`gradingAnalysis` 並送 `GRADING_WEIGHTS_UPDATED`；再跑一次零 LLM 呼叫；同 tick 兩次觸發只有一次 LLM 呼叫；純文字供應商不下載 PDF；LLM 500 → `error` 且 `source` 保留；`AI_GET_STATUS` 形狀；連結 PDF 只試前 5 個；`Content-Length`／`text/html` 不讀 body；reset epoch。
+`extension/ai/analysisRunner.test.js`（`node:vm` 載入三個 ai/ 檔＋stub `chrome`／`fetch`）：沒 key 零請求；成功寫入 `customWeights`＋`gradingAnalysis` 並送 `GRADING_WEIGHTS_UPDATED`；再跑一次零 LLM 呼叫；同 tick 兩次觸發只有一次 LLM 呼叫；純文字供應商不下載 PDF；LLM 500 → `error` 且 `source` 保留；`AI_GET_STATUS` 形狀；連結 PDF 只試前 5 個；`Content-Length`／`text/html` 不讀 body；reset epoch；需要 host permission 的供應商未授權 → `NO_HOST_PERMISSION` 且零 LLM 呼叫、已授權 → 正常打 NVIDIA 端點並寫入權重；`AI_GET_STATUS.providerPermission` 三種情境（`chrome.permissions.contains` 的 stub 依 origin 判定）。
 
 ### 13.2 靜態檢查
 - `node --check` 全部 JS：`background.js`、`ai/*.js`、`dashboard/dashboard.js`、`dashboard/aiSettings.js`、`popup.js`。

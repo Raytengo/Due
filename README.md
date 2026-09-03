@@ -54,7 +54,7 @@ there's nothing to configure. Log in to Canvas once and it syncs automatically.
 Due never asks for a Canvas API token or a password. It uses the Canvas session
 already in your browser, so any school running Canvas works out of the box —
 just be logged in. The only key Due ever asks for is optional: your own
-Gemini / Qwen / DeepSeek API key, if you turn on AI grading-weight analysis
+Gemini / Qwen / DeepSeek / NVIDIA NIM API key, if you turn on AI grading-weight analysis
 (see below).
 
 ---
@@ -76,12 +76,14 @@ course syllabus (text and PDF) after each sync, extracts the grading breakdown,
 and writes it into the course's **manual weights** — the same place you'd type
 them yourself, so you can still edit or reset them.
 
-- Settings gear → **AI analysis settings** → choose Gemini, Qwen, or DeepSeek,
-  paste your own API key, save.
+- Settings gear → **AI analysis settings** → choose Gemini, Qwen, DeepSeek, or
+  NVIDIA NIM, paste your own API key, save.
 - Each course is analyzed **once**. Courses that already have Canvas or manual
   weights are skipped. Nothing runs until you add a key.
 - When you save with Gemini selected, Chrome asks for access to `canvas-user-content.com` so Due can download
   syllabus PDFs; decline and it still works with the syllabus text.
+- NVIDIA NIM does not allow direct browser calls, so saving with it selected asks for access to
+  `integrate.api.nvidia.com` — without that permission the provider cannot run at all.
 - Syllabus content goes straight from your browser to the provider you chose.
   Due has no server in between.
 

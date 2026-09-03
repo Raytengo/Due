@@ -24,7 +24,7 @@ When you visit your school's Canvas site, the Extension reads the following data
 If you are logged in to claude.ai, the Extension can read your own usage percentage from claude.ai's usage endpoint and show it in the popup. This is read-only, stays on your device, and can be hidden from the settings menu.
 
 ### AI API Key (optional)
-You may optionally provide an API key for one of these third-party AI services: Google Gemini, Alibaba Qwen (DashScope), or DeepSeek. This key is:
+You may optionally provide an API key for one of these third-party AI services: Google Gemini, Alibaba Qwen (DashScope), DeepSeek, or NVIDIA NIM. This key is:
 
 - Stored locally on your device (`chrome.storage.local`, readable only by the Extension's own pages)
 - Never transmitted to the extension developer
@@ -49,6 +49,7 @@ You are responsible for reviewing the privacy policy of your chosen AI provider:
 - Google Gemini: https://policies.google.com/privacy
 - Alibaba Cloud (Qwen / DashScope): https://www.alibabacloud.com/help/en/legal/latest/alibaba-cloud-international-website-privacy-policy
 - DeepSeek: https://cdn.deepseek.com/policies/en-US/deepseek-privacy-policy.html
+- NVIDIA (NIM): https://www.nvidia.com/en-us/about-nvidia/privacy-policy/
 
 ---
 
@@ -57,9 +58,10 @@ You are responsible for reviewing the privacy policy of your chosen AI provider:
 - `https://*.instructure.com/*` — read your Canvas data with your existing login
 - `https://claude.ai/*` — read your own Claude usage for the optional popup chip
 - Optional, requested only when you save AI analysis settings: `https://*.canvas-user-content.com/*` — download syllabus PDFs from Canvas's file host. You can decline; the analysis then uses syllabus text only.
+- Optional, requested only when you save AI analysis settings with NVIDIA NIM selected: `https://integrate.api.nvidia.com/*` — call the NVIDIA NIM API. Unlike the other providers, NVIDIA's endpoint does not allow direct browser calls, so this permission is required for it to work at all. You can decline; the AI analysis then does nothing until you pick another provider.
 - `storage`, `tabs`, `webNavigation`, `scripting` — save data locally, detect when you visit Canvas, and open the dashboard tab.
 
-Calls to the AI providers use their public HTTPS APIs and do not require additional permissions.
+Calls to Gemini, Qwen and DeepSeek use their public HTTPS APIs and require no additional permissions; NVIDIA NIM is the one exception noted above.
 
 ---
 
