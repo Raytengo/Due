@@ -36,6 +36,7 @@ const defaults = () => ({
   bodyReads: 0,          // arrayBuffer() 被呼叫幾次（驗「下載前就拒絕」時不讀 body）
   pdfHeaders: PDF_HEADERS,
   llmGate: null,         // 設成 promise 可把 LLM 回應卡住，模擬「分析途中」
+  llmThrow: false,       // fetch 本身丟 TypeError（CORS 被擋／離線），而不是回 HTTP 狀態碼
   platformInfo: 0,       // keepalive 呼叫 chrome.runtime.getPlatformInfo 的次數
   failNextSet: false,    // 下一次 storage.local.set 丟錯
   afterGet: null,        // 每次 storage.local.get 回覆前呼叫：可在 get 與 set 之間插入事件
@@ -59,6 +60,7 @@ async function fakeFetch(url, init) {
   if (u.includes(':generateContent') || u.includes('/chat/completions')) {
     S.llm.push({ url: u, method: (init || {}).method, headers: (init || {}).headers, body: JSON.parse((init || {}).body) });
     if (S.llmGate) await S.llmGate; // 手動放行：測試「分析途中」的行為
+    if (S.llmThrow) throw new TypeError('Failed to fetch');
     if (S.llmStatus !== 200) return res(S.llmStatus, 'provider exploded');
     return res(200, u.includes(':generateContent')
       ? { candidates: [{ content: { parts: [{ text: S.llmText }] } }] }
@@ -295,6 +297,37 @@ const run = (base) => sandbox.runPendingGradingAnalysis(base);
     assert.equal(S.store.gradingAnalysis[919].status, 'done');
     assert.equal(S.store.gradingAnalysis[919].attempts, 1);
     assert.deepEqual(plain(S.store.customWeights[919]), WEIGHTS);
+  });
+
+  await test('分析途中重置：迴圈提前結束，剩下的課不再花額度（作廢 1 次＋補跑 2 次＝3 次 LLM 呼叫）', async () => {
+    reset({ aiConfig: { provider: 'gemini', apiKey: 'k' }, courses: [{ id: 931, name: 'C9d' }, { id: 932, name: 'C9e' }], customWeights: {} }, { syllabus: SYLLABUS_HTML });
+    let release;
+    S.llmGate = new Promise((r) => { release = r; });
+    const p = run(BASE);
+    while (!S.llm.length) await new Promise((r) => setTimeout(r, 0)); // 第一門課的 LLM 請求已送出、卡住
+    sandbox.handleAiMessage({ type: 'AI_RESET_ANALYSIS' }, () => { }, BASE);
+    setTimeout(release, 150);
+    await p;
+    const deadline = Date.now() + 2000;
+    while (!(S.store.gradingAnalysis && S.store.gradingAnalysis[931] && S.store.gradingAnalysis[932]) && Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 10));
+    }
+    await new Promise((r) => setTimeout(r, 50));
+    // 沒有 break 的話會是 4（作廢那輪把第二門也跑完再丟掉）
+    assert.equal(S.llm.length, 3, '第一輪只跑一門就中止，補跑兩門');
+    assert.equal(S.store.gradingAnalysis[931].status, 'done');
+    assert.equal(S.store.gradingAnalysis[932].status, 'done');
+    assert.equal(S.store.gradingAnalysis[931].attempts, 1);
+  });
+
+  await test('fetch 丟 TypeError（CORS 被擋／離線）→ error 紀錄帶 network/CORS 字樣，與 key 錯可區分', async () => {
+    reset({ aiConfig: { provider: 'deepseek', apiKey: 'sk-x' }, courses: [{ id: 941, name: 'C9f' }], customWeights: {} }, { syllabus: SYLLABUS_HTML, llmThrow: true });
+    await run(BASE);
+    const rec = S.store.gradingAnalysis[941];
+    assert.equal(rec.status, 'error');
+    assert.match(rec.error, /deepseek network\/CORS error: Failed to fetch/);
+    assert.equal(rec.source, 'syllabus_body');
+    assert.deepEqual(S.store.customWeights, {});
   });
 
   await test('寫入前再驗 epoch：重置剛好落在 get 與 set 之間 → 放棄寫入', async () => {

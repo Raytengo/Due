@@ -69,6 +69,8 @@ async function runPendingGradingAnalysis(baseUrlHint) {
     console.log(`[Due][AI] 待分析 ${todo.length} 門課（PDF 權限：${pdfAllowed}）`);
 
     for (const course of todo) {
+      // 使用者中途按了「清除分析紀錄」：剩下的課不再花額度（結果反正會被 epoch 守衛丟掉），finally 會補排一輪
+      if (epoch !== _aiResetEpoch) break;
       let outcome;
       try {
         outcome = await analyzeCourse(course, cfg, { baseUrl, pdfAllowed });
@@ -263,7 +265,14 @@ async function callProvider(cfg, parts, systemPrompt, opts) {
     ? setInterval(() => { try { chrome.runtime.getPlatformInfo(() => { }); } catch (_) { } }, 20000)
     : null;
   try {
-    const res = await fetch(req.url, { method: 'POST', headers: req.headers, body: JSON.stringify(req.body) });
+    let res;
+    try {
+      res = await fetch(req.url, { method: 'POST', headers: req.headers, body: JSON.stringify(req.body) });
+    } catch (err) {
+      // fetch 本身丟錯（拿不到 HTTP 狀態碼）：多半是供應商未對擴充功能來源開放 CORS，或離線；
+      // 給可辨識的訊息，讓 modal 狀態列能與「key 錯」區分
+      throw new Error(`${cfg.provider} network/CORS error: ${err && err.message ? err.message : String(err)}`);
+    }
     if (!res.ok) {
       const t = await res.text().catch(() => '');
       throw new Error(`${cfg.provider} API ${res.status}: ${t.slice(0, 160)}`);

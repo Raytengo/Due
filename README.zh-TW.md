@@ -76,7 +76,7 @@ Due 已上架 Chrome Web Store，一鍵安裝、免設定：
 - 設定齒輪 →「**AI 分析設定**」→ 選 Gemini／Qwen／DeepSeek，貼上你自己的
   API key，儲存。
 - 每門課只分析**一次**；已有 Canvas 或手動權重的課會跳過。沒填 key 什麼都不會跑。
-- Chrome 會問一次是否允許存取 `canvas-user-content.com`，用來下載大綱 PDF；
+- 選 Gemini 儲存時，Chrome 會問是否允許存取 `canvas-user-content.com`，用來下載大綱 PDF；
   拒絕也能用，只是只讀大綱文字。
 - 大綱內容直接從你的瀏覽器送到你選的供應商，中間沒有 Due 的伺服器。
 

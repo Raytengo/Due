@@ -80,7 +80,7 @@ them yourself, so you can still edit or reset them.
   paste your own API key, save.
 - Each course is analyzed **once**. Courses that already have Canvas or manual
   weights are skipped. Nothing runs until you add a key.
-- Chrome asks once for access to `canvas-user-content.com` so Due can download
+- When you save with Gemini selected, Chrome asks for access to `canvas-user-content.com` so Due can download
   syllabus PDFs; decline and it still works with the syllabus text.
 - Syllabus content goes straight from your browser to the provider you chose.
   Due has no server in between.
