@@ -47,6 +47,44 @@ test('resolveConfig: 非 https 的自訂 baseUrl 一律退回供應商預設（B
   assert.equal(R.resolveConfig({ provider: 'qwen', apiKey: 'k', baseUrl: 'HTTPS://x.example/v1' }).baseUrl, 'HTTPS://x.example/v1');
 });
 
+test('resolveConfig: nvidia → 預設模型與官方 base URL', () => {
+  const c = R.resolveConfig({ provider: 'nvidia', apiKey: 'nvapi-x' });
+  assert.equal(c.provider, 'nvidia');
+  assert.equal(c.model, 'deepseek-ai/deepseek-v4-flash-0731');
+  assert.equal(c.baseUrl, 'https://integrate.api.nvidia.com/v1');
+  assert.equal(c.configured, true);
+});
+
+test('resolveConfig: nvidia 的自訂 baseUrl 也吃 https-only 規則', () => {
+  assert.equal(
+    R.resolveConfig({ provider: 'nvidia', apiKey: 'k', baseUrl: 'https://nim.example/v1' }).baseUrl,
+    'https://nim.example/v1'
+  );
+  assert.equal(
+    R.resolveConfig({ provider: 'nvidia', apiKey: 'k', baseUrl: 'http://nim.example/v1' }).baseUrl,
+    'https://integrate.api.nvidia.com/v1'
+  );
+});
+
+// ── providerHostPermission / requiredOrigins ──
+test('providerHostPermission: 只有 nvidia 需要額外 host permission', () => {
+  assert.equal(R.providerHostPermission('nvidia'), 'https://integrate.api.nvidia.com/*');
+  assert.equal(R.providerHostPermission('deepseek'), null);
+  assert.equal(R.providerHostPermission('qwen'), null);
+  assert.equal(R.providerHostPermission('gemini'), null);
+  assert.equal(R.providerHostPermission('bogus'), null);
+  assert.equal(R.providerHostPermission(undefined), null);
+});
+
+test('requiredOrigins: 供應商 host ＋ PDF 權限（未知供應商比照 gemini）', () => {
+  assert.deepEqual(R.requiredOrigins('gemini'), [R.PDF_PERMISSION_ORIGIN]);
+  assert.deepEqual(R.requiredOrigins('deepseek'), []);
+  assert.deepEqual(R.requiredOrigins('qwen'), []);
+  assert.deepEqual(R.requiredOrigins('nvidia'), ['https://integrate.api.nvidia.com/*']);
+  assert.deepEqual(R.requiredOrigins('bogus'), [R.PDF_PERMISSION_ORIGIN]);
+  assert.deepEqual(R.requiredOrigins(undefined), [R.PDF_PERMISSION_ORIGIN]);
+});
+
 // ── shouldAnalyze ──
 const base = { courseId: 7, customWeights: {}, groups: [], record: undefined, now: NOW };
 

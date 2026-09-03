@@ -25,6 +25,8 @@
   const WEIGHT_SUM_MAX = 120;
   const PDF_PERMISSION_ORIGIN = 'https://*.canvas-user-content.com/*';
 
+  // hostPermission（選填）：該供應商的端點不回 CORS header，必須靠 Chrome host permission 略過 CORS。
+  // 沒有這個欄位（gemini／qwen／deepseek）代表供應商自己有開 CORS，純 fetch 就能呼叫，不佔任何權限。
   const PROVIDERS = {
     gemini: {
       label: 'Google Gemini',
@@ -47,7 +49,32 @@
       supportsPdf: false,
       keyPlaceholder: 'sk-...',
     },
+    nvidia: {
+      label: 'NVIDIA NIM',
+      baseUrl: 'https://integrate.api.nvidia.com/v1',
+      defaultModel: 'deepseek-ai/deepseek-v4-flash-0731',
+      supportsPdf: false,
+      keyPlaceholder: 'nvapi-...',
+      // NVIDIA 端點完全不回 CORS header（連一般網頁來源也不回），純 fetch 一定被瀏覽器擋掉；
+      // 宣告 host permission 可讓 Chrome 直接略過 CORS 檢查（走 optional，儲存設定時才請求）
+      hostPermission: 'https://integrate.api.nvidia.com/*',
+    },
   };
+
+  // 該供應商需要哪些 host permission（供 modal 一次請求、runner 檢查是否已授權）
+  function providerHostPermission(provider) {
+    const p = PROVIDERS[provider];
+    return (p && p.hostPermission) || null;
+  }
+
+  // 儲存設定時要一次請求的 origins：供應商自己的 host（若需要）＋ PDF 下載（若該供應商吃 PDF）
+  function requiredOrigins(provider) {
+    const p = PROVIDERS[provider] || PROVIDERS.gemini;
+    const out = [];
+    if (p.hostPermission) out.push(p.hostPermission);
+    if (p.supportsPdf) out.push(PDF_PERMISSION_ORIGIN);
+    return out;
+  }
 
   // ── 設定 ──
   function resolveConfig(stored) {
@@ -333,6 +360,8 @@
     PDF_PERMISSION_ORIGIN,
     SYSTEM_PROMPT,
     USER_PROMPT,
+    providerHostPermission,
+    requiredOrigins,
     resolveConfig,
     shouldAnalyze,
     nextRecord,

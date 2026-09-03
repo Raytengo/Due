@@ -14,7 +14,8 @@
     "https://claude.ai/*"
   ],
   "optional_host_permissions": [
-    "https://*.canvas-user-content.com/*"
+    "https://*.canvas-user-content.com/*",
+    "https://integrate.api.nvidia.com/*"
   ],
   "content_scripts": [
     {

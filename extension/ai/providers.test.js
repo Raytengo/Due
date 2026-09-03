@@ -30,11 +30,12 @@ test('supportsPdf: 只有 gemini', () => {
   assert.equal(P.supportsPdf('gemini'), true);
   assert.equal(P.supportsPdf('qwen'), false);
   assert.equal(P.supportsPdf('deepseek'), false);
+  assert.equal(P.supportsPdf('nvidia'), false);
 });
 
 test('supportsPdf 與 gradingRules.PROVIDERS 的 supportsPdf 一致（單一真相來源）', () => {
   const keys = Object.keys(R.PROVIDERS);
-  assert.ok(keys.length >= 3);
+  assert.ok(keys.length >= 4);
   for (const k of keys) assert.equal(P.supportsPdf(k), R.PROVIDERS[k].supportsPdf, `provider=${k}`);
 });
 
@@ -99,6 +100,20 @@ test('buildRequest OpenAI 相容: /chat/completions、Bearer、PDF 丟棄、文�
   assert.equal(req.body.max_tokens, 2048);
   assert.equal(req.body.temperature, 0);
   assert.equal(JSON.stringify(req.body).includes('QUJD'), false);
+});
+
+test('buildRequest nvidia: 走 OpenAI 相容路徑，model 含斜線也不被 URL 編碼（在 body 裡）', () => {
+  const req = P.buildRequest(
+    { provider: 'nvidia', apiKey: 'nvapi-x', model: 'deepseek-ai/deepseek-v4-flash-0731', baseUrl: 'https://integrate.api.nvidia.com/v1' },
+    [{ type: 'text', text: 'hi' }],
+    'SYS',
+    { maxTokens: 512 }
+  );
+  assert.equal(req.url, 'https://integrate.api.nvidia.com/v1/chat/completions');
+  assert.deepEqual(Object.keys(req.headers).sort(), ['Authorization', 'Content-Type']);
+  assert.equal(req.headers.Authorization, 'Bearer nvapi-x');
+  assert.equal(req.body.model, 'deepseek-ai/deepseek-v4-flash-0731');
+  assert.equal(req.body.max_tokens, 512);
 });
 
 test('buildRequest OpenAI 相容: null part 被忽略（與 gemini 路徑一致，不丟 TypeError）', () => {
