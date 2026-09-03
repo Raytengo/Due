@@ -3279,6 +3279,266 @@
 
     .weight-edit-save:hover { opacity: 0.8; }
 
+    /* ── AI 分析設定 modal（spec 2026-09-03；視覺語言與權重編輯器一致）── */
+    .ai-settings-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.35);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;            /* 低於 .confirm-overlay(3000)：清除紀錄的確認框要疊在上面 */
+    }
+
+    .ai-settings-overlay.open { display: flex; }
+
+    .ai-settings-modal {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      width: 460px;
+      max-width: 92vw;
+      max-height: 84vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.14);
+    }
+
+    .ai-settings-header {
+      padding: 18px 20px 14px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .ai-settings-title {
+      font-family: 'Source Serif 4', Georgia, serif;
+      font-size: 18px;
+      color: var(--dark);
+    }
+
+    .ai-settings-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px 20px 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 300;
+      font-size: 13px;
+      color: var(--dark);
+    }
+
+    .ai-settings-intro { color: var(--muted); line-height: 1.55; }
+
+    .ai-settings-consent {
+      color: var(--muted);
+      line-height: 1.55;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--surface);
+    }
+
+    .ai-settings-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    .ai-settings-select,
+    .ai-settings-input {
+      width: 100%;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+      font-weight: 300;
+      padding: 7px 10px;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      background: var(--bg);
+      color: var(--dark);
+      outline: none;
+      transition: border-color 0.12s;
+    }
+
+    .ai-settings-select:focus,
+    .ai-settings-input:focus { border-color: var(--orange); }
+
+    .ai-settings-keyrow {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .ai-settings-keyrow .ai-settings-input { flex: 1; font-family: 'DM Mono', monospace; }
+
+    .ai-settings-eye {
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      padding: 6px 10px;
+      border-radius: 5px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: border-color 0.12s, color 0.12s;
+    }
+
+    .ai-settings-eye:hover { border-color: var(--orange); color: var(--orange); }
+
+    .ai-settings-hint {
+      font-size: 12px;
+      color: var(--warm);
+      line-height: 1.5;
+    }
+
+    .ai-settings-actions-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 2px;
+    }
+
+    .ai-settings-link {
+      border: none;
+      background: none;
+      color: var(--muted);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 12px;
+      cursor: pointer;
+      padding: 4px 0;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+      transition: color 0.12s;
+      white-space: nowrap;
+    }
+
+    .ai-settings-link:hover { color: var(--orange); }
+
+    .ai-settings-link:disabled { color: var(--border); cursor: default; text-decoration: none; }
+
+    .ai-settings-test-result {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      color: var(--muted);
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 260px;
+    }
+
+    .ai-settings-test-result.ok { color: var(--green); }
+    .ai-settings-test-result.fail { color: var(--overdue); }
+
+    .ai-settings-section {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-top: 10px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+    }
+
+    .ai-settings-summary {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .ai-status-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .ai-status-list li {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .ai-status-name {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--dark);
+    }
+
+    .ai-status-state {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      white-space: nowrap;
+      color: var(--muted);
+    }
+
+    .ai-status-state.done { color: var(--green); }
+    .ai-status-state.error { color: var(--overdue); }
+    .ai-status-state.notFound { color: var(--warm); }
+
+    .ai-status-error {
+      flex-basis: 100%;
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      color: var(--muted);
+      padding-left: 2px;
+    }
+
+    .ai-settings-footer {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      padding: 14px 20px;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .ai-settings-cancel {
+      padding: 7px 16px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: transparent;
+      color: var(--muted);
+      font-family: 'DM Mono', monospace;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      transition: border-color 0.12s, color 0.12s;
+    }
+
+    .ai-settings-cancel:hover { border-color: var(--orange); color: var(--orange); }
+
+    .ai-settings-save {
+      padding: 7px 20px;
+      border: none;
+      border-radius: 6px;
+      background: var(--dark);
+      color: var(--bg);
+      font-family: 'DM Mono', monospace;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      transition: opacity 0.12s;
+    }
+
+    .ai-settings-save:hover { opacity: 0.8; }
+
 
 
     /* ── 無障礙：鍵盤 focus 一致外框（只在鍵盤導航時顯示，不干擾滑鼠點擊）──
@@ -3477,6 +3737,7 @@
                 <div class="settings-menu-title">Quick Actions</div>
                 <div class="settings-menu-divider"></div>
                 <button class="settings-menu-item" id="menu-claude-usage-toggle">Claude 用量</button>
+                <button class="settings-menu-item" id="menu-ai-settings">AI 分析設定</button>
                 <div class="settings-menu-item has-submenu" id="menu-language-label">語言
                   <div class="settings-submenu">
                     <button id="menu-language-zh-tw">繁體中文</button>
@@ -3831,6 +4092,60 @@
     </div>
   </div>
 
+  <!-- AI 分析設定 modal（spec 2026-09-03；所有文字由 aiSettings.js 依語言填入）-->
+  <div class="ai-settings-overlay" id="ai-settings-overlay">
+    <div class="ai-settings-modal" role="dialog" aria-modal="true" aria-labelledby="ai-settings-title">
+      <div class="ai-settings-header">
+        <span class="ai-settings-title" id="ai-settings-title"></span>
+      </div>
+      <div class="ai-settings-body">
+        <p class="ai-settings-intro" id="ai-settings-intro"></p>
+        <p class="ai-settings-consent" id="ai-settings-consent"></p>
+
+        <label class="ai-settings-label" for="ai-provider" id="ai-provider-label"></label>
+        <select class="ai-settings-select" id="ai-provider">
+          <option value="gemini">Google Gemini</option>
+          <option value="qwen">Qwen (通義千問)</option>
+          <option value="deepseek">DeepSeek</option>
+        </select>
+
+        <label class="ai-settings-label" for="ai-api-key" id="ai-api-key-label"></label>
+        <div class="ai-settings-keyrow">
+          <input class="ai-settings-input" id="ai-api-key" type="password" autocomplete="off" spellcheck="false">
+          <button type="button" class="ai-settings-eye" id="ai-key-toggle"></button>
+        </div>
+
+        <label class="ai-settings-label" for="ai-model" id="ai-model-label"></label>
+        <input class="ai-settings-input" id="ai-model" type="text" autocomplete="off" spellcheck="false">
+
+        <div id="ai-base-url-wrap" hidden>
+          <label class="ai-settings-label" for="ai-base-url" id="ai-base-url-label"></label>
+          <input class="ai-settings-input" id="ai-base-url" type="text" autocomplete="off" spellcheck="false">
+        </div>
+
+        <p class="ai-settings-hint" id="ai-text-only-hint" hidden></p>
+        <p class="ai-settings-hint" id="ai-pdf-hint" hidden></p>
+
+        <div class="ai-settings-actions-row">
+          <button type="button" class="ai-settings-link" id="ai-test-btn"></button>
+          <span class="ai-settings-test-result" id="ai-test-result"></span>
+          <button type="button" class="ai-settings-link" id="ai-clear-btn"></button>
+        </div>
+
+        <div class="ai-settings-section" id="ai-status-heading"></div>
+        <div class="ai-settings-summary" id="ai-status-summary"></div>
+        <ul class="ai-status-list" id="ai-status-list"></ul>
+        <div class="ai-settings-actions-row">
+          <button type="button" class="ai-settings-link" id="ai-reset-btn"></button>
+        </div>
+      </div>
+      <div class="ai-settings-footer">
+        <button type="button" class="ai-settings-cancel" id="ai-cancel-btn"></button>
+        <button type="button" class="ai-settings-save" id="ai-save-btn"></button>
+      </div>
+    </div>
+  </div>
+
   <!-- 自製確認對話框（取代 window.confirm；標題/內文/按鈕文字由 JS 依語言填入） -->
   <div class="confirm-overlay" id="confirm-overlay">
     <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-message">
@@ -3847,7 +4162,9 @@
   <script src="customAssignments.js"></script>
   <script src="completion.js"></script>
   <script src="descSanitizer.js"></script>
+  <script src="../ai/gradingRules.js"></script>
   <script src="dashboard.js"></script>
+  <script src="aiSettings.js"></script>
 </body>
 
 </html>
