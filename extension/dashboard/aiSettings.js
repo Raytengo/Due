@@ -12,7 +12,7 @@
       menuItem: 'AI 分析設定',
       title: 'AI 分析設定',
       intro: '同步後自動分析課程大綱、填入手動權重。',
-      consent: '大綱與 PDF 會送到你選的供應商，開發者看不到。按「儲存」即同意。',
+      consent: '大綱與 PDF 只送到你選的供應商，開發者看不到。',
       providerLabel: '供應商',
       apiKeyLabel: 'API key',
       modelLabel: '模型 ID',
@@ -27,7 +27,6 @@
       clearBtn: '清除金鑰',
       statusHeading: '分析狀態',
       notConfigured: '尚未設定 API key，分析不會執行。',
-      summary: '已分析 {done} · 找不到大綱 {notFound} · 錯誤 {error} · 待分析 {pending}',
       lastRun: '上次分析 {time}',
       running: '分析中…',
       never: '尚未分析',
@@ -41,10 +40,6 @@
       noteNoBreakdown: '文件中沒有評分比重資訊',
       noteEmptyWeights: '沒有解析出任何權重項目',
       noteWeightsSum: '權重總和 {total}%，超出合理範圍',
-      resetBtn: '清除分析紀錄',
-      resetConfirmTitle: '清除分析紀錄？',
-      resetConfirmMsg: '所有課程的分析紀錄會清除，並立即為「目前沒有權重」的課程重新分析（會使用你的 API 額度）。已寫入的權重不會改動——若要重新分析某門課，請先在該課的權重編輯器按「還原 Canvas 權重」。',
-      resetConfirmOk: '清除',
       cancel: '取消',
       save: '儲存',
       show: '顯示',
@@ -54,7 +49,7 @@
       menuItem: 'AI 分析设置',
       title: 'AI 分析设置',
       intro: '同步后自动分析课程大纲、写入手动权重。',
-      consent: '大纲与 PDF 会发送到你选择的供应商，开发者看不到。点击「保存」即同意。',
+      consent: '大纲与 PDF 只发送到你选择的供应商，开发者看不到。',
       providerLabel: '供应商',
       apiKeyLabel: 'API key',
       modelLabel: '模型 ID',
@@ -69,7 +64,6 @@
       clearBtn: '清除密钥',
       statusHeading: '分析状态',
       notConfigured: '尚未设置 API key，分析不会执行。',
-      summary: '已分析 {done} · 未找到大纲 {notFound} · 错误 {error} · 待分析 {pending}',
       lastRun: '上次分析 {time}',
       running: '分析中…',
       never: '尚未分析',
@@ -83,10 +77,6 @@
       noteNoBreakdown: '文件中没有评分比重信息',
       noteEmptyWeights: '未解析出任何权重项目',
       noteWeightsSum: '权重总和 {total}%，超出合理范围',
-      resetBtn: '清除分析记录',
-      resetConfirmTitle: '清除分析记录？',
-      resetConfirmMsg: '所有课程的分析记录将被清除，并立即为「目前没有权重」的课程重新分析（会使用你的 API 额度）。已写入的权重不会改动——若要重新分析某门课，请先在该课的权重编辑器点击「还原 Canvas 权重」。',
-      resetConfirmOk: '清除',
       cancel: '取消',
       save: '保存',
       show: '显示',
@@ -96,7 +86,7 @@
       menuItem: 'AI analysis settings',
       title: 'AI analysis settings',
       intro: 'After sync, Due analyzes the syllabus and fills in the grading weights.',
-      consent: 'The syllabus and PDFs go to your chosen provider — the developer never sees them. Saving means you agree.',
+      consent: 'Sent only to your chosen provider, never to the developer.',
       providerLabel: 'Provider',
       apiKeyLabel: 'API key',
       modelLabel: 'Model ID',
@@ -111,7 +101,6 @@
       clearBtn: 'Remove key',
       statusHeading: 'Analysis status',
       notConfigured: 'No API key set. Analysis will not run.',
-      summary: 'Done {done} · No syllabus {notFound} · Error {error} · Pending {pending}',
       lastRun: 'Last run {time}',
       running: 'Analyzing…',
       never: 'Not run yet',
@@ -125,10 +114,6 @@
       noteNoBreakdown: 'No grading breakdown found in the document',
       noteEmptyWeights: 'No weight items were parsed',
       noteWeightsSum: 'Weights sum to {total}%, outside the expected range',
-      resetBtn: 'Clear analysis records',
-      resetConfirmTitle: 'Clear analysis records?',
-      resetConfirmMsg: 'All analysis records are cleared and courses that currently have no weights are re-analyzed right away (this uses your API quota). Weights already written are left untouched — to re-analyze a course, first press "Reset to Canvas weights" in that course\'s weight editor.',
-      resetConfirmOk: 'Clear',
       cancel: 'Cancel',
       save: 'Save',
       show: 'Show',
@@ -240,7 +225,6 @@
     $('ai-test-btn').textContent = t('testBtn');
     $('ai-clear-btn').textContent = t('clearBtn');
     $('ai-status-heading').textContent = t('statusHeading');
-    $('ai-reset-btn').textContent = t('resetBtn');
     $('ai-cancel-btn').textContent = t('cancel');
     $('ai-save-btn').textContent = t('save');
     $('ai-key-toggle').textContent = _keyVisible ? t('hide') : t('show');
@@ -265,12 +249,13 @@
   async function refreshStatus() {
     const st = await sendMsg({ type: 'AI_GET_STATUS' });
     const summary = $('ai-status-summary');
+    const lastrun = $('ai-status-lastrun');
     const list = $('ai-status-list');
     if (!st || st.error) {
       _lastStatus = null;
-      summary.textContent = '';
+      summary.innerHTML = '';
+      lastrun.textContent = '';
       list.innerHTML = '';
-      $('ai-reset-btn').disabled = true;
       $('ai-pdf-hint').hidden = true;
       $('ai-host-perm-hint').hidden = true;
       return;
@@ -282,18 +267,21 @@
     renderHostPermHint();
 
     if (!st.configured) {
-      summary.textContent = t('notConfigured');
+      summary.innerHTML = escapeHtml(t('notConfigured'));
+      lastrun.textContent = '';
       list.innerHTML = '';
-      $('ai-reset-btn').disabled = true;
       return;
     }
-    $('ai-reset-btn').disabled = false;
+
+    lastrun.textContent = st.running ? t('running') : (st.lastRunAt ? t('lastRun', { time: formatTime(st.lastRunAt) }) : t('never'));
 
     const counts = { done: 0, notFound: 0, error: 0, pending: 0, skipped: 0 };
     for (const c of st.courses) counts[c.status] = (counts[c.status] || 0) + 1;
-    const lines = [t('summary', counts)];
-    lines.push(st.running ? t('running') : (st.lastRunAt ? t('lastRun', { time: formatTime(st.lastRunAt) }) : t('never')));
-    summary.textContent = lines.join('  ·  ');
+    // 每個計數用跟課程列表一致的顏色（綠/紅/暖黃），一眼看出哪類需要注意；待分析用預設的 muted 色
+    summary.innerHTML = [
+      ['done', 'stDone'], ['notFound', 'stNotFound'], ['error', 'stError'], ['pending', 'stPending'],
+    ].map(([key, label]) => `<span class="ai-count ${key}">${escapeHtml(t(label))} ${counts[key]}</span>`)
+      .join('<span class="ai-count-sep"> · </span>');
 
     if (!st.courses.length) { list.innerHTML = `<li><span class="ai-status-name">${escapeHtml(t('noCourses'))}</span></li>`; return; }
     const label = { done: 'stDone', notFound: 'stNotFound', error: 'stError', skipped: 'stSkipped', pending: 'stPending' };
@@ -384,17 +372,6 @@
       $('ai-model').value = '';
       $('ai-base-url').value = '';
       if (chrome.storage?.local?.remove) chrome.storage.local.remove('aiConfig', refreshStatus);
-    });
-
-    $('ai-reset-btn').addEventListener('click', () => {
-      if (typeof openConfirmDialog !== 'function') return;
-      openConfirmDialog({
-        title: t('resetConfirmTitle'),
-        message: t('resetConfirmMsg'),
-        confirmLabel: t('resetConfirmOk'),
-        cancelLabel: t('cancel'),
-        onConfirm: () => { sendMsg({ type: 'AI_RESET_ANALYSIS' }).then(refreshStatus); },
-      });
     });
 
     $('ai-save-btn').addEventListener('click', () => {

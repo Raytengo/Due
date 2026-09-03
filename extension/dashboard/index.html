@@ -3447,12 +3447,31 @@
       border-top: 1px solid var(--border);
     }
 
+    .ai-status-heading-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .ai-status-lastrun {
+      text-transform: none;
+      letter-spacing: normal;
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 300;
+    }
+
     .ai-settings-summary {
       font-family: 'DM Mono', monospace;
       font-size: 11px;
       color: var(--muted);
       line-height: 1.6;
     }
+
+    .ai-count-sep { color: var(--border); }
+    .ai-count.done { color: var(--green); }
+    .ai-count.error { color: var(--overdue); }
+    .ai-count.notFound { color: var(--warm); }
 
     .ai-status-list {
       list-style: none;
@@ -4137,12 +4156,12 @@
           <button type="button" class="ai-settings-link" id="ai-clear-btn"></button>
         </div>
 
-        <div class="ai-settings-section" id="ai-status-heading"></div>
+        <div class="ai-settings-section ai-status-heading-row">
+          <span id="ai-status-heading"></span>
+          <span class="ai-status-lastrun" id="ai-status-lastrun"></span>
+        </div>
         <div class="ai-settings-summary" id="ai-status-summary" aria-live="polite"></div>
         <ul class="ai-status-list" id="ai-status-list"></ul>
-        <div class="ai-settings-actions-row">
-          <button type="button" class="ai-settings-link" id="ai-reset-btn"></button>
-        </div>
       </div>
       <div class="ai-settings-footer">
         <button type="button" class="ai-settings-cancel" id="ai-cancel-btn"></button>

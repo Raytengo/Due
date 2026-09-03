@@ -104,9 +104,14 @@ test('shouldAnalyze: 全部 group_weight 為 0/null → 照跑', () => {
   assert.equal(R.shouldAnalyze({ ...base, groups: [{ group_weight: 0 }, { group_weight: null }] }).run, true);
 });
 
-test('shouldAnalyze: 已 done → 永不重跑（即使權重被還原）', () => {
-  const d = R.shouldAnalyze({ ...base, record: { status: 'done', attempts: 1 } });
-  assert.deepEqual(d, { run: false, reason: 'done' });
+test('shouldAnalyze: done 但目前有 customWeights → 不重跑（hasCustomWeights 擋掉，不靠 record.status）', () => {
+  const d = R.shouldAnalyze({ ...base, customWeights: { 7: [{ name: 'HW', weight: 40 }] }, record: { status: 'done', attempts: 1 } });
+  assert.deepEqual(d, { run: false, reason: 'hasCustomWeights' });
+});
+
+test('shouldAnalyze: done 但使用者已按「還原 Canvas 權重」清空 customWeights → 照跑，不需要另外清分析紀錄', () => {
+  const d = R.shouldAnalyze({ ...base, customWeights: {}, record: { status: 'done', attempts: 1 } });
+  assert.deepEqual(d, { run: true, reason: 'retry' });
 });
 
 test('shouldAnalyze: 無冷卻期／無次數上限——notFound／error 紀錄一律照跑', () => {

@@ -99,13 +99,14 @@
     return Array.isArray(groups) && groups.some((g) => g && Number(g.group_weight) > 0);
   }
 
-  // 沒有冷卻期、沒有次數上限：只要這門課還沒成功（done）就每次同步都試
-  // （使用者 2026-09-03 要求：notFound／error 都不設冷卻，一直試到抓到或課程被刪除為止）
+  // 沒有冷卻期、沒有次數上限：只要這門課目前沒有權重就每次同步都試（2026-09-03）。
+  // 不特別擋「record.status === done」：done 之所以不重跑，是因為 done 一定會把權重寫進
+  // customWeights，下面的 hasCustomWeights 就會擋掉；使用者按「還原 Canvas 權重」把
+  // customWeights 清空後，這裡會自然放行重跑，不需要另外清「分析紀錄」
   function shouldAnalyze({ courseId, customWeights, groups, record }) {
     const cw = customWeights && customWeights[courseId];
     if (Array.isArray(cw) && cw.length > 0) return { run: false, reason: 'hasCustomWeights' };
     if (hasCanvasWeights(groups)) return { run: false, reason: 'hasCanvasWeights' };
-    if (record && record.status === 'done') return { run: false, reason: 'done' };
     return { run: true, reason: record ? 'retry' : 'first' };
   }
 
