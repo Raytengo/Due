@@ -101,6 +101,11 @@ test('buildRequest OpenAI 相容: /chat/completions、Bearer、PDF 丟棄、文�
   assert.equal(JSON.stringify(req.body).includes('QUJD'), false);
 });
 
+test('buildRequest OpenAI 相容: null part 被忽略（與 gemini 路徑一致，不丟 TypeError）', () => {
+  const req = P.buildRequest(DEEPSEEK, [null, { type: 'text', text: 'hi' }], '');
+  assert.equal(req.body.messages[0].content, 'hi');
+});
+
 test('buildRequest OpenAI 相容: 無 systemPrompt 只有 user 訊息；maxTokens 預設 2048', () => {
   const req = P.buildRequest(DEEPSEEK, [{ type: 'text', text: 'hi' }], '', {});
   assert.equal(req.body.messages.length, 1);
@@ -123,6 +128,16 @@ test('extractText gemini: 跳過非文字 part；空回應附上原因', () => {
   assert.equal(P.extractText('gemini', { candidates: [{ content: { parts: [{ inlineData: {} }, { text: 'ok' }] } }] }), 'ok');
   assert.throws(() => P.extractText('gemini', { candidates: [{ finishReason: 'MAX_TOKENS', content: {} }] }), /Empty response \(MAX_TOKENS\)/);
   assert.throws(() => P.extractText('gemini', { promptFeedback: { blockReason: 'SAFETY' } }), /SAFETY/);
+});
+
+test('extractText gemini: finishReason 非字串／超長時截斷，不讓錯誤訊息爆長', () => {
+  let msg = '';
+  try { P.extractText('gemini', { candidates: [{ finishReason: 'X'.repeat(100), content: {} }] }); } catch (e) { msg = e.message; }
+  assert.ok(msg.startsWith('Empty response (X'), msg);
+  assert.ok(msg.length <= 'Empty response ('.length + 40 + 1, `len=${msg.length}`);
+  let msg2 = '';
+  try { P.extractText('gemini', { candidates: [{ finishReason: { a: 1 }, content: {} }] }); } catch (e) { msg2 = e.message; }
+  assert.equal(msg2, 'Empty response ([object Object])');
 });
 
 test('extractText OpenAI 相容: 只有 reasoning_content → 錯誤訊息指出原因', () => {

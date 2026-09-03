@@ -28,7 +28,7 @@
     const temperature = o.temperature;
 
     if (cfg.provider === 'gemini') {
-      // 只認得 pdf／text，其餘一律丟棄（與 OpenAI 相容路徑的行為一致）
+      // 只認得 pdf／text，其餘（含 null）一律丟棄；OpenAI 相容路徑同樣容忍 null／未知 part
       const geminiParts = parts
         .map((p) => {
           if (!p) return null;
@@ -53,7 +53,8 @@
     if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
     messages.push({
       role: 'user',
-      content: parts.filter((p) => p.type === 'text').map((p) => p.text).join('\n\n'),
+      // 只留文字 part（PDF 這條路徑不支援）；null／未知 part 靜靜丟掉，與 gemini 路徑一致
+      content: parts.filter((p) => p && p.type === 'text').map((p) => p.text).join('\n\n'),
     });
     const body = { model: cfg.model, messages, max_tokens: maxTokens };
     if (temperature !== undefined) body.temperature = temperature;
@@ -71,7 +72,8 @@
       const text = parts.map((p) => (p && typeof p.text === 'string' ? p.text : '')).join('');
       if (!text.trim()) {
         // 空回應多半是被截斷（MAX_TOKENS）或安全阻擋（blockReason）——寫進錯誤才查得出來
-        const why = (cand && cand.finishReason) || (json && json.promptFeedback && json.promptFeedback.blockReason) || '';
+        // 一律轉字串再截 40：供應商回非字串的 finishReason 時不讓訊息變成整包物件
+        const why = String((cand && cand.finishReason) || (json && json.promptFeedback && json.promptFeedback.blockReason) || '').slice(0, 40);
         throw new Error(why ? `Empty response (${why})` : 'Empty response');
       }
       return text;
