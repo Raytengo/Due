@@ -38,6 +38,7 @@ const defaults = () => ({
   llmGate: null,         // 設成 promise 可把 LLM 回應卡住，模擬「分析途中」
   platformInfo: 0,       // keepalive 呼叫 chrome.runtime.getPlatformInfo 的次數
   failNextSet: false,    // 下一次 storage.local.set 丟錯
+  afterGet: null,        // 每次 storage.local.get 回覆前呼叫：可在 get 與 set 之間插入事件
 });
 const S = { store: {}, ...defaults() };
 function reset(store, over) {
@@ -95,8 +96,11 @@ const sandbox = {
     storage: {
       local: {
         get: async (keys) => {
+          const list = Array.isArray(keys) ? keys : [keys];
           const out = {};
-          for (const k of (Array.isArray(keys) ? keys : [keys])) if (k in S.store) out[k] = S.store[k];
+          // 真的 chrome.storage 會跨邊界結構化複製：拿到的物件改了也不會動到 store，一定要 set 才算數
+          for (const k of list) if (k in S.store) out[k] = structuredClone(S.store[k]);
+          if (S.afterGet) await S.afterGet(list);
           return out;
         },
         set: async (obj) => {
@@ -265,6 +269,50 @@ const run = (base) => sandbox.runPendingGradingAnalysis(base);
     assert.deepEqual(plain(S.store.gradingAnalysis), {}); // 舊 run 沒把 done 寫回來
     assert.deepEqual(plain(S.store.customWeights), {});
     assert.deepEqual(plain(S.sent), []); // 也不會通知 dashboard 更新權重
+    // 作廢的那輪在 finally 會補排一輪；這裡課程已清空 → 補跑無事可做。
+    // 等它跑完再進下一個測試，免得全域鎖／計時器外溢
+    await new Promise((r) => setTimeout(r, 20));
+    assert.equal(S.llm.length, 1);
+  });
+
+  await test('分析途中重置：作廢的那輪結束後會補排一輪，重新分析並寫入（不會卡在 pending）', async () => {
+    reset({ aiConfig: { provider: 'gemini', apiKey: 'k' }, courses: [{ id: 919, name: 'C9b' }], customWeights: {} }, { syllabus: SYLLABUS_HTML });
+    let release;
+    S.llmGate = new Promise((r) => { release = r; });
+    const p = run(BASE);
+    while (!S.llm.length) await new Promise((r) => setTimeout(r, 0)); // 等到 LLM 請求已送出
+    sandbox.handleAiMessage({ type: 'AI_RESET_ANALYSIS' }, () => { }, BASE);
+    // reset 排的補跑會撞上仍持有的全域鎖而直接返回；LLM 再卡 150ms 確保那次補跑確實無效
+    setTimeout(release, 150);
+    await p;
+    // 補跑必須由 in-flight 那輪的 finally 重新排出來
+    const deadline = Date.now() + 2000;
+    while (!(S.store.gradingAnalysis && S.store.gradingAnalysis[919]) && Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 10));
+    }
+    await new Promise((r) => setTimeout(r, 50)); // 讓可能多出來的第三輪現形
+    assert.equal(S.llm.length, 2, '作廢一輪＋補跑一輪，不多不少');
+    assert.equal(S.store.gradingAnalysis[919].status, 'done');
+    assert.equal(S.store.gradingAnalysis[919].attempts, 1);
+    assert.deepEqual(plain(S.store.customWeights[919]), WEIGHTS);
+  });
+
+  await test('寫入前再驗 epoch：重置剛好落在 get 與 set 之間 → 放棄寫入', async () => {
+    reset({ aiConfig: { provider: 'gemini', apiKey: 'k' }, courses: [{ id: 929, name: 'C9c' }], customWeights: {} }, { syllabus: SYLLABUS_HTML });
+    S.afterGet = (keys) => {
+      // recordOutcome 的那次 get（只讀這兩個 key）：在它與 set 之間插入重置
+      if (keys.length === 2 && keys.includes('gradingAnalysis') && keys.includes('customWeights')) {
+        S.afterGet = null;
+        sandbox.handleAiMessage({ type: 'AI_RESET_ANALYSIS' }, () => { }, BASE);
+        S.store.courses = []; // 之後的補跑無事可做
+      }
+    };
+    await run(BASE);
+    await new Promise((r) => setTimeout(r, 20)); // 讓補跑跑完
+    assert.deepEqual(plain(S.store.gradingAnalysis), {});
+    assert.deepEqual(plain(S.store.customWeights), {});
+    assert.deepEqual(plain(S.sent), []);
+    assert.equal(S.llm.length, 1);
   });
 
   await test('供應商 500：記 error/attempts 1/24 小時後重試，source 保留 syllabus_body，不動 customWeights', async () => {

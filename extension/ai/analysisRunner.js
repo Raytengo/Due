@@ -79,6 +79,9 @@ async function runPendingGradingAnalysis(baseUrlHint) {
     }
   } finally {
     _aiAnalyzing = false;
+    // 執行中被 AI_RESET_ANALYSIS 作廢：那次 reset 排的補跑撞到鎖而直接返回了，
+    // 這裡補排一輪（每輪重新取 epoch，必然收斂），否則所有課會停在 pending 沒人再跑
+    if (epoch !== _aiResetEpoch) scheduleGradingAnalysis(baseUrlHint);
   }
 }
 
@@ -106,6 +109,11 @@ async function recordOutcome(courseId, outcome, cfg, epoch) {
       cw[courseId] = weights;
       toSet.customWeights = cw;
     }
+  }
+  // 寫入前再驗一次：get 與 set 之間（含上面的 await）仍可能發生重置，窗口越窄越好
+  if (epoch !== undefined && epoch !== _aiResetEpoch) {
+    console.log(`[Due][AI] 課程 ${courseId}: 放棄寫入（讀取後、寫入前使用者已重置紀錄）`);
+    return;
   }
   await chrome.storage.local.set(toSet);
   console.log(`[Due][AI] 課程 ${courseId}: ${outcome.kind} (${outcome.source})`);
@@ -231,7 +239,9 @@ async function tryFetchPdf(url) {
     const res = await fetch(url, { credentials: 'include' });
     if (!res.ok) return null;
     const contentType = res.headers.get('Content-Type');
-    // 先看 header：宣告長度已超上限、或根本是網頁／JSON（未登入時 Canvas 會回登入頁）就別把 body 讀進記憶體
+    // 先看 header：宣告長度已超上限、或根本是網頁／JSON（未登入時 Canvas 會回登入頁）就別把 body 讀進記憶體。
+    // 只在伺服器有宣告 Content-Length／Content-Type 時擋得到（Canvas／S3 都有宣告）；
+    // 沒宣告的超大 body 仍會整份讀進來，由下面的 acceptPdf 事後擋掉
     if (R.rejectBeforeDownload({
       contentType,
       contentLength: res.headers.get('Content-Length'),
@@ -267,15 +277,16 @@ async function callProvider(cfg, parts, systemPrompt, opts) {
 
 // ── AI_* 訊息（由 background.js 的 onMessage 轉交；回傳值即 onMessage 的回傳值）──
 function handleAiMessage(message, sendResponse, baseUrl) {
+  // 一律用 then(onOk, onErr) 兩參數形式：sendResponse 自己丟錯時（port 已斷）
+  // 不會再被 catch 接住而重複呼叫一次
   if (message.type === 'AI_GET_STATUS') {
-    aiGetStatus().then(sendResponse).catch((err) => sendResponse({ error: err.message }));
+    aiGetStatus().then(sendResponse, (err) => sendResponse({ error: err.message }));
     return true;
   }
   if (message.type === 'AI_TEST_CONNECTION') {
     // 一定要回覆：漏掉 sendResponse 會讓 modal 的「測試連線」永遠轉圈
     aiTestConnection(message.config)
-      .then(sendResponse)
-      .catch(() => sendResponse({ success: false, error: 'internal error' }));
+      .then(sendResponse, () => sendResponse({ success: false, error: 'internal error' }));
     return true;
   }
   if (message.type === 'AI_RUN_NOW') {
@@ -288,11 +299,13 @@ function handleAiMessage(message, sendResponse, baseUrl) {
     _aiResetEpoch++;
     // 只清分析紀錄；不動 customWeights（使用者要還原權重走編輯器的「還原 Canvas 權重」）
     chrome.storage.local.set({ gradingAnalysis: {} })
-      .then(() => {
-        scheduleGradingAnalysis(baseUrl);
-        sendResponse({ success: true });
-      })
-      .catch(() => sendResponse({ success: false, error: 'internal error' }));
+      .then(
+        () => {
+          scheduleGradingAnalysis(baseUrl);
+          sendResponse({ success: true });
+        },
+        () => sendResponse({ success: false, error: 'internal error' })
+      );
     return true;
   }
   return false;
