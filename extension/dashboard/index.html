@@ -3465,7 +3465,7 @@
       display: flex;
       flex-wrap: wrap;              /* 沒有 wrap，.ai-status-error 的 flex-basis:100% 會把課名擠成 0 寬 */
       align-items: baseline;
-      gap: 10px;
+      gap: 2px 10px;
       font-size: 12px;
       line-height: 1.5;
     }
@@ -4134,8 +4134,8 @@
         </div>
 
         <div class="ai-settings-section" id="ai-status-heading"></div>
-        <div class="ai-settings-summary" id="ai-status-summary"></div>
-        <ul class="ai-status-list" id="ai-status-list" aria-live="polite"></ul>
+        <div class="ai-settings-summary" id="ai-status-summary" aria-live="polite"></div>
+        <ul class="ai-status-list" id="ai-status-list"></ul>
         <div class="ai-settings-actions-row">
           <button type="button" class="ai-settings-link" id="ai-reset-btn"></button>
         </div>

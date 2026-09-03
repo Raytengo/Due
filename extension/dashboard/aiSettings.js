@@ -7,7 +7,8 @@
 (function () {
   'use strict';
 
-  const PDF_ORIGIN = 'https://*.canvas-user-content.com/*';
+  // 與 manifest optional_host_permissions、DueGradingRules.PDF_PERMISSION_ORIGIN 同一字串（單一真相來源在 gradingRules）
+  const PDF_ORIGIN = (typeof DueGradingRules !== 'undefined' && DueGradingRules.PDF_PERMISSION_ORIGIN) || 'https://*.canvas-user-content.com/*';
 
   const STRINGS = {
     'zh-TW': {
@@ -41,7 +42,7 @@
       stPending: '待分析',
       resetBtn: '清除分析紀錄',
       resetConfirmTitle: '清除分析紀錄？',
-      resetConfirmMsg: '所有課程的分析紀錄會清除；下次同步會為「目前沒有權重」的課程重新分析。已寫入的權重不會改動——若要重新分析某門課，請先在該課的權重編輯器按「還原 Canvas 權重」。',
+      resetConfirmMsg: '所有課程的分析紀錄會清除，並立即為「目前沒有權重」的課程重新分析（會使用你的 API 額度）。已寫入的權重不會改動——若要重新分析某門課，請先在該課的權重編輯器按「還原 Canvas 權重」。',
       resetConfirmOk: '清除',
       cancel: '取消',
       save: '儲存',
@@ -79,7 +80,7 @@
       stPending: '待分析',
       resetBtn: '清除分析记录',
       resetConfirmTitle: '清除分析记录？',
-      resetConfirmMsg: '所有课程的分析记录将被清除；下次同步会为「目前没有权重」的课程重新分析。已写入的权重不会改动——若要重新分析某门课，请先在该课的权重编辑器点击「还原 Canvas 权重」。',
+      resetConfirmMsg: '所有课程的分析记录将被清除，并立即为「目前没有权重」的课程重新分析（会使用你的 API 额度）。已写入的权重不会改动——若要重新分析某门课，请先在该课的权重编辑器点击「还原 Canvas 权重」。',
       resetConfirmOk: '清除',
       cancel: '取消',
       save: '保存',
@@ -117,7 +118,7 @@
       stPending: 'Pending',
       resetBtn: 'Clear analysis records',
       resetConfirmTitle: 'Clear analysis records?',
-      resetConfirmMsg: 'All analysis records are cleared; the next sync re-analyzes courses that currently have no weights. Weights already written are left untouched — to re-analyze a course, first press "Reset to Canvas weights" in that course\'s weight editor.',
+      resetConfirmMsg: 'All analysis records are cleared and courses that currently have no weights are re-analyzed right away (this uses your API quota). Weights already written are left untouched — to re-analyze a course, first press "Reset to Canvas weights" in that course\'s weight editor.',
       resetConfirmOk: 'Clear',
       cancel: 'Cancel',
       save: 'Save',
@@ -166,8 +167,14 @@
     return (typeof DueGradingRules !== 'undefined' && DueGradingRules.PROVIDERS) || {};
   }
 
+  // 目前表單選的供應商設定；未知值一律退回 gemini（與 loadConfigIntoForm 的正規化一致）
+  function currentProvider() {
+    const all = providers();
+    return all[$('ai-provider').value] || all.gemini || {};
+  }
+
   function readForm() {
-    const p = providers()[$('ai-provider').value] || {};
+    const p = currentProvider();
     return {
       provider: $('ai-provider').value,
       apiKey: $('ai-api-key').value.trim(),
@@ -180,7 +187,7 @@
 
   // 切換供應商只更新 placeholder／提示，不清空使用者已輸入的欄位
   function updateProviderUi() {
-    const p = providers()[$('ai-provider').value] || providers().gemini || {};
+    const p = currentProvider();
     $('ai-model').placeholder = t('modelPlaceholder', { model: p.defaultModel || '' });
     $('ai-api-key').placeholder = p.keyPlaceholder || '';
     $('ai-base-url').placeholder = p.baseUrl || '';
@@ -244,7 +251,7 @@
     _lastStatus = st;
 
     // 只有支援 PDF 的供應商才需要那個權限，所以提示也跟著表單上選的供應商走
-    const formPdf = !!(providers()[$('ai-provider').value] || {}).supportsPdf;
+    const formPdf = !!currentProvider().supportsPdf;
     $('ai-pdf-hint').hidden = !(st.configured && !st.pdfPermission && formPdf);
 
     if (!st.configured) {
@@ -293,6 +300,7 @@
     $('ai-api-key').type = 'password';
     $('ai-test-result').textContent = '';
     $('ai-test-result').className = 'ai-settings-test-result';
+    $('ai-test-result').title = '';
     applyStaticText();
     loadConfigIntoForm();
     overlay.classList.add('open');
@@ -325,6 +333,7 @@
       const out = $('ai-test-result');
       out.className = 'ai-settings-test-result';
       out.textContent = t('testing');
+      out.title = '';
       const res = await sendMsg({ type: 'AI_TEST_CONNECTION', config: readForm() });
       if (res && res.success) { out.textContent = t('testOk'); out.classList.add('ok'); }
       else { out.textContent = t('testFail', { error: (res && res.error) || 'no response' }); out.classList.add('fail'); }
@@ -352,7 +361,7 @@
     $('ai-save-btn').addEventListener('click', () => {
       // 只有支援 PDF 的供應商才需要 canvas-user-content.com（純文字供應商永遠不會下載 PDF，彈窗只是噪音）。
       // 供應商查表是同步 DOM 讀取，user gesture 不會斷；權限請求必須是第一個 async 呼叫、前面不能有 await
-      const wantsPdf = !!(providers()[$('ai-provider').value] || {}).supportsPdf;
+      const wantsPdf = !!currentProvider().supportsPdf;
       const perm = wantsPdf && chrome.permissions?.request
         ? chrome.permissions.request({ origins: [PDF_ORIGIN] }).catch(() => false)
         : Promise.resolve(false);
