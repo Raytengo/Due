@@ -21,6 +21,8 @@
   const MAX_TOTAL_PDF_BYTES = 12 * 1024 * 1024;
   const MAX_FILES_FOR_PICK = 60;                // AI 挑檔時最多列幾個檔名
   const MIN_SYLLABUS_TEXT_CHARS = 50;           // syllabus 文字短於此不算材料
+  // pdf.js 抽出的文字上限：約數十頁大綱，同時不把單次 LLM 請求的 token 預算撐爆（超過就截斷，大綱重點通常在前段）
+  const MAX_EXTRACTED_TEXT_CHARS = 30000;
   const WEIGHT_SUM_MIN = 80;                    // 權重總和合理區間
   const WEIGHT_SUM_MAX = 120;
   const PDF_PERMISSION_ORIGIN = 'https://*.canvas-user-content.com/*';
@@ -68,12 +70,13 @@
     return (p && p.hostPermission) || null;
   }
 
-  // 儲存設定時要一次請求的 origins：供應商自己的 host（若需要）＋ PDF 下載（若該供應商吃 PDF）
+  // 儲存設定時要一次請求的 origins：供應商自己的 host（若需要）＋ PDF 下載（所有供應商都要）。
+  // 純文字供應商現在也會下載 PDF 大綱、用 pdf.js 抽字，故不再看 supportsPdf
   function requiredOrigins(provider) {
     const p = PROVIDERS[provider] || PROVIDERS.gemini;
     const out = [];
     if (p.hostPermission) out.push(p.hostPermission);
-    if (p.supportsPdf) out.push(PDF_PERMISSION_ORIGIN);
+    out.push(PDF_PERMISSION_ORIGIN);
     return out;
   }
 
@@ -358,6 +361,7 @@
     MAX_TOTAL_PDF_BYTES,
     MAX_FILES_FOR_PICK,
     MIN_SYLLABUS_TEXT_CHARS,
+    MAX_EXTRACTED_TEXT_CHARS,
     PDF_PERMISSION_ORIGIN,
     SYSTEM_PROMPT,
     USER_PROMPT,

@@ -28,6 +28,8 @@ cc/
     ├── ai/
     │   ├── gradingRules.js        ← AI 評分比重分析純規則：設定解析、只跑一次規則、重試狀態機、回應解析、權重正規化（含測試）
     │   ├── providers.js           ← LLM 供應商請求層：Gemini 原生／OpenAI 相容（含測試）
+    │   ├── pdfText.js             ← PDF 抽字：bytes → text（包 vendor pdf.js；純函式，含測試）
+    │   ├── vendor/                ← pdfjs-dist 3.11.174 legacy build（載入順序：worker → lib，見 vendor/README.md）
     │   └── analysisRunner.js      ← service worker 側編排：同步後排程、Canvas 材料蒐集、PDF 下載、呼叫供應商、寫 customWeights、AI_* 訊息（含 node:vm 測試）
     ├── popup.html                 ← 點擊擴充功能圖示的小視窗
     ├── popup.js                   ← popup 的邏輯
@@ -50,7 +52,7 @@ cc/
 - **Manifest Version**：3（必須用 V3）
 - **Permissions**：`storage`、`tabs`、`webNavigation`、`scripting`
 - **Host Permissions**：`https://*.instructure.com/*`、`https://claude.ai/*`（後者供 popup 的 Claude 用量顯示與 content script）
-- **Optional Host Permissions**：`https://*.canvas-user-content.com/*`（僅 AI 分析下載 Canvas PDF 用）、`https://integrate.api.nvidia.com/*`（僅選 NVIDIA NIM 供應商時用）；兩者都在儲存 AI 設定時才請求。LLM 端點原則上靠供應商 CORS、不佔必要權限，NVIDIA 是唯一例外（見 AI 章節）
+- **Optional Host Permissions**：`https://*.canvas-user-content.com/*`（AI 分析下載 Canvas PDF 用；所有供應商都會請求）、`https://integrate.api.nvidia.com/*`（僅選 NVIDIA NIM 供應商時用）；兩者都在儲存 AI 設定時才請求。LLM 端點原則上靠供應商 CORS、不佔必要權限，NVIDIA 是唯一例外（見 AI 章節）
 - **背景執行**：Service Worker（background.js），不能用 `window` 或 `document`
 
 ### Canvas API 端點
@@ -158,7 +160,7 @@ GET /api/v1/courses/:id/assignment_groups?include[]=assignments&include[]=group_
 - `syncAll()`：並行拉取所有課程的作業與評分分組（courses / assignments / assignmentGroups）
 - `fetchSchoolName()`：自動偵測學校名稱（優先 Canvas API → hostname 解析）
 - `fetchClaudeUsageDirect()`：popup 的 Claude 用量 chip — 找開著的 `claude.ai` 分頁，借該分頁登入狀態讀 `/api/organizations/:id/usage`，**不呼叫任何 LLM**；結果存 `claudeUsage`。搭配注入 claude.ai 的 `claude_injected.js` / `claude_content.js`
-- `importScripts('ai/gradingRules.js', 'ai/providers.js', 'ai/analysisRunner.js')`：AI 評分比重分析（見下節）；`syncAll` 成功寫入 storage 後呼叫 `scheduleGradingAnalysis(BASE_URL)`（`setTimeout` 排程，不 await、不阻塞 SYNC 回應、不持有 `_syncing`）；`AI_*` 訊息轉交 `handleAiMessage`
+- `importScripts('ai/vendor/pdf.worker.min.js', 'ai/vendor/pdf.min.js', 'ai/pdfText.js', 'ai/gradingRules.js', 'ai/providers.js', 'ai/analysisRunner.js')`（vendor 兩檔的順序不可調換）：AI 評分比重分析（見下節）；`syncAll` 成功寫入 storage 後呼叫 `scheduleGradingAnalysis(BASE_URL)`（`setTimeout` 排程，不 await、不阻塞 SYNC 回應、不持有 `_syncing`）；`AI_*` 訊息轉交 `handleAiMessage`
 - 啟動時 `chrome.storage.local.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' })`：API key 只讓擴充功能自身頁面讀得到
 
 ### AI 評分比重分析（`extension/ai/`，spec `docs/superpowers/specs/2026-09-03-ai-grading-weights-restore-design.md`）
@@ -166,10 +168,10 @@ GET /api/v1/courses/:id/assignment_groups?include[]=assignments&include[]=group_
 - **定位**：AI 只負責「產生課程權重」並寫進現有 `customWeights[courseId]`；圓餅圖／權重編輯器／「還原 Canvas 權重」原樣呈現，**前端顯示邏輯零改動**。沒填 API key 時整個功能沉默，行為與未加此功能完全相同
 - **觸發**：每次同步完成後自動、序列、每輪最多 10 門；全域鎖 `_aiAnalyzing`（進函式即同步設定）防疊跑；LLM 呼叫期間每 20 秒 `getPlatformInfo` keepalive 防 SW 回收；`AI_RESET_ANALYSIS` 遞增 `_aiResetEpoch`，進行中的分析發現 epoch 變了就不寫回
 - **只跑一次**（`DueGradingRules.shouldAnalyze`）：有手動權重／Canvas `group_weight`／已 `done` → 跳過；`notFound` 7 天冷卻、`error` 24 小時冷卻、最多 3 次。成功後即使按「還原 Canvas 權重」也不重跑；要重跑某課：先在該課權重編輯器按「還原 Canvas 權重」，再用 modal 的「清除分析紀錄」（只清紀錄、不動權重，只為目前沒權重的課重跑）
-- **材料**（`analyzeCourse`）：API `syllabus_body` 文字（`stripHtml`）→ syllabus 內連結 PDF → 課程 PDF 檔案（強關鍵字 → AI 挑檔）；PDF 只在有 optional 權限且供應商支援 PDF（Gemini）時下載；`parts` 為空不呼叫 LLM。下載前先看 `Content-Length`／`Content-Type`，下載後 `%PDF-`／Content-Type 檢查，單檔 10MB、累計 12MB（base64 膨脹後仍低於 Gemini 20MB 請求上限），大綱內連結檔最多試 5 個
+- **材料**（`analyzeCourse`）：API `syllabus_body` 文字（`stripHtml`）→ syllabus 內連結 PDF → 課程 PDF 檔案（強關鍵字 → AI 挑檔）；PDF 只要有 optional 權限就下載，**所有供應商都適用**（AI 挑檔亦然）——Gemini 送原始 bytes（`inlineData`，自帶 OCR），其餘供應商用 `ai/pdfText.js`（vendor pdf.js）抽字後送純文字 part，截斷至 `MAX_EXTRACTED_TEXT_CHARS`（30000）、短於 `MIN_SYLLABUS_TEXT_CHARS` 視同這個檔案沒材料（掃描／圖片型 PDF 仍只有 Gemini 讀得到，其餘落到 `notFound`）；`parts` 為空不呼叫 LLM。下載前先看 `Content-Length`／`Content-Type`，下載後 `%PDF-`／Content-Type 檢查，單檔 10MB、累計 12MB（base64 膨脹後仍低於 Gemini 20MB 請求上限），大綱內連結檔最多試 5 個
 - **供應商**（`DueAiProviders`）：Gemini 原生（key 走 `x-goog-api-key` header；base URL 固定 Google，不吃使用者輸入）；Qwen／DeepSeek／NVIDIA NIM 走 OpenAI 相容 `/chat/completions`（純文字，可自訂 base URL，僅接受 `https://`）。**NVIDIA NIM 需要 host permission**：該端點完全不回 `Access-Control-Allow-*` header（實測連一般網頁來源也不回），純 fetch 必被瀏覽器擋掉，靠 `optional_host_permissions` 的 `https://integrate.api.nvidia.com/*` 讓 Chrome 略過 CORS；`PROVIDERS[].hostPermission` 為單一真相來源，`requiredOrigins()` 決定儲存時請求哪些 origin，未授權時 `callProvider` 直接丟 `NO_HOST_PERMISSION`（不送請求、不花額度），modal 顯示 `#ai-host-perm-hint`。只送供應商需要的 header。Gemini 2.5 的 thinking token 計入輸出上限，主分析 `maxTokens 8192`、挑檔／測試連線 512
 - **回應**：`parseAnalysisResponse`（去 ``` 圍欄；解析失敗再取第一個 `{` 到最後一個 `}`）→ `normalizeWeights`（小數比例 ×100、同名合併、總和須在 [80,120] 且為有限數）→ `toCustomWeights`。寫入前重新讀 storage；若使用者已手動填權重則不覆蓋。寫入後送 `GRADING_WEIGHTS_UPDATED` 給 dashboard
-- **設定 modal**（`dashboard/aiSettings.js`，設定選單「AI 分析設定」）：供應商／key／模型／base URL、測試連線、清除金鑰、分析狀態列、清除紀錄。「儲存」在 user gesture 內先 `chrome.permissions.request(DueGradingRules.requiredOrigins(provider))`——供應商 host（NVIDIA）＋ PDF 權限（Gemini）一次請求完，用不到的不請求——再寫 `aiConfig`（Gemini 不存隱藏的 base URL）。字串自帶三語，`applyUILanguage` 末尾呼叫 `DueAiSettings.applyLanguage`
+- **設定 modal**（`dashboard/aiSettings.js`，設定選單「AI 分析設定」）：供應商／key／模型／base URL、測試連線、清除金鑰、分析狀態列、清除紀錄。「儲存」在 user gesture 內先 `chrome.permissions.request(DueGradingRules.requiredOrigins(provider))`——供應商 host（NVIDIA）＋ PDF 權限（所有供應商都要）一次請求完——再寫 `aiConfig`（Gemini 不存隱藏的 base URL）。字串自帶三語，`applyUILanguage` 末尾呼叫 `DueAiSettings.applyLanguage`
 - **訊息**：`AI_GET_STATUS`／`AI_TEST_CONNECTION`／`AI_RUN_NOW`／`AI_RESET_ANALYSIS`（dashboard → bg）、`GRADING_WEIGHTS_UPDATED`（bg → dashboard）
 - 逐作業 AI 分析（A）仍為移除狀態，不在此功能範圍
 

@@ -1,5 +1,6 @@
 // AI 評分比重分析（spec 2026-09-03）：純規則 + 供應商層 + 編排，全部在 ai/ 目錄，與同步路徑隔離
-importScripts('ai/gradingRules.js', 'ai/providers.js', 'ai/analysisRunner.js');
+// vendor 的 pdf.js 必須先 worker 再 lib（worker 檔設定全域 pdfjsWorker，lib 的 fake-worker 直接抓它用）——見 ai/vendor/README.md
+importScripts('ai/vendor/pdf.worker.min.js', 'ai/vendor/pdf.min.js', 'ai/pdfText.js', 'ai/gradingRules.js', 'ai/providers.js', 'ai/analysisRunner.js');
 
 let BASE_URL = '';
 

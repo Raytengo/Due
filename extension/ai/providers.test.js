@@ -26,6 +26,13 @@ test('normalizeBaseUrl: 去尾斜線與空白', () => {
   assert.equal(P.normalizeBaseUrl(undefined), '');
 });
 
+test('normalizeBaseUrl: 貼完整端點時砍掉 /chat/completions', () => {
+  assert.equal(P.normalizeBaseUrl('https://integrate.api.nvidia.com/v1/chat/completions'), 'https://integrate.api.nvidia.com/v1');
+  assert.equal(P.normalizeBaseUrl('https://integrate.api.nvidia.com/v1/chat/completions/'), 'https://integrate.api.nvidia.com/v1');
+  // 不誤砍：base 本身就叫 /v1 的正常情況
+  assert.equal(P.normalizeBaseUrl('https://integrate.api.nvidia.com/v1'), 'https://integrate.api.nvidia.com/v1');
+});
+
 test('supportsPdf: 只有 gemini', () => {
   assert.equal(P.supportsPdf('gemini'), true);
   assert.equal(P.supportsPdf('qwen'), false);

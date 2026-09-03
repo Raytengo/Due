@@ -141,11 +141,25 @@ async function analyzeCourse(course, cfg, ctx) {
   const parts = [];
   const flags = { syllabusPdf: false, keywordPdf: false, aiPdf: false, syllabusText: false };
   let pdfBudget = R.MAX_TOTAL_PDF_BYTES;
-  const wantPdf = ctx.pdfAllowed && DueAiProviders.supportsPdf(cfg.provider); // 純文字供應商不下載 PDF
-  const pushPdf = (pdf) => {
+  // 唯一的供應商分流點：Gemini 送原始 PDF bytes（自帶 OCR，掃描件也讀得到），
+  // 其餘供應商用 pdf.js 抽字後送純文字（掃描件抽不到字 → 視同這個檔案沒材料）
+  const providerSupportsPdf = DueAiProviders.supportsPdf(cfg.provider);
+  const pushPdf = async (pdf) => {
     if (!pdf || pdf.bytes > pdfBudget) return false;
-    pdfBudget -= pdf.bytes;
-    parts.push(pdf);
+    pdfBudget -= pdf.bytes; // 已經下載了：不論用不用得上都算進累計預算
+    if (providerSupportsPdf) {
+      parts.push({
+        type: 'pdf',
+        base64: R.arrayBufferToBase64(pdf.buffer),
+        mimeType: pdf.mimeType,
+        bytes: pdf.bytes,
+      });
+      return true;
+    }
+    const text = String(await DuePdfText.extractText(new Uint8Array(pdf.buffer)) || '')
+      .slice(0, R.MAX_EXTRACTED_TEXT_CHARS);
+    if (text.length <= R.MIN_SYLLABUS_TEXT_CHARS) return false; // 抽不到字（掃描件／損毀）→ 當沒材料
+    parts.push({ type: 'text', text: `Course Syllabus (PDF):\n${text}` });
     return true;
   };
 
@@ -158,13 +172,13 @@ async function analyzeCourse(course, cfg, ctx) {
 
   const fetchedIds = new Set();
   if (syllabusBody.trim()) {
-    // Step 2：syllabus 內連結的 PDF
-    if (wantPdf) {
+    // Step 2：syllabus 內連結的 PDF（不分供應商都下載，分流在 pushPdf）
+    if (ctx.pdfAllowed) {
       // 只試前 MAX_LINKED_PDFS 個：未嘗試的 id 不進 fetchedIds，Step 3 仍可考慮
       for (const fid of R.extractFileIds(syllabusBody).slice(0, MAX_LINKED_PDFS)) {
         fetchedIds.add(String(fid));
         const pdf = await tryFetchPdf(`${ctx.baseUrl}/courses/${course.id}/files/${fid}/download?download_frd=1`);
-        if (pushPdf(pdf)) flags.syllabusPdf = true;
+        if (await pushPdf(pdf)) flags.syllabusPdf = true;
       }
     }
     const text = R.stripHtml(syllabusBody);
@@ -174,8 +188,8 @@ async function analyzeCourse(course, cfg, ctx) {
     }
   }
 
-  // Step 3：課程檔案（關鍵字 → AI 挑檔）
-  if (wantPdf) {
+  // Step 3：課程檔案（關鍵字 → AI 挑檔）；所有供應商都跑，抽字失敗才落到 no syllabus material
+  if (ctx.pdfAllowed) {
     let files = [];
     try {
       files = await fetchAllPages(`${ctx.baseUrl}/api/v1/courses/${course.id}/files?per_page=50&content_types[]=application/pdf`);
@@ -199,7 +213,7 @@ async function analyzeCourse(course, cfg, ctx) {
             if (meta && meta.url) pdf = await tryFetchPdf(meta.url);
           } catch (_) { }
         }
-        if (pushPdf(pdf)) {
+        if (await pushPdf(pdf)) {
           if (viaAi) flags.aiPdf = true;
           else flags.keywordPdf = true;
         }
@@ -258,7 +272,8 @@ async function tryFetchPdf(url) {
     const buf = await res.arrayBuffer();
     const head = String.fromCharCode(...new Uint8Array(buf.slice(0, 5)));
     if (!R.acceptPdf({ ok: true, contentType, byteLength: buf.byteLength, head, maxBytes: R.MAX_PDF_BYTES })) return null;
-    return { type: 'pdf', base64: R.arrayBufferToBase64(buf), mimeType: 'application/pdf', bytes: buf.byteLength };
+    // 回原始 buffer：Gemini 路徑到 pushPdf 才轉 base64，抽字路徑根本不需要 base64
+    return { buffer: buf, mimeType: 'application/pdf', bytes: buf.byteLength };
   } catch (_) {
     return null;
   }
@@ -346,7 +361,13 @@ async function aiGetStatus() {
       record,
       now,
     });
-    return { courseId: c.id, status, at: record ? record.at : null, error: record && record.error ? record.error : null };
+    return {
+      courseId: c.id,
+      status,
+      at: record ? record.at : null,
+      error: record && record.error ? record.error : null,
+      notes: record && record.notes ? record.notes : null,
+    };
   });
   // 上次執行時間＝所有紀錄中最新的 at
   const lastRunAt = Object.values(records).reduce((m, r) => (r && r.at && (!m || r.at > m) ? r.at : m), null);

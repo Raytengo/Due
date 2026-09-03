@@ -13,7 +13,13 @@
   // ═══════════════════════════════════════════════════════════════
 
   function normalizeBaseUrl(url) {
-    return String(url || '').trim().replace(/\/+$/, '');
+    // 使用者常直接貼供應商文件上的完整端點（.../v1/chat/completions）；
+    // 這裡要的是 base，不砍掉會組成 .../chat/completions/chat/completions → 404
+    return String(url || '')
+      .trim()
+      .replace(/\/+$/, '')
+      .replace(/\/chat\/completions$/i, '')
+      .replace(/\/+$/, '');
   }
 
   function supportsPdf(provider) {

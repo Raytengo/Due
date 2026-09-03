@@ -76,11 +76,11 @@ test('providerHostPermission: 只有 nvidia 需要額外 host permission', () =>
   assert.equal(R.providerHostPermission(undefined), null);
 });
 
-test('requiredOrigins: 供應商 host ＋ PDF 權限（未知供應商比照 gemini）', () => {
+test('requiredOrigins: 所有供應商都要 PDF 權限（純文字供應商改成下載後抽字），nvidia 另加自己的 host', () => {
   assert.deepEqual(R.requiredOrigins('gemini'), [R.PDF_PERMISSION_ORIGIN]);
-  assert.deepEqual(R.requiredOrigins('deepseek'), []);
-  assert.deepEqual(R.requiredOrigins('qwen'), []);
-  assert.deepEqual(R.requiredOrigins('nvidia'), ['https://integrate.api.nvidia.com/*']);
+  assert.deepEqual(R.requiredOrigins('deepseek'), [R.PDF_PERMISSION_ORIGIN]);
+  assert.deepEqual(R.requiredOrigins('qwen'), [R.PDF_PERMISSION_ORIGIN]);
+  assert.deepEqual(R.requiredOrigins('nvidia'), ['https://integrate.api.nvidia.com/*', R.PDF_PERMISSION_ORIGIN]);
   assert.deepEqual(R.requiredOrigins('bogus'), [R.PDF_PERMISSION_ORIGIN]);
   assert.deepEqual(R.requiredOrigins(undefined), [R.PDF_PERMISSION_ORIGIN]);
 });
@@ -346,6 +346,8 @@ test('constants: 上限值', () => {
   assert.equal(R.MAX_PDF_BYTES, 10 * 1024 * 1024);
   assert.equal(R.MAX_TOTAL_PDF_BYTES, 12 * 1024 * 1024);
   assert.equal(R.PDF_PERMISSION_ORIGIN, 'https://*.canvas-user-content.com/*');
+  assert.equal(R.MIN_SYLLABUS_TEXT_CHARS, 50);
+  assert.equal(R.MAX_EXTRACTED_TEXT_CHARS, 30000);
 });
 
 console.log('ALL gradingRules TESTS PASSED');

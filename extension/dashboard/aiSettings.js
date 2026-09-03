@@ -18,7 +18,7 @@
       modelLabel: '模型 ID',
       modelPlaceholder: '留空使用預設：{model}',
       baseUrlLabel: 'Base URL（進階）',
-      textOnlyHint: '此供應商只能讀 syllabus 文字；大綱若是 PDF，建議改用 Gemini。',
+      textOnlyHint: 'PDF 大綱會自動轉成文字讀取；掃描／圖片型的 PDF 讀不到（只有 Gemini 讀得到）。',
       pdfHint: '尚未授權存取 canvas-user-content.com，只會分析 syllabus 文字。重新按「儲存」可再次授權。',
       hostPermHint: '此供應商不允許瀏覽器直接呼叫，需要「存取 {host}」的權限才能運作。請重新按「儲存」並允許。',
       testBtn: '測試連線',
@@ -57,7 +57,7 @@
       modelLabel: '模型 ID',
       modelPlaceholder: '留空使用默认：{model}',
       baseUrlLabel: 'Base URL（高级）',
-      textOnlyHint: '此供应商只能读取 syllabus 文本；大纲若为 PDF，建议改用 Gemini。',
+      textOnlyHint: 'PDF 大纲会自动转成文本读取；扫描／图片型的 PDF 读不到（只有 Gemini 读得到）。',
       pdfHint: '尚未授权访问 canvas-user-content.com，只会分析 syllabus 文本。重新点击「保存」可再次授权。',
       hostPermHint: '此供应商不允许浏览器直接调用，需要「访问 {host}」的权限才能运作。请重新点击「保存」并允许。',
       testBtn: '测试连接',
@@ -96,7 +96,7 @@
       modelLabel: 'Model ID',
       modelPlaceholder: 'Leave blank for default: {model}',
       baseUrlLabel: 'Base URL (advanced)',
-      textOnlyHint: 'This provider can only read the syllabus text. If your syllabus is a PDF, use Gemini.',
+      textOnlyHint: 'PDF syllabi are converted to text automatically. Scanned or image-only PDFs cannot be read (only Gemini can).',
       pdfHint: 'Access to canvas-user-content.com was not granted, so only the syllabus text is analyzed. Press Save again to re-request.',
       hostPermHint: 'This provider blocks direct browser calls, so Due needs permission to access {host}. Press Save again and allow it.',
       testBtn: 'Test connection',
@@ -192,10 +192,11 @@
     $('ai-api-key').placeholder = p.keyPlaceholder || '';
     $('ai-base-url').placeholder = p.baseUrl || '';
     $('ai-base-url-wrap').hidden = !!p.supportsPdf;      // Gemini 不需要 base URL
+    // 純文字供應商的 PDF 大綱走 pdf.js 抽字（掃描件除外）；只有這一點差異值得提示
     $('ai-text-only-hint').hidden = !!p.supportsPdf;
-    // 純文字供應商不會下載 PDF → 未授權提示無意義；用上次 AI_GET_STATUS 的快取重算，
-    // 切回 Gemini 時不必再送一次訊息就能把提示放回來
-    $('ai-pdf-hint').hidden = !(p.supportsPdf && _lastStatus && _lastStatus.configured && !_lastStatus.pdfPermission);
+    // 所有供應商都會下載 PDF 大綱 → 未授權提示與供應商無關；用上次 AI_GET_STATUS 的快取重算，
+    // 切換供應商時不必再送一次訊息就能把提示放回來
+    $('ai-pdf-hint').hidden = !(_lastStatus && _lastStatus.configured && !_lastStatus.pdfPermission);
   }
 
   // host permission 字串（'https://integrate.api.nvidia.com/*'）→ 給人看的主機名
@@ -270,9 +271,8 @@
     }
     _lastStatus = st;
 
-    // 只有支援 PDF 的供應商才需要那個權限，所以提示也跟著表單上選的供應商走
-    const formPdf = !!currentProvider().supportsPdf;
-    $('ai-pdf-hint').hidden = !(st.configured && !st.pdfPermission && formPdf);
+    // 所有供應商都會下載 PDF 大綱（Gemini 送原始 bytes，其餘抽字），未授權提示與供應商無關
+    $('ai-pdf-hint').hidden = !(st.configured && !st.pdfPermission);
     renderHostPermHint();
 
     if (!st.configured) {
@@ -298,6 +298,7 @@
         <span class="ai-status-name" title="${name}">${name}</span>
         <span class="ai-status-state ${escapeHtml(c.status)}">${escapeHtml(t(label[c.status] || 'stPending'))}</span>
         ${c.status === 'error' && c.error ? `<span class="ai-status-error">${escapeHtml(c.error)}</span>` : ''}
+        ${c.status === 'notFound' && c.notes ? `<span class="ai-status-error">${escapeHtml(c.notes)}</span>` : ''}
       </li>`;
     }).join('');
   }

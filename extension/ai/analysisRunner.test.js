@@ -26,6 +26,8 @@ const LLM_JSON =
   '```json\n{"found":true,"components":[{"name":"Homework","weight":"30%"},' +
   '{"name":"Midterm","weight":30},{"name":"Final Exam","weight":40}]}\n```';
 const WEIGHTS = [{ name: 'Homework', weight: 30 }, { name: 'Midterm', weight: 30 }, { name: 'Final Exam', weight: 40 }];
+// pdf.js 抽出來的文字（夠長，超過 MIN_SYLLABUS_TEXT_CHARS）
+const EXTRACTED = 'Grading: Homework 30%, Midterm 30%, Final Exam 40%. Attendance is required for all sessions.';
 
 // ── 可變的測試狀態 ──
 const PDF_HEADERS = { 'content-type': 'application/pdf' };
@@ -38,6 +40,8 @@ const defaults = () => ({
   // 需要驗供應商自己的 host permission 時由測試明確給
   grantedOrigins: null,
   llmStatus: 200, llmText: LLM_JSON,
+  // DuePdfText.extractText 的回傳（真的 pdf.js 太重，這裡只驗編排；抽字本身見 pdfText.test.js）
+  extractedText: '',
   bodyReads: 0,          // arrayBuffer() 被呼叫幾次（驗「下載前就拒絕」時不讀 body）
   pdfHeaders: PDF_HEADERS,
   llmGate: null,         // 設成 promise 可把 LLM 回應卡住，模擬「分析途中」
@@ -67,9 +71,12 @@ async function fakeFetch(url, init) {
     if (S.llmGate) await S.llmGate; // 手動放行：測試「分析途中」的行為
     if (S.llmThrow) throw new TypeError('Failed to fetch');
     if (S.llmStatus !== 200) return res(S.llmStatus, 'provider exploded');
+    // llmText 可給函式：同一輪裡「AI 挑檔」與「主分析」要回不同內容時用
+    const body = (init || {}).body;
+    const text = typeof S.llmText === 'function' ? S.llmText(String(body)) : S.llmText;
     return res(200, u.includes(':generateContent')
-      ? { candidates: [{ content: { parts: [{ text: S.llmText }] } }] }
-      : { choices: [{ message: { content: S.llmText } }] });
+      ? { candidates: [{ content: { parts: [{ text }] } }] }
+      : { choices: [{ message: { content: text } }] });
   }
   if (/\/api\/v1\/courses\/\d+\?/.test(u)) return res(200, { id: 1, syllabus_body: S.syllabus });
   if (u.includes('/files?')) return res(200, S.files, { link: '' });
@@ -135,6 +142,8 @@ const sandbox = {
   fetch: fakeFetch,
   fetchJSON,
   fetchAllPages,
+  // ai/pdfText.js 的替身（不載入 1.5MB 的 vendor pdf.js）
+  DuePdfText: { extractText: async () => S.extractedText },
   btoa: (s) => Buffer.from(s, 'binary').toString('base64'),
   console: { log() { }, warn() { }, error() { } },
   setTimeout,
@@ -201,16 +210,102 @@ const run = (base) => sandbox.runPendingGradingAnalysis(base);
     assert.equal(S.store.gradingAnalysis[404].attempts, 1);
   });
 
-  await test('純文字供應商（deepseek）：不列課程檔案、不抓 PDF，無材料 → notFound 且零 LLM 呼叫', async () => {
+  await test('純文字供應商（deepseek）：課程檔案是 PDF 大綱 → 照樣下載、抽字後送純文字 part', async () => {
     reset({ aiConfig: { provider: 'deepseek', apiKey: 'sk-x' }, courses: [{ id: 202, name: 'C2' }], customWeights: {} }, {
       syllabus: '', files: [{ id: 9, display_name: 'Syllabus.pdf', url: `${BASE}/files/9/download` }],
+      extractedText: EXTRACTED,
     });
     await run(BASE);
-    assert.equal(S.fetches.filter((f) => f.url.includes('/files')).length, 0);
+    assert.equal(S.fetches.filter((f) => f.url.includes('/files/9/download')).length, 1, '純文字供應商也要下載 PDF');
+    assert.ok(S.bodyReads > 0);
+    assert.equal(S.llm.length, 1);
+    const sent = S.llm[0].body.messages.map((m) => m.content).join('\n');
+    assert.ok(sent.includes(EXTRACTED), '抽出來的文字要進 prompt');
+    assert.equal(JSON.stringify(S.llm[0].body).includes('inlineData'), false); // 不是原始 PDF 路徑
+    assert.equal(S.store.gradingAnalysis[202].status, 'done');
+    assert.equal(S.store.gradingAnalysis[202].source, 'keyword_pdf');
+    assert.deepEqual(plain(S.store.customWeights[202]), WEIGHTS);
+  });
+
+  await test('純文字供應商（deepseek）：syllabus_body 內連 PDF → 下載並抽字，文字進 prompt', async () => {
+    reset({ aiConfig: { provider: 'deepseek', apiKey: 'sk-x' }, courses: [{ id: 203, name: 'C2b' }], customWeights: {} }, {
+      syllabus: '<a href="/courses/203/files/9/download">Syllabus PDF</a>',
+      extractedText: EXTRACTED,
+    });
+    await run(BASE);
+    assert.equal(S.fetches.filter((f) => f.url.includes('/files/9/download')).length, 1);
+    assert.equal(S.llm.length, 1);
+    assert.ok(S.llm[0].body.messages.map((m) => m.content).join('\n').includes(EXTRACTED));
+    assert.equal(S.store.gradingAnalysis[203].status, 'done');
+    assert.equal(S.store.gradingAnalysis[203].source, 'syllabus_pdf');
+    assert.deepEqual(plain(S.store.customWeights[203]), WEIGHTS);
+  });
+
+  await test('純文字供應商：抽字失敗（掃描件）且無其他材料 → notFound: no syllabus material，不打 LLM', async () => {
+    reset({ aiConfig: { provider: 'deepseek', apiKey: 'sk-x' }, courses: [{ id: 204, name: 'C2c' }], customWeights: {} }, {
+      syllabus: '<a href="/courses/204/files/9/download">Syllabus PDF</a>', // 純連結，文字太短不算材料
+      extractedText: '',
+    });
+    await run(BASE);
+    assert.equal(S.fetches.filter((f) => f.url.includes('/files/9/download')).length, 1, '仍會下載，只是抽不到字');
+    assert.equal(S.llm.length, 0, '沒材料就不該花額度');
+    assert.equal(S.store.gradingAnalysis[204].status, 'notFound');
+    assert.equal(S.store.gradingAnalysis[204].source, 'none');
+    assert.equal(S.store.gradingAnalysis[204].notes, 'no syllabus material');
+    assert.equal(S.store.customWeights[204], undefined);
+  });
+
+  await test('純文字供應商：抽出的文字太短（≤ MIN_SYLLABUS_TEXT_CHARS）→ 視同這個檔案沒材料', async () => {
+    reset({ aiConfig: { provider: 'deepseek', apiKey: 'sk-x' }, courses: [{ id: 205, name: 'C2d' }], customWeights: {} }, {
+      syllabus: '<a href="/courses/205/files/9/download">Syllabus PDF</a>',
+      extractedText: 'Cover page only',
+    });
+    await run(BASE);
     assert.equal(S.llm.length, 0);
-    assert.equal(S.store.gradingAnalysis[202].status, 'notFound');
-    assert.equal(S.store.gradingAnalysis[202].source, 'none');
-    assert.equal(S.store.customWeights[202], undefined);
+    assert.equal(S.store.gradingAnalysis[205].status, 'notFound');
+    assert.equal(S.store.gradingAnalysis[205].source, 'none');
+  });
+
+  await test('純文字供應商：抽出的文字超過 MAX_EXTRACTED_TEXT_CHARS → 截斷後仍照常送出', async () => {
+    const huge = 'Grading policy. '.repeat(4000); // 64000 字元
+    reset({ aiConfig: { provider: 'deepseek', apiKey: 'sk-x' }, courses: [{ id: 206, name: 'C2e' }], customWeights: {} }, {
+      syllabus: '<a href="/courses/206/files/9/download">Syllabus PDF</a>',
+      extractedText: huge,
+    });
+    await run(BASE);
+    assert.equal(S.llm.length, 1);
+    const user = S.llm[0].body.messages.find((m) => m.role === 'user').content;
+    assert.ok(user.includes(huge.slice(0, 30000)));
+    assert.equal(user.includes(huge.slice(0, 30001)), false, '超過 30000 字元要截掉');
+    assert.equal(S.store.gradingAnalysis[206].status, 'done');
+  });
+
+  await test('純文字供應商：關鍵字比對不到 → 一樣會呼叫 AI 挑檔，挑到的檔案下載＋抽字', async () => {
+    reset({ aiConfig: { provider: 'deepseek', apiKey: 'sk-x' }, courses: [{ id: 207, name: 'C2f' }], customWeights: {} }, {
+      syllabus: '',
+      files: [{ id: 11, display_name: 'week01-intro.pdf', url: `${BASE}/files/11/download` }],
+      extractedText: EXTRACTED,
+      // 第一次呼叫是挑檔（prompt 內含 Course files:），回檔案 id；第二次才是主分析
+      llmText: (body) => (body.includes('Course files:') ? '11' : LLM_JSON),
+    });
+    await run(BASE);
+    assert.equal(S.llm.length, 2, '挑檔一次＋主分析一次');
+    assert.ok(JSON.stringify(S.llm[0].body).includes('Course files:'));
+    assert.equal(S.fetches.filter((f) => f.url.includes('/files/11/download')).length, 1);
+    assert.ok(S.llm[1].body.messages.map((m) => m.content).join('\n').includes(EXTRACTED));
+    assert.equal(S.store.gradingAnalysis[207].status, 'done');
+    assert.equal(S.store.gradingAnalysis[207].source, 'ai_selected_pdf');
+  });
+
+  await test('純文字供應商：沒有 PDF 權限 → 不下載 PDF，只用 syllabus 文字', async () => {
+    reset({ aiConfig: { provider: 'deepseek', apiKey: 'sk-x' }, courses: [{ id: 208, name: 'C2g' }], customWeights: {} }, {
+      syllabus: '<a href="/courses/208/files/9/download">Syllabus PDF</a>' + SYLLABUS_HTML,
+      pdfPermission: false, extractedText: EXTRACTED,
+    });
+    await run(BASE);
+    assert.equal(S.fetches.filter((f) => f.url.includes('/files/9/download')).length, 0);
+    assert.equal(S.llm.length, 1);
+    assert.equal(S.store.gradingAnalysis[208].source, 'syllabus_body');
   });
 
   await test('大綱連結的 PDF 只試前 5 個；未嘗試的 id 之後仍可被課程檔案步驟撿到', async () => {
