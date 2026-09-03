@@ -99,7 +99,7 @@ UMD 包裝沿用 `taskRules.js` 樣式：Node 下 `module.exports`，瀏覽器�
   consentedAt: string,     // ISO；按「儲存」即視為同意送出課程資料
 }
 ```
-`resolveConfig(stored)` → `{ provider, apiKey, model, baseUrl, configured: boolean }`；`configured = apiKey.trim() !== ''`。`provider === 'gemini'` 時 `resolveConfig` **忽略**儲存的 `baseUrl`，一律用 Google 預設（避免切換供應商後殘留的其他家 URL 把 Gemini key 送錯地方）。供應商預設：
+`resolveConfig(stored)` → `{ provider, apiKey, model, baseUrl, configured: boolean }`；`configured = apiKey.trim() !== ''`。非 gemini 的 `baseUrl` 只接受 `https://` 開頭，否則退回該供應商預設（避免 bearer token 走明文）。`provider === 'gemini'` 時 `resolveConfig` **忽略**儲存的 `baseUrl`，一律用 Google 預設（避免切換供應商後殘留的其他家 URL 把 Gemini key 送錯地方）。供應商預設：
 
 | provider | baseUrl 預設 | model 預設 | 支援 PDF |
 |---|---|---|---|
@@ -150,7 +150,11 @@ UMD 包裝沿用 `taskRules.js` 樣式：Node 下 `module.exports`，瀏覽器�
 - 分析內部任何錯誤不會變成「同步失敗」。
 
 ### 5.2 全域鎖
-`analysisRunner.js` 有模組層 `_analyzing` 旗標：已在跑就直接 return（新手教學期間連續多次 SYNC 不會疊跑）。`try/finally` 歸位。
+`analysisRunner.js` 有模組層 `_aiAnalyzing` 旗標：進入函式第一件事就同步設為 true（不能夾在 `await` 之後，否則同一 tick 兩次觸發都會通過檢查），已在跑就直接 return（新手教學期間連續多次 SYNC 不會疊跑）；所有提前 return 都在 `try/finally` 內歸位。
+
+**Service worker 存活**：MV3 SW 閒置約 30 秒會被回收，長 LLM 呼叫期間 `callProvider` 以 `setInterval` 每 20 秒呼叫一次 `chrome.runtime.getPlatformInfo` 重置閒置計時器，呼叫結束 `clearInterval`。
+
+**重置期間的競態**：`AI_RESET_ANALYSIS` 會遞增模組層 `_aiResetEpoch`；進行中的分析在 `recordOutcome` 前發現 epoch 已變就放棄寫入，避免把結果寫回剛清空的紀錄。
 
 ### 5.3 `shouldAnalyze({ courseId, customWeights, groups, record, now })`（純函式，有測試）
 依序判斷，回 `{ run: boolean, reason: string }`：
@@ -194,7 +198,7 @@ UMD 包裝沿用 `taskRules.js` 樣式：Node 下 `module.exports`，瀏覽器�
 - 沒命中且 `files.length > 0` → `selectSyllabusPdfWithAI(files.slice(0, 60), cfg)`：一次 LLM 呼叫（temperature 0，`maxTokens 512`），prompt 見 §6.3；回傳合法檔案 id 才算。
 - 命中的檔案 → `tryFetchPdf(file.url)`；失敗則 `GET /api/v1/files/:id` 取新 `url` 再試一次。
 
-**`tryFetchPdf(url)`**：`fetch(url, {credentials:'include'})`；`res.ok` 且（`Content-Type` 含 `pdf` **或** 前 5 bytes 為 `%PDF-`）才接受；單檔 ≤ `MAX_PDF_BYTES` 10MB；**累計** ≤ `MAX_TOTAL_PDF_BYTES` 15MB，超過的略過（Gemini inline 上限約 20MB）。不合格回 `null`。
+**`tryFetchPdf(url)`**：`fetch(url, {credentials:'include'})`；**下載前**先看 header：`Content-Length` 超過單檔上限、或 `Content-Type` 為 `text/html`／`application/json` 就不讀 body（`rejectBeforeDownload`）；下載後 `res.ok` 且（`Content-Type` 含 `pdf` **或** 前 5 bytes 為 `%PDF-`）才接受（`acceptPdf`）；單檔 ≤ `MAX_PDF_BYTES` 10MB；**累計** ≤ `MAX_TOTAL_PDF_BYTES` 12MB，超過的略過（base64 膨脹 4/3 後約 16MB，留 Gemini 20MB 請求上限的空間；15MB 會剛好撞頂）。syllabus 內連結的檔案最多嘗試 `MAX_LINKED_PDFS` 5 個。不合格回 `null`。
 
 **Step 4 — 判定**：`parts` 為空 → outcome `notFound`，`source:'none'`，**不呼叫 LLM**。
 
@@ -254,7 +258,7 @@ Which single file most likely contains the course syllabus or grading policy? Re
 
 ### 8.3 API key 存放
 明文存 `aiConfig.apiKey`（與舊版相同，Web Store 上 BYOK 擴充常見作法），但：
-- `background.js` 啟動時呼叫 `chrome.storage.local.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' })`（守衛：API 存在才呼叫），讓 claude.ai 的 content script 讀不到 storage（已確認 `claude_content.js` 只用 `runtime.sendMessage`，不讀 storage）。
+- `background.js` 呼叫 `chrome.storage.local.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' })`（守衛：API 存在才呼叫，並以 `try/catch` 包住、放在所有 listener 註冊**之後**——若在舊版 Chrome 同步拋錯，不能連帶讓 `onMessage` 等 listener 沒註冊到），讓 claude.ai 的 content script 讀不到 storage（已確認 `claude_content.js` 只用 `runtime.sendMessage`，不讀 storage）。
 - 絕不 `console.log` key、絕不用 `storage.sync`、只送到使用者選的供應商 host。
 - modal 有「清除金鑰」。
 
@@ -352,6 +356,8 @@ chrome.runtime?.onMessage?.addListener((msg) => {
 - OpenAI 相容 request：`/chat/completions`、Bearer、PDF 被丟棄、base URL 尾斜線正規化
 - `extractText` 兩家正常／空回應 throw
 - `supportsPdf`
+
+`extension/ai/analysisRunner.test.js`（`node:vm` 載入三個 ai/ 檔＋stub `chrome`／`fetch`）：沒 key 零請求；成功寫入 `customWeights`＋`gradingAnalysis` 並送 `GRADING_WEIGHTS_UPDATED`；再跑一次零 LLM 呼叫；同 tick 兩次觸發只有一次 LLM 呼叫；純文字供應商不下載 PDF；LLM 500 → `error` 且 `source` 保留；`AI_GET_STATUS` 形狀；連結 PDF 只試前 5 個；`Content-Length`／`text/html` 不讀 body；reset epoch。
 
 ### 13.2 靜態檢查
 - `node --check` 全部 JS：`background.js`、`ai/*.js`、`dashboard/dashboard.js`、`dashboard/aiSettings.js`、`popup.js`。
