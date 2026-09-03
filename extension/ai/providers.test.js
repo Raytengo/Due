@@ -1,5 +1,6 @@
 const assert = require('node:assert/strict');
 const P = require('./providers.js');
+const R = require('./gradingRules.js');
 
 function test(name, fn) {
   try {
@@ -31,6 +32,12 @@ test('supportsPdf: 只有 gemini', () => {
   assert.equal(P.supportsPdf('deepseek'), false);
 });
 
+test('supportsPdf 與 gradingRules.PROVIDERS 的 supportsPdf 一致（單一真相來源）', () => {
+  const keys = Object.keys(R.PROVIDERS);
+  assert.ok(keys.length >= 3);
+  for (const k of keys) assert.equal(P.supportsPdf(k), R.PROVIDERS[k].supportsPdf, `provider=${k}`);
+});
+
 test('buildRequest gemini: url 不含 key、key 走 x-goog-api-key、pdf → inlineData、systemInstruction、generationConfig', () => {
   const req = P.buildRequest(GEMINI, PARTS, 'SYS', { temperature: 0, maxTokens: 2048 });
   assert.equal(req.url, 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent');
@@ -48,6 +55,38 @@ test('buildRequest gemini: 無 systemPrompt／無 temperature 時不帶對應欄
   const req = P.buildRequest(GEMINI, [{ type: 'text', text: 'hi' }], '', { maxTokens: 8 });
   assert.equal('systemInstruction' in req.body, false);
   assert.deepEqual(req.body.generationConfig, { maxOutputTokens: 8 });
+});
+
+test('buildRequest gemini: model 帶 models/ 前綴時不重複', () => {
+  const req = P.buildRequest({ ...GEMINI, model: 'models/gemini-2.5-flash' }, [{ type: 'text', text: 'hi' }], '', {});
+  assert.ok(req.url.endsWith('/models/gemini-2.5-flash:generateContent'), req.url);
+});
+
+test('buildRequest gemini: 未知 part 型別一律丟棄（與 OpenAI 路徑一致）', () => {
+  const parts = [{ type: 'image', data: 'x' }, ...PARTS];
+  const req = P.buildRequest(GEMINI, parts, '', {});
+  assert.equal(req.body.contents[0].parts.length, 3); // 1 pdf + 2 text，image 被丟掉
+  assert.equal(JSON.stringify(req.body).includes('"image"'), false);
+});
+
+test('buildRequest: 未給 opts 時 maxTokens 預設 2048、不帶 temperature（兩條路徑）', () => {
+  const g = P.buildRequest(GEMINI, [{ type: 'text', text: 'hi' }], 'SYS');
+  assert.equal(g.body.generationConfig.maxOutputTokens, 2048);
+  assert.equal('temperature' in g.body.generationConfig, false);
+  const d = P.buildRequest(DEEPSEEK, [{ type: 'text', text: 'hi' }], 'SYS');
+  assert.equal(d.body.max_tokens, 2048);
+  assert.equal('temperature' in d.body, false);
+});
+
+test('buildRequest: 非 gemini 的 provider（含未知）一律走 OpenAI 相容路徑', () => {
+  const req = P.buildRequest({ provider: 'openai', apiKey: 'k', model: 'gpt-4o-mini', baseUrl: 'https://api.openai.com/v1' }, [{ type: 'text', text: 'hi' }], '', {});
+  assert.ok(req.url.endsWith('/chat/completions'), req.url);
+  assert.equal(req.body.model, 'gpt-4o-mini');
+});
+
+test('buildRequest OpenAI 相容: header 只有 Authorization 與 Content-Type', () => {
+  const req = P.buildRequest(DEEPSEEK, [{ type: 'text', text: 'hi' }], '', {});
+  assert.deepEqual(Object.keys(req.headers).sort(), ['Authorization', 'Content-Type']);
 });
 
 test('buildRequest OpenAI 相容: /chat/completions、Bearer、PDF 丟棄、文字以空行串接', () => {
@@ -78,6 +117,19 @@ test('extractText gemini: 串接 parts；空回應 throw', () => {
 test('extractText OpenAI 相容: choices[0].message.content；空回應 throw', () => {
   assert.equal(P.extractText('deepseek', { choices: [{ message: { content: 'ok' } }] }), 'ok');
   assert.throws(() => P.extractText('qwen', { choices: [{ message: { content: '' } }] }), /Empty response/);
+});
+
+test('extractText gemini: 跳過非文字 part；空回應附上原因', () => {
+  assert.equal(P.extractText('gemini', { candidates: [{ content: { parts: [{ inlineData: {} }, { text: 'ok' }] } }] }), 'ok');
+  assert.throws(() => P.extractText('gemini', { candidates: [{ finishReason: 'MAX_TOKENS', content: {} }] }), /Empty response \(MAX_TOKENS\)/);
+  assert.throws(() => P.extractText('gemini', { promptFeedback: { blockReason: 'SAFETY' } }), /SAFETY/);
+});
+
+test('extractText OpenAI 相容: 只有 reasoning_content → 錯誤訊息指出原因', () => {
+  assert.throws(
+    () => P.extractText('deepseek', { choices: [{ message: { content: null, reasoning_content: '想了很久…' } }] }),
+    /Empty response \(reasoning_content only\)/
+  );
 });
 
 console.log('ALL providers TESTS PASSED');
