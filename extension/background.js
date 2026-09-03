@@ -1,3 +1,6 @@
+// AI 評分比重分析（spec 2026-09-03）：純規則 + 供應商層 + 編排，全部在 ai/ 目錄，與同步路徑隔離
+importScripts('ai/gradingRules.js', 'ai/providers.js', 'ai/analysisRunner.js');
+
 let BASE_URL = '';
 
 // 自動同步節流狀態（記憶體）：上次成功同步的時間戳（ms）。
@@ -16,6 +19,11 @@ chrome.storage.local.get(['canvasBaseUrl', 'lastSync'], (data) => {
     if (Number.isFinite(ms)) _lastAutoSyncAt = ms;
   }
 });
+
+// API key 存在 storage.local：鎖成只有擴充功能自身頁面可讀（claude.ai 的 content script 讀不到）
+if (chrome.storage.local.setAccessLevel) {
+  chrome.storage.local.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' }).catch(() => { });
+}
 
 // 首次安裝時開啟教學頁面
 chrome.runtime.onInstalled.addListener((details) => {
@@ -75,6 +83,10 @@ chrome.webNavigation
 
 // ── Message handlers ──
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message && typeof message.type === 'string' && message.type.startsWith('AI_')) {
+    return handleAiMessage(message, sendResponse, BASE_URL);
+  }
+
   if (message.type === 'SYNC') {
     syncAll()
       .then(() => sendResponse({ success: true }))
@@ -332,6 +344,9 @@ async function syncAll() {
     // 成功寫入 storage 後才更新節流時間戳；上面拉課程失敗會 throw、走不到這裡，
     // 時間戳不更新 → 下次造訪 Canvas 仍會重試同步
     _lastAutoSyncAt = Date.now();
+
+    // AI 評分比重分析：排到下一個 tick 跑，不 await、不阻塞 SYNC 回應、不持有 _syncing
+    scheduleGradingAnalysis(BASE_URL);
 
     console.log(`[Due] 同步完成，共 ${courses.length} 門課程`);
   } finally {

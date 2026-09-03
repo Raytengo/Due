@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Due",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "description": "Canvas LMS Dashboard - auto-sync assignments and deadlines for any Canvas school",
   "permissions": [
     "storage",
@@ -12,6 +12,9 @@
   "host_permissions": [
     "https://*.instructure.com/*",
     "https://claude.ai/*"
+  ],
+  "optional_host_permissions": [
+    "https://*.canvas-user-content.com/*"
   ],
   "content_scripts": [
     {
