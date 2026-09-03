@@ -41,6 +41,12 @@ test('resolveConfig: gemini 忽略殘留的 baseUrl（避免把 Gemini key 送�
   assert.equal(c.baseUrl, 'https://generativelanguage.googleapis.com/v1beta');
 });
 
+test('resolveConfig: 非 https 的自訂 baseUrl 一律退回供應商預設（Bearer token 不走明文）', () => {
+  assert.equal(R.resolveConfig({ provider: 'deepseek', apiKey: 'k', baseUrl: 'http://evil.example/v1' }).baseUrl, 'https://api.deepseek.com/v1');
+  assert.equal(R.resolveConfig({ provider: 'qwen', apiKey: 'k', baseUrl: '//evil.example/v1' }).baseUrl, 'https://dashscope.aliyuncs.com/compatible-mode/v1');
+  assert.equal(R.resolveConfig({ provider: 'qwen', apiKey: 'k', baseUrl: 'HTTPS://x.example/v1' }).baseUrl, 'HTTPS://x.example/v1');
+});
+
 // ── shouldAnalyze ──
 const base = { courseId: 7, customWeights: {}, groups: [], record: undefined, now: NOW };
 
@@ -132,6 +138,11 @@ test('courseStatus: error 冷卻中／attempts 用盡 → 都顯示 error', () =
   const rec = { status: 'error', attempts: 1, nextRetryAt: new Date(NOW + DAY).toISOString() };
   assert.equal(R.courseStatus({ ...base, record: rec }), 'error');
   assert.equal(R.courseStatus({ ...base, record: { ...rec, attempts: 3 } }), 'error');
+});
+
+test('courseStatus: 未知 status 的髒紀錄 → 收斂為 skipped（modal 只認得固定幾種）', () => {
+  const rec = { status: 'weird', attempts: 1, nextRetryAt: new Date(NOW + DAY).toISOString() };
+  assert.equal(R.courseStatus({ ...base, record: rec }), 'skipped');
 });
 
 // ── findSyllabusByKeyword ──
@@ -258,11 +269,44 @@ test('pickSource: 優先序 syllabus_pdf > keyword_pdf > ai_selected_pdf > sylla
   assert.equal(R.pickSource({}), 'none');
 });
 
+// ── acceptPdf / rejectBeforeDownload ──
+test('acceptPdf: application/pdf 小檔接受；octet-stream 但 %PDF- 魔數也接受', () => {
+  assert.equal(R.acceptPdf({ ok: true, contentType: 'application/pdf; charset=binary', byteLength: 1024, head: 'xxxxx' }), true);
+  assert.equal(R.acceptPdf({ ok: true, contentType: 'application/octet-stream', byteLength: 1024, head: '%PDF-' }), true);
+});
+
+test('acceptPdf: text/html、超過上限、0 bytes、res 非 ok 一律拒絕', () => {
+  assert.equal(R.acceptPdf({ ok: true, contentType: 'text/html', byteLength: 1024, head: '<!DOC' }), false);
+  assert.equal(R.acceptPdf({ ok: true, contentType: 'application/pdf', byteLength: 11 * 1024 * 1024, head: '%PDF-' }), false);
+  assert.equal(R.acceptPdf({ ok: true, contentType: 'application/pdf', byteLength: 0, head: '' }), false);
+  assert.equal(R.acceptPdf({ ok: false, contentType: 'application/pdf', byteLength: 1024, head: '%PDF-' }), false);
+  assert.equal(R.acceptPdf({ ok: true, contentType: 'application/pdf', byteLength: NaN, head: '%PDF-' }), false);
+  assert.equal(R.acceptPdf({ ok: true, contentType: 'application/pdf', byteLength: 5000, head: '%PDF-', maxBytes: 1000 }), false);
+});
+
+test('rejectBeforeDownload: Content-Length 超上限或 Content-Type 明顯不是 PDF → 連 body 都不讀', () => {
+  const MAX = R.MAX_PDF_BYTES;
+  assert.equal(R.rejectBeforeDownload({ contentType: 'application/pdf', contentLength: String(20 * 1024 * 1024), maxBytes: MAX }), true);
+  assert.equal(R.rejectBeforeDownload({ contentType: 'text/html; charset=utf-8', contentLength: '1024', maxBytes: MAX }), true);
+  assert.equal(R.rejectBeforeDownload({ contentType: 'application/json', contentLength: null, maxBytes: MAX }), true);
+  assert.equal(R.rejectBeforeDownload({ contentType: 'application/pdf', contentLength: null, maxBytes: MAX }), false);
+  assert.equal(R.rejectBeforeDownload({ contentType: 'binary/octet-stream', contentLength: '2048', maxBytes: MAX }), false);
+});
+
+// ── arrayBufferToBase64 ──
+test('arrayBufferToBase64: 二進位往返正確；2 萬 bytes（跨 8192 chunk）也正確', () => {
+  const src = new Uint8Array([0, 1, 2, 253, 254, 255]);
+  assert.deepEqual(Buffer.from(R.arrayBufferToBase64(src.buffer), 'base64'), Buffer.from(src));
+  const big = new Uint8Array(20000);
+  for (let i = 0; i < big.length; i++) big[i] = i % 256;
+  assert.deepEqual(Buffer.from(R.arrayBufferToBase64(big.buffer), 'base64'), Buffer.from(big));
+});
+
 test('constants: 上限值', () => {
   assert.equal(R.MAX_ATTEMPTS, 3);
   assert.equal(R.MAX_COURSES_PER_RUN, 10);
   assert.equal(R.MAX_PDF_BYTES, 10 * 1024 * 1024);
-  assert.equal(R.MAX_TOTAL_PDF_BYTES, 15 * 1024 * 1024);
+  assert.equal(R.MAX_TOTAL_PDF_BYTES, 12 * 1024 * 1024);
   assert.equal(R.PDF_PERMISSION_ORIGIN, 'https://*.canvas-user-content.com/*');
 });
 

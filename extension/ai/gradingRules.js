@@ -17,7 +17,8 @@
   const RETRY_ERROR_MS = 24 * 3600000;          // 供應商／網路錯誤 → 24 小時後再試
   const MAX_COURSES_PER_RUN = 10;               // 每輪最多處理幾門課
   const MAX_PDF_BYTES = 10 * 1024 * 1024;       // 單檔上限
-  const MAX_TOTAL_PDF_BYTES = 15 * 1024 * 1024; // 累計上限（Gemini inline 約 20MB）
+  // 累計上限：base64 膨脹 4/3 → 約 16MB，加上文字與 JSON 包裝仍低於 Gemini 20MB 請求上限（15MB 會剛好撞頂）
+  const MAX_TOTAL_PDF_BYTES = 12 * 1024 * 1024;
   const MAX_FILES_FOR_PICK = 60;                // AI 挑檔時最多列幾個檔名
   const MIN_SYLLABUS_TEXT_CHARS = 50;           // syllabus 文字短於此不算材料
   const WEIGHT_SUM_MIN = 80;                    // 權重總和合理區間
@@ -57,9 +58,11 @@
     const model = (typeof s.model === 'string' && s.model.trim()) || def.defaultModel;
     // baseUrl 只有 OpenAI 相容路徑會用到（spec §4.1）；gemini 一律用官方端點，
     // 免得切換供應商後殘留的自訂 baseUrl 把 Gemini key 送去別家。
+    // 自訂端點只收 https：http:// 會把 Authorization: Bearer <key> 用明文送出。
+    const custom = typeof s.baseUrl === 'string' ? s.baseUrl.trim() : '';
     const baseUrl = provider === 'gemini'
       ? def.baseUrl
-      : ((typeof s.baseUrl === 'string' && s.baseUrl.trim()) || def.baseUrl);
+      : ((/^https:\/\//i.test(custom) && custom) || def.baseUrl);
     return { provider, apiKey, model, baseUrl, configured: apiKey !== '' };
   }
 
@@ -114,7 +117,9 @@
     const d = shouldAnalyze({ courseId, customWeights, groups, record, now });
     if (d.run) return 'pending';
     if (d.reason === 'hasCustomWeights' || d.reason === 'hasCanvasWeights') return 'skipped';
-    return record ? record.status : 'skipped'; // cooldown / maxAttempts → 顯示最後結果
+    // cooldown / maxAttempts → 顯示最後結果；髒紀錄（未知 status）收斂成 skipped，modal 只認得固定幾種
+    if (record && (record.status === 'notFound' || record.status === 'error')) return record.status;
+    return 'skipped';
   }
 
   // ── 材料搜尋 ──
@@ -279,6 +284,35 @@
     return files.find((f) => Number(f.id) === v) || null;
   }
 
+  // ── PDF 取用判準（純函式；實際 fetch 在 analysisRunner.tryFetchPdf）──
+  // 讀 body 之前就能判死的情況：宣告長度已超上限，或型別明擺著是網頁／JSON（Canvas 未登入會回登入頁）
+  function rejectBeforeDownload({ contentType, contentLength, maxBytes } = {}) {
+    const limit = Number.isFinite(maxBytes) ? maxBytes : MAX_PDF_BYTES;
+    const declared = Number(contentLength);
+    if (Number.isFinite(declared) && declared > limit) return true;
+    const ct = String(contentType || '').toLowerCase();
+    return ct.includes('text/html') || ct.includes('application/json');
+  }
+
+  // 讀完 body 後才判得準的：Content-Type 含 pdf 或前 5 bytes 為 %PDF-，且大小在 (0, maxBytes]
+  function acceptPdf({ ok, contentType, byteLength, head, maxBytes } = {}) {
+    if (!ok) return false;
+    const limit = Number.isFinite(maxBytes) ? maxBytes : MAX_PDF_BYTES;
+    if (!Number.isFinite(byteLength) || byteLength <= 0 || byteLength > limit) return false;
+    return String(contentType || '').toLowerCase().includes('pdf') || head === '%PDF-';
+  }
+
+  // Gemini inlineData 要 base64；分段避免 String.fromCharCode.apply 參數過多爆堆疊
+  function arrayBufferToBase64(buffer) {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    const chunk = 8192;
+    for (let i = 0; i < bytes.length; i += chunk) {
+      binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+    }
+    return btoa(binary);
+  }
+
   // parts 組完後依實際附進去的材料決定 source（舊版在下載前就寫，會與實際不符）
   function pickSource({ syllabusPdf, keywordPdf, aiPdf, syllabusText } = {}) {
     if (syllabusPdf) return 'syllabus_pdf';
@@ -312,5 +346,8 @@
     buildFilePickPrompt,
     parseFilePick,
     pickSource,
+    rejectBeforeDownload,
+    acceptPdf,
+    arrayBufferToBase64,
   };
 });
