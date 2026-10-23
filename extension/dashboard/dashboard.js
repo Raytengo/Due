@@ -1244,83 +1244,32 @@ function updateSideNav() {
   }
 }
 
+// ── 學期待辦 ↔ 課程 切換（#15）──
+// 直接渲染真的新頁（listener 第一幀就在，切換途中點卡片照常生效），只讓進場那一頁淡入＋橫移 shift.tabs（12px），
+// transition.panelIn 300ms。不做字串拷貝、不包 slider、不留 timer、不用 rAF 觸發（分頁隱藏時 rAF 暫停會卡在起點）。
+// 連點：新的一次先 cancel 上一段，DOM 永遠只有一頁。不設 fill：動畫結束（或分頁在背景時跑完）一定落在最終狀態。
+// 具名 deviation：tabs recipe 的 panelOut（舊頁 150ms 淡出）刻意拿掉——常用導航不等出場。
+// 方向保留：去課程從右邊進、回學期待辦從左邊進。減少動態：不橫移，只淡入（#0）。
+const SHIFT_TABS_PX = 12;   // shift.tabs
+let _pageAnim = null;
 function switchPage(page) {
   if (page === currentPage) return;
   if (!_currentData.courses) return;
 
-  const mainSection = document.getElementById('main-section');
-  const direction = (currentPage === 'week' && page === 'courses') ? 'left' : 'right';
-
-  // 減少動態：不做整頁橫移，直接渲染新頁、只淡入（transition.panelIn；#0，完整的 WAAPI 版見 #15）
-  if (reduceMotion()) {
-    currentPage = page;
-    updateSideNav();
-    syncHistory();
-    const { courses = [], assignments = {}, assignmentGroups = {} } = _currentData;
-    if (page === 'week') renderWeekSection(courses, assignments);
-    else renderCardGrid(courses, assignments, assignmentGroups);
-    const entering = mainSection.firstElementChild;
-    if (entering) entering.animate([{ opacity: 0 }, { opacity: 1 }], MOTION.panelIn);
-    return;
-  }
-
-  // 1. 保存旧内容
-  const oldContent = mainSection.innerHTML;
-
-  // 2. 渲染新内容到一个临时容器（不触发 loadData）
-  const tempDiv = document.createElement('div');
-  tempDiv.style.display = 'none';
-  document.body.appendChild(tempDiv);
-
-  const { courses = [], assignments = {}, assignmentGroups = {} } = _currentData;
-  const prevPage = currentPage;
+  const dir = page === 'courses' ? 1 : -1;
   currentPage = page;
   updateSideNav();
   syncHistory();   // 週待辦↔課程 為橫向切換：更新目前 entry，不疊返回步
 
-  // 渲染新页面内容到 mainSection（暂时）
-  if (page === 'week') {
-    renderWeekSection(courses, assignments);
-  } else {
-    renderCardGrid(courses, assignments, assignmentGroups);
-  }
-  const newContent = mainSection.innerHTML;
+  if (_pageAnim) { _pageAnim.cancel(); _pageAnim = null; }
+  const { courses = [], assignments = {}, assignmentGroups = {} } = _currentData;
+  if (page === 'week') renderWeekSection(courses, assignments);
+  else renderCardGrid(courses, assignments, assignmentGroups);
 
-  // 3. 创建并排滑动容器
-  if (direction === 'left') {
-    mainSection.innerHTML = `
-      <div class="page-slider" id="page-slider">
-        <div class="page-slide">${oldContent}</div>
-        <div class="page-slide">${newContent}</div>
-      </div>`;
-  } else {
-    mainSection.innerHTML = `
-      <div class="page-slider" id="page-slider" style="transform: translateX(-50%)">
-        <div class="page-slide">${newContent}</div>
-        <div class="page-slide">${oldContent}</div>
-      </div>`;
-  }
-
-  document.body.removeChild(tempDiv);
-
-  const slider = document.getElementById('page-slider');
-
-  // 4. 触发滑动动画
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      slider.style.transition = 'transform 0.45s cubic-bezier(0.4, 0.0, 0.2, 1)';
-      slider.style.transform = direction === 'left' ? 'translateX(-50%)' : 'translateX(0)';
-    });
-  });
-
-  // 5. 动画结束后恢复正常内容并绑定事件
-  setTimeout(() => {
-    if (currentPage === 'week') {
-      renderWeekSection(courses, assignments);
-    } else {
-      renderCardGrid(courses, assignments, assignmentGroups);
-    }
-  }, 470);
+  const entering = document.getElementById('main-section').firstElementChild;
+  if (!entering) return;
+  const from = reduceMotion() ? 'none' : `translateX(${SHIFT_TABS_PX * dir}px)`;
+  _pageAnim = entering.animate([{ opacity: 0, transform: from }, { opacity: 1, transform: 'none' }], MOTION.panelIn);
 }
 
 // ── 本週待辦 ──
@@ -1483,7 +1432,7 @@ function renderWeekSection(courses, assignments) {
     if (list.length === 0) return '';
     return `
       <div class="week-group" data-group="${g.key}">
-        <div class="week-group-title ${g.color}">${weekGroupTitleText(g.key, list.length)}</div>
+        <div class="week-group-title ${g.color}" tabindex="-1">${weekGroupTitleText(g.key, list.length)}</div>
         <div class="week-task-grid">
           ${list.map(renderWeekCard).join('')}
         </div>
@@ -1579,7 +1528,13 @@ function renderWeekSection(courses, assignments) {
       const target = el.querySelector(`.week-group[data-group="${row.dataset.scrollGroup}"]`);
       const right = el.querySelector('.week-right');
       if (!target || !right) return;
-      const delta = target.getBoundingClientRect().top - right.getBoundingClientRect().top + right.scrollTop;
+      // 焦點跟著捲動走（#33，A17）：開始捲動時就交給目標組標題（tabindex=-1，不進 Tab 順序）。
+      // 螢幕閱讀器念出「7 天內 (3)」，下一個 Tab 到該組第一張卡；preventScroll，捲動交給下面的 scrollTo
+      const title = target.querySelector('.week-group-title');
+      if (title) title.focus({ preventScroll: true });
+      // 對齊到 padding 內緣（.week-right 上方留給焦點框的 4px 不捲掉，組標題的框才不會被裁）
+      const padTop = parseFloat(getComputedStyle(right).paddingTop) || 0;
+      const delta = target.getBoundingClientRect().top - right.getBoundingClientRect().top + right.scrollTop - padTop;
       right.scrollTo({ top: delta, behavior: reduceMotion() ? 'auto' : 'smooth' });
     });
   });
@@ -1741,6 +1696,106 @@ function setMorphName(el, name) {
   if (el && !reduceMotion()) el.style.viewTransitionName = name;
 }
 
+// 卡片端命名（開詳情的 FIRST、回清單的 LAST 共用）。
+// 課程卡：外框＋課號／課名／badge／meta 各自對到詳情的同一個東西。
+// 週卡（#17）：卡片本身＝course-shell，課名 .week-task-course＝course-name（課名對課名）；
+// 作業名不命名，跟著 course-shell 快照一起 crossfade；週卡沒有課號／badge／meta，詳情那幾個只有 new 端，自然淡入
+function nameCardForMorph(cardEl) {
+  const isWeek = cardEl.classList.contains('week-task-card');
+  setMorphName(cardEl, 'course-shell');
+  setMorphName(cardEl.querySelector(isWeek ? '.week-task-course' : '.card-name'), 'course-name');
+  if (isWeek) return;
+  setMorphName(cardEl.querySelector('.card-code'), 'course-code');
+  setMorphName(cardEl.querySelector('.card-badge-urgent'), 'course-badge');
+  setMorphName(cardEl.querySelector('.card-meta'), 'course-meta');
+}
+
+// 詳情端命名（開詳情的 LAST、回清單的 FIRST 共用）
+function nameDetailForMorph(container) {
+  setMorphName(container.querySelector('.course-detail-view'), 'course-shell');
+  setMorphName(container.querySelector('.detail-code'), 'course-code');
+  setMorphName(container.querySelector('.detail-name'), 'course-name');
+  setMorphName(container.querySelector('.card-badge-urgent'), 'course-badge');
+  setMorphName(container.querySelector('.detail-meta'), 'course-meta');
+}
+
+// ── 卡片 ↔ 詳情 morph 的啟動與清理（#42）──
+// 新的 startViewTransition 會 skip 上一段，上一段的 finished 在 microtask 裡 resolve——早於新的一段捕捉 old 狀態。
+// 若上一段 finished 無條件清掉所有名字，morph 中途按 Back（或再點一張卡）時，新一段剛設好的 old 名字會被清掉，
+// 回程退化成只有 new 的淡入。所以只有「目前這一段」結束時才清；已被下一段接手就把名字交給下一段管
+let _morph = null;
+function clearMorphNames() {
+  document.querySelectorAll('[style*="view-transition-name"]').forEach((el) => {
+    el.style.viewTransitionName = '';
+  });
+}
+// 新的一段命名（FIRST）之前呼叫：上一段還在跑時，它 LAST 掛的名字還留在清單的卡上。
+// 回程 morph 中途用鍵盤在「另一張」卡按 Enter，兩張卡都叫 course-shell → duplicate name，
+// 整段 VT 被 skip（InvalidStateError）、硬切。先清掉再命名；與 startViewTransition 同一個 task，中間不會畫出任何一幀
+function clearStaleMorphNames() {
+  if (_morph) clearMorphNames();
+}
+function startMorph(update) {
+  const t = document.startViewTransition(update);
+  _morph = t;
+  t.ready.catch(() => {});   // 被下一段 skip 時 ready 會 reject（AbortError），屬預期，不要變成未處理的 rejection
+  t.finished.then(() => {
+    if (_morph !== t) return;   // 已被下一段接手，名字交給它管
+    _morph = null;
+    clearMorphNames();
+  });
+  return t;
+}
+
+// ── 開詳情的來源（#2／#27）──
+// 回清單時：焦點還給觸發的卡（或側欄項），週卡還在可視區內就 morph 回那張卡，週清單捲回開詳情前的位置。
+// 存 selector／id、不存節點：回清單時整段重繪，節點都是新的。
+//   focusSel     — 回清單後焦點的去處（找不到就退到 #page-title）
+//   assignmentId — 從週卡開的才有：回程 morph 的目標週卡
+//   weekScroll   — 離開清單那一刻 .week-right 的 scrollTop
+let _detailOrigin = null;
+function rememberDetailOrigin(courseId, cardEl) {
+  const fromList = currentView !== 'course';
+  const isWeekCard = !!cardEl && cardEl.classList.contains('week-task-card');
+  const active = document.activeElement;
+  const fromNav = !cardEl && !!active && !!active.closest && !!active.closest('.nav-course-item');
+  let focusSel;
+  if (isWeekCard) focusSel = `.week-task-card[data-assignment-id="${CSS.escape(String(cardEl.dataset.assignmentId))}"]`;
+  else if (fromNav) focusSel = `.nav-course-item[data-target-course="${courseId}"]`;
+  else focusSel = `.course-card-grid[data-course-id="${courseId}"]`;
+  // 詳情內換課時清單是隱藏的（display:none 讀不到 scrollTop）：沿用第一次離開清單時記下的位置
+  const weekRight = document.querySelector('#main-section .week-right');
+  const weekScroll = fromList
+    ? (weekRight ? weekRight.scrollTop : 0)
+    : (_detailOrigin ? _detailOrigin.weekScroll : 0);
+  _detailOrigin = {
+    focusSel,
+    assignmentId: isWeekCard ? String(cardEl.dataset.assignmentId) : null,
+    weekScroll,
+  };
+}
+
+// 開詳情後焦點落在詳情標題（#2，A17）：在 VT update callback 裡移（焦點跟著動效走，不等 finished）。
+// .detail-name-text 是 tabindex=-1：只接受程式 focus、不進 Tab 順序；preventScroll 不打斷 morph。
+// 程式 focus 在滑鼠點擊後不會觸發 :focus-visible，滑鼠使用者看不出差別
+function focusDetailHeading(container) {
+  const h = container.querySelector('.detail-name-text');
+  if (h) h.focus({ preventScroll: true });
+}
+
+// 回程 morph 的目標：課程卡（課程頁）；找不到時改找開詳情的那張週卡——只在 .week-right 可視區內才 morph，否則維持淡出（#27）
+function returnMorphTarget(courseId, origin, weekRight) {
+  const main = document.getElementById('main-section');
+  const courseCard = main.querySelector(`.course-card-grid[data-course-id="${courseId}"]`);
+  if (courseCard) return courseCard;
+  if (!origin || !origin.assignmentId || !weekRight) return null;
+  const wc = main.querySelector(`.week-task-card[data-assignment-id="${CSS.escape(origin.assignmentId)}"]`);
+  if (!wc || parseInt(wc.dataset.courseId, 10) !== courseId) return null;
+  const r = wc.getBoundingClientRect();
+  const v = weekRight.getBoundingClientRect();
+  return (r.bottom > v.top && r.top < v.bottom) ? wc : null;
+}
+
 // ── 切換至課程詳細 ──
 function showCourseDetail(courseId, cardEl) {
   // 歷史：從清單進詳情 → push（新增一個返回步，Back 回清單）；
@@ -1751,43 +1806,13 @@ function showCourseDetail(courseId, cardEl) {
     else history.pushState(loc, '');
   }
 
-  // 没有卡片元素或不支持 View Transitions 时的回退
-  if (!cardEl || !document.startViewTransition) {
+  rememberDetailOrigin(courseId, cardEl);   // 必須在 currentView 改成 'course' 之前（據此判斷是否從清單離開）
+
+  const detailContainer = document.getElementById('course-detail-container');
+  const update = () => {
     currentView = 'course';
     currentCourseId = courseId;
 
-    const detailContainer = document.getElementById('course-detail-container');
-    const pageTabs = document.getElementById('page-tabs');
-    const mainSection = document.getElementById('main-section');
-    const detailBackBtn = document.getElementById('detail-back-btn');
-
-    pageTabs.classList.add('detail-mode');
-    if (detailBackBtn) detailBackBtn.style.display = 'inline-flex';
-    mainSection.style.display = 'none';
-    detailContainer.style.display = 'flex';
-
-    const { courses = [], assignments = {}, assignmentGroups = {}, scores = {} } = _currentData;
-    const course = courses.find((c) => c.id === courseId);
-    if (course) {
-      renderNav(courses, assignments);
-      renderCourseDetailSection(course, assignments[course.id] || [], assignmentGroups[course.id] || [], scores);
-    }
-    return;
-  }
-
-  // ── FIRST: 在小卡片上标记共享元素 ──
-  setMorphName(cardEl, 'course-shell');
-  setMorphName(cardEl.querySelector('.card-code, .week-task-course'), 'course-code');
-  setMorphName(cardEl.querySelector('.card-name, .week-task-title'), 'course-name');
-  setMorphName(cardEl.querySelector('.card-badge-urgent'), 'course-badge');
-  setMorphName(cardEl.querySelector('.card-meta'), 'course-meta');
-
-  // ── 启动 View Transition ──
-  const transition = document.startViewTransition(() => {
-    currentView = 'course';
-    currentCourseId = courseId;
-
-    const detailContainer = document.getElementById('course-detail-container');
     const pageTabs = document.getElementById('page-tabs');
     const mainSection = document.getElementById('main-section');
     const detailBackBtn = document.getElementById('detail-back-btn');
@@ -1800,24 +1825,27 @@ function showCourseDetail(courseId, cardEl) {
 
     const { courses = [], assignments = {}, assignmentGroups = {}, scores = {} } = _currentData;
     const course = courses.find((c) => c.id === courseId);
-    if (!course) return;
+    if (!course) return false;
 
     renderNav(courses, assignments);
     renderCourseDetailSection(course, assignments[course.id] || [], assignmentGroups[course.id] || [], scores);
+    focusDetailHeading(detailContainer);
+    return true;
+  };
 
-    // ── LAST: 在详情视图上标记对应的共享元素 ──
-    setMorphName(detailContainer.querySelector('.course-detail-view'), 'course-shell');
-    setMorphName(detailContainer.querySelector('.detail-code'), 'course-code');
-    setMorphName(detailContainer.querySelector('.detail-name'), 'course-name');
-    setMorphName(detailContainer.querySelector('.card-badge-urgent'), 'course-badge');
-    setMorphName(detailContainer.querySelector('.detail-meta'), 'course-meta');
-  });
+  // 没有卡片元素（側欄、popstate 前進）或不支持 View Transitions 时：直接切換，無 morph
+  if (!cardEl || !document.startViewTransition) {
+    update();
+    return;
+  }
 
-  // 动画完成后清理 view-transition-name
-  transition.finished.then(() => {
-    document.querySelectorAll('[style*="view-transition-name"]').forEach((el) => {
-      el.style.viewTransitionName = '';
-    });
+  // ── FIRST: 在小卡片上标记共享元素 ──
+  clearStaleMorphNames();
+  nameCardForMorph(cardEl);
+
+  // ── 启动 View Transition；LAST: 在详情视图上标记对应的共享元素 ──
+  startMorph(() => {
+    if (update()) nameDetailForMorph(detailContainer);
   });
 }
 
@@ -1826,23 +1854,11 @@ function showCourseDetail(courseId, cardEl) {
 // 由 popstate（Back）或 render() fallback 呼叫；currentPage/showSubmitted 已由呼叫端設好。
 function showGridView() {
   const prevCourseId = currentCourseId;
-
-  if (!document.startViewTransition) {
-    currentView = 'grid';
-    currentCourseId = null;
-    loadData();
-    return;
-  }
-
-  // ── FIRST: 在详情视图上标记共享元素 ──
+  const origin = _detailOrigin;
+  _detailOrigin = null;
   const detailContainer = document.getElementById('course-detail-container');
-  setMorphName(detailContainer.querySelector('.course-detail-view'), 'course-shell');
-  setMorphName(detailContainer.querySelector('.detail-code'), 'course-code');
-  setMorphName(detailContainer.querySelector('.detail-name'), 'course-name');
-  setMorphName(detailContainer.querySelector('.card-badge-urgent'), 'course-badge');
-  setMorphName(detailContainer.querySelector('.detail-meta'), 'course-meta');
 
-  const transition = document.startViewTransition(() => {
+  const update = () => {
     currentView = 'grid';
     currentCourseId = null;
 
@@ -1859,29 +1875,35 @@ function showGridView() {
     const { courses = [], assignments = {}, assignmentGroups = {} } = _currentData;
     updateSideNav();
     renderNav(courses, assignments);
-    // 回到原本所在的清單（週待辦或課程 grid）；回週待辦時下方 querySelector 找不到課程卡 → 自然淡出
+    // 回到原本所在的清單（週待辦或課程 grid）
     if (currentPage === 'week' && !showSubmitted) {
       renderWeekSection(courses, assignments);
     } else {
       renderCardGrid(courses, assignments, assignmentGroups);
     }
 
-    // ── LAST: 在小卡片上标记对应的共享元素 ──
-    const card = document.querySelector(`.course-card-grid[data-course-id="${prevCourseId}"]`);
-    if (card) {
-      setMorphName(card, 'course-shell');
-      setMorphName(card.querySelector('.card-code'), 'course-code');
-      setMorphName(card.querySelector('.card-name'), 'course-name');
-      setMorphName(card.querySelector('.card-badge-urgent'), 'course-badge');
-      setMorphName(card.querySelector('.card-meta'), 'course-meta');
-    }
-  });
+    // 週清單捲回開詳情前的位置（#27）：同步寫入，VT 捕捉 new 狀態時已就位；要在找回程目標之前（可視判定看的是還原後的位置）
+    const weekRight = mainSection.querySelector('.week-right');
+    if (weekRight && origin && origin.weekScroll) weekRight.scrollTop = origin.weekScroll;
 
-  transition.finished.then(() => {
-    document.querySelectorAll('[style*="view-transition-name"]').forEach((el) => {
-      el.style.viewTransitionName = '';
-    });
-  });
+    // ── LAST: 在小卡片上标记对应的共享元素（找不到 → 詳情原地淡出）──
+    const card = returnMorphTarget(prevCourseId, origin, weekRight);
+    if (card) nameCardForMorph(card);
+
+    // 焦點還給觸發它的卡／側欄項（#2）；找不到（已完成離開清單、側欄以外的來源）就落在頁面標題
+    const back = (origin && document.querySelector(origin.focusSel)) || document.getElementById('page-title');
+    if (back) back.focus({ preventScroll: true });
+  };
+
+  if (!document.startViewTransition) {
+    update();
+    return;
+  }
+
+  // ── FIRST: 在详情视图上标记共享元素 ──
+  clearStaleMorphNames();
+  nameDetailForMorph(detailContainer);
+  startMorph(update);
 }
 
 // ── 課程重命名（inline edit）──
@@ -2457,7 +2479,7 @@ function renderCourseDetailSection(course, asgns, groups, scores) {
           ${detailUrgentBadge}
         </div>
         <div class="detail-name">
-          <span class="detail-name-text">${esc(getCourseName(course))}</span>
+          <span class="detail-name-text" tabindex="-1">${esc(getCourseName(course))}</span>
           <button class="btn-rename-course" data-course-id="${course.id}" title="${tr('renameCourse')}"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg></button>
         </div>
         <div class="detail-meta">${detailMeta}</div>
@@ -2488,8 +2510,6 @@ function renderCourseDetailSection(course, asgns, groups, scores) {
   // 固定寬左欄下，評分圖例字體自動縮放（過長再 ellipsis）
   fitLegendText(el);
 
-  // ← 返回：走 history.back()，與瀏覽器返回（手勢／按鈕／Cmd+[）統一由 popstate 處理
-  document.getElementById('detail-back-btn').addEventListener('click', () => history.back());
 
   el.querySelectorAll('.assignment-item').forEach((item) => {
     item.addEventListener('click', () => {
@@ -3200,6 +3220,7 @@ function goToPage(page) {
     document.getElementById('detail-back-btn').style.display = 'none';
     document.getElementById('course-detail-container').style.display = 'none';
     document.getElementById('main-section').style.display = '';
+    _detailOrigin = null;   // 不是 Back：不還原來源卡的焦點與捲動
     syncHistory();   // 由詳情經 sidebar 離開：把目前 entry 更新為目標清單
     loadData();
     return;
@@ -3216,6 +3237,11 @@ function goToPage(page) {
 }
 document.getElementById('nav-week').addEventListener('click', () => goToPage('week'));
 document.getElementById('nav-courses').addEventListener('click', () => goToPage('courses'));
+
+// ← 返回：走 history.back()，與瀏覽器返回（手勢／按鈕／Cmd+[）統一由 popstate 處理。
+// 按鈕是 index.html 的靜態節點，只綁一次（以前每次 renderCourseDetailSection 都再綁一個：開過 N 次詳情後
+// 一次點擊會 history.back() N 次，退過清單那一步、直接離開 dashboard）
+document.getElementById('detail-back-btn').addEventListener('click', () => history.back());
 
 // ── 查看已繳交（切換過濾） ──
 document.getElementById('nav-submitted').addEventListener('click', () => {
