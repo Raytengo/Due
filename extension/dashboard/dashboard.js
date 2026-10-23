@@ -7,6 +7,61 @@ const GROUP_COLORS = [
 // 拖曳握把（grip-vertical，用於可拖曳的考試/簽到列：升級/降級）；緊跟在作業名稱後、為唯一拖曳起點
 const DRAG_GRIP = '<span class="drag-grip" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="15" cy="18" r="1.4"/></svg></span>';
 
+// ── 動效 token（鏡像 index.html :root 的 --t-*／--spring-*／--reflow／--ring，見 docs/motion-review-2026-10-22.md #39）──
+// 每個 token 都是 { duration(ms), easing }：WAAPI 直接當 options 用 el.animate(kf, MOTION.reveal)；
+// inline transition 用 cssTransition('transform', MOTION.reflow)；setTimeout 讀 .duration。
+// 數值必須與 CSS 同步：改一邊要改另一邊（不要在呼叫端另寫時長／曲線）。
+const _EASE_COLOR = 'cubic-bezier(0.25, 0.1, 0.25, 1)';   // ease.color
+const _EASE_OUT = 'cubic-bezier(0.23, 1, 0.32, 1)';       // ease.out
+const _EASE_SOFT = 'cubic-bezier(0.215, 0.61, 0.355, 1)'; // ease.soft
+// spring.highlight 500/40（--spring-highlight）；spring.reflow 同為 500/40（--reflow），共用同一組值
+const _SPRING_HIGHLIGHT = Object.freeze({ duration: 300, easing: 'linear(0, 0.0233, 0.0813, 0.1598, 0.2483, 0.3396, 0.4288, 0.5126, 0.5894, 0.658, 0.7183, 0.7704, 0.8149, 0.8524, 0.8837, 0.9094, 0.9303, 0.9472, 0.9607, 0.9713, 0.9796, 0.986, 0.9908, 0.9944, 0.997, 0.9988, 1.0001, 1.001, 1.0015, 1)' });
+const MOTION = Object.freeze({
+  color: Object.freeze({ duration: 200, easing: _EASE_COLOR }),      // --t-color：hover 換色
+  fade: Object.freeze({ duration: 200, easing: _EASE_OUT }),         // --t-fade：原地淡入淡出
+  swap: Object.freeze({ duration: 150, easing: _EASE_OUT }),         // --t-swap：兩個標籤原地互換
+  reveal: Object.freeze({ duration: 300, easing: _EASE_OUT }),       // --t-reveal：落地後才出現的標籤
+  menu: Object.freeze({ duration: 220, easing: _EASE_SOFT }),        // --t-menu
+  disclosure: Object.freeze({ duration: 350, easing: _EASE_SOFT }),  // --t-disclosure
+  // transition.panelIn（無 CSS 對應）：新頁在舊頁離開後淡入
+  panelIn: Object.freeze({ duration: 300, easing: 'cubic-bezier(0.25, 0.1, 0.35, 1)' }),
+  // spring.press 550/30
+  press: Object.freeze({ duration: 400, easing: 'linear(0, 0.0261, 0.0935, 0.188, 0.2977, 0.4132, 0.5271, 0.6343, 0.7313, 0.8159, 0.8872, 0.9452, 0.9906, 1.0244, 1.048, 1.063, 1.0709, 1.0732, 1.0713, 1.0663, 1.0594, 1.0514, 1.0429, 1.0346, 1.0267, 1.0196, 1.0134, 1.0082, 1.004, 1.0007, 0.9982, 0.9965, 1, 0.9948, 0.9946, 0.9948, 1, 1, 1, 1)' }),
+  highlight: _SPRING_HIGHLIGHT,                                      // --spring-highlight：跟隨指標的 highlight
+  reflow: _SPRING_HIGHLIGHT,                                         // --reflow：補位、落點
+  // spring.selection 300/30
+  selection: Object.freeze({ duration: 500, easing: 'linear(0, 0.0141, 0.0509, 0.1035, 0.1663, 0.2349, 0.306, 0.3769, 0.4459, 0.5115, 0.573, 0.6297, 0.6814, 0.728, 0.7696, 0.8064, 0.8387, 0.8668, 0.8911, 0.9119, 0.9296, 0.9445, 0.957, 0.9673, 0.9758, 0.9827, 0.9882, 0.9926, 0.9961, 0.9987, 1.0007, 1.0021, 1.0031, 1.0038, 1.0041, 1, 1, 1, 1.004, 1.0038, 1.0035, 1.0032, 1.0029, 1.0026, 1.0023, 1.002, 1.0017, 1.0015, 1, 1)' }),
+  ring: Object.freeze({ duration: 800, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' }),      // --ring：進度環弧（使用者拍板）
+  ringTick: Object.freeze({ duration: 400, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' }),  // --ring-tick：分子 tick
+});
+
+// inline transition 字串：cssTransition('opacity', MOTION.fade) → 'opacity 200ms cubic-bezier(...)'
+function cssTransition(prop, token) {
+  return `${prop} ${token.duration}ms ${token.easing}`;
+}
+
+// ── 減少動態（prefers-reduced-motion，#0）──
+// CSS 端由 index.html 檔尾的 media 區塊處理；WAAPI、scrollTo、View Transition 共享元素命名、JS 寫的 transform
+// 都是 CSS 管不到的，呼叫端自己讀 reduceMotion()：保留淡入淡出與顏色，拿掉位移、縮放、旋轉。
+// 每次呼叫即時讀 media query，系統設定中途切換也跟得上。
+const _reduceMotionMq = window.matchMedia('(prefers-reduced-motion: reduce)');
+function reduceMotion() {
+  return _reduceMotionMq.matches;
+}
+
+// ── 螢幕閱讀器播報（#3）──
+// 寫進頁面一開始就掛好的 #a11y-status（role=status、aria-live=polite）：只用動效呈現的結果
+// （完成、撤銷、同步、拖曳升降級、全部完成）都要經這裡念出來。
+// 先清空、50ms 後才寫入：同一句連播兩次（如連勾兩項）也會重念；短時間內連續呼叫只念最後一句。
+let _announceTimer = 0;
+function announce(text) {
+  const region = document.getElementById('a11y-status');
+  if (!region) return;
+  clearTimeout(_announceTimer);
+  region.textContent = '';
+  _announceTimer = setTimeout(() => { region.textContent = text; }, 50);
+}
+
 let _uiLanguage = 'zh-TW';
 let _showClaudeUsage = true;
 const I18N = {
@@ -651,7 +706,7 @@ let showSubmitted = false;
 
 // ── 完成過渡動畫（碎點爆）狀態 ──
 const COMPLETE_DELAY_MS = 1500;       // 勾選後的撤銷窗口（毫秒）
-const COMPLETE_BURST_MS = 480;        // 碎點爆淡出後才重繪（略長於 .45s 動畫）
+const COMPLETE_BURST_MS = 560;        // 碎點爆的保底計時：正常由 afterBurst 等動畫真的跑完（列 0.4s、碎點 0.5s）才重繪
 const _completeTimers = {};           // assignmentId -> setTimeout id
 
 // 清掉所有殘留完成計時器（重繪/切頁前呼叫，course detail 與 week 卡共用）
@@ -1180,6 +1235,19 @@ function switchPage(page) {
   const mainSection = document.getElementById('main-section');
   const direction = (currentPage === 'week' && page === 'courses') ? 'left' : 'right';
 
+  // 減少動態：不做整頁橫移，直接渲染新頁、只淡入（transition.panelIn；#0，完整的 WAAPI 版見 #15）
+  if (reduceMotion()) {
+    currentPage = page;
+    updateSideNav();
+    syncHistory();
+    const { courses = [], assignments = {}, assignmentGroups = {} } = _currentData;
+    if (page === 'week') renderWeekSection(courses, assignments);
+    else renderCardGrid(courses, assignments, assignmentGroups);
+    const entering = mainSection.firstElementChild;
+    if (entering) entering.animate([{ opacity: 0 }, { opacity: 1 }], MOTION.panelIn);
+    return;
+  }
+
   // 1. 保存旧内容
   const oldContent = mainSection.innerHTML;
 
@@ -1253,6 +1321,13 @@ const RING_C = 2 * Math.PI * RING_R;
 // 內容：環微彈＋分子 pop、多色碎點沿圓周外迸（切線初速＝旋轉能量）、中心淡入「全部完成」
 function celebrateRingArrival(ring) {
   if (!ring || !ring.isConnected) return;   // 等待落地期間被重繪換掉 → 略過
+  // 中心換字淡入「全部完成」（transition.reveal）：減少動態時也保留，它是唯一的完成訊號
+  const cap = ring.querySelector('.wk-ring-cap');
+  if (cap) {
+    cap.textContent = tr('weekAllDoneLabel');
+    cap.animate([{ opacity: 0 }, { opacity: 1 }], MOTION.reveal);
+  }
+  if (reduceMotion()) return;   // 減少動態：環與分子不縮放、不迸粒子（#0）
   const spring = 'cubic-bezier(0.34, 1.3, 0.5, 1)';
   ring.animate(
     [{ transform: 'scale(1)' }, { transform: 'scale(1.04)', offset: 0.38 }, { transform: 'scale(1)' }],
@@ -1262,11 +1337,6 @@ function celebrateRingArrival(ring) {
     fracB.animate(
       [{ transform: 'scale(1)' }, { transform: 'scale(1.16)', offset: 0.4 }, { transform: 'scale(1)' }],
       { duration: 320, easing: spring });
-  }
-  const cap = ring.querySelector('.wk-ring-cap');
-  if (cap) {
-    cap.textContent = tr('weekAllDoneLabel');
-    cap.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 350, easing: 'ease-out' });
   }
   // 放大多色版碎點爆：16 顆沿圓周迸開，橘/藍/綠/暖黃輪替
   const colors = ['--orange', '--blue', '--green', '--warm'];
@@ -1430,9 +1500,10 @@ function renderWeekSection(courses, assignments, celebrate = false) {
   }
 
   // 慶祝：等弧合攏「落地」的 transitionend 才引爆；弧已在終點（無過渡可等）則直接引爆
+  // 減少動態時弧沒有過渡（transition:none → transitionend 永遠不來），也直接引爆
   if (celebrateNow && _barEl) {
     const _ringEl = el.querySelector('.wk-ring');
-    if (Math.abs(prevOffset - targetOffset) < 0.5) {
+    if (reduceMotion() || Math.abs(prevOffset - targetOffset) < 0.5) {
       celebrateRingArrival(_ringEl);
     } else {
       _barEl.addEventListener('transitionend', function h(e) {
@@ -1499,7 +1570,7 @@ function renderWeekSection(courses, assignments, celebrate = false) {
       const right = el.querySelector('.week-right');
       if (!target || !right) return;
       const delta = target.getBoundingClientRect().top - right.getBoundingClientRect().top + right.scrollTop;
-      right.scrollTo({ top: delta, behavior: 'smooth' });
+      right.scrollTo({ top: delta, behavior: reduceMotion() ? 'auto' : 'smooth' });
     });
   });
 }
@@ -1654,6 +1725,12 @@ function updateCardPage(courseId, dir) {
   });
 }
 
+// View Transition 共享元素命名（卡片 ↔ 詳情 morph）。減少動態時不命名：沒有 morph 的位移與縮放，
+// 只剩 root 的 opacity crossfade（#0；不要改用 group animation-duration:0，old 快照仍會被放大後淡出）
+function setMorphName(el, name) {
+  if (el && !reduceMotion()) el.style.viewTransitionName = name;
+}
+
 // ── 切換至課程詳細 ──
 function showCourseDetail(courseId, cardEl) {
   // 歷史：從清單進詳情 → push（新增一個返回步，Back 回清單）；
@@ -1689,15 +1766,11 @@ function showCourseDetail(courseId, cardEl) {
   }
 
   // ── FIRST: 在小卡片上标记共享元素 ──
-  cardEl.style.viewTransitionName = 'course-shell';
-  const cCode = cardEl.querySelector('.card-code, .week-task-course');
-  const cName = cardEl.querySelector('.card-name, .week-task-title');
-  const cBadge = cardEl.querySelector('.card-badge-urgent');
-  const cMeta = cardEl.querySelector('.card-meta');
-  if (cCode) cCode.style.viewTransitionName = 'course-code';
-  if (cName) cName.style.viewTransitionName = 'course-name';
-  if (cBadge) cBadge.style.viewTransitionName = 'course-badge';
-  if (cMeta) cMeta.style.viewTransitionName = 'course-meta';
+  setMorphName(cardEl, 'course-shell');
+  setMorphName(cardEl.querySelector('.card-code, .week-task-course'), 'course-code');
+  setMorphName(cardEl.querySelector('.card-name, .week-task-title'), 'course-name');
+  setMorphName(cardEl.querySelector('.card-badge-urgent'), 'course-badge');
+  setMorphName(cardEl.querySelector('.card-meta'), 'course-meta');
 
   // ── 启动 View Transition ──
   const transition = document.startViewTransition(() => {
@@ -1723,16 +1796,11 @@ function showCourseDetail(courseId, cardEl) {
     renderCourseDetailSection(course, assignments[course.id] || [], assignmentGroups[course.id] || [], scores);
 
     // ── LAST: 在详情视图上标记对应的共享元素 ──
-    const detailCard = detailContainer.querySelector('.course-detail-view');
-    if (detailCard) detailCard.style.viewTransitionName = 'course-shell';
-    const dCode = detailContainer.querySelector('.detail-code');
-    const dName = detailContainer.querySelector('.detail-name');
-    const dBadge = detailContainer.querySelector('.card-badge-urgent');
-    const dMeta = detailContainer.querySelector('.detail-meta');
-    if (dCode) dCode.style.viewTransitionName = 'course-code';
-    if (dName) dName.style.viewTransitionName = 'course-name';
-    if (dBadge) dBadge.style.viewTransitionName = 'course-badge';
-    if (dMeta) dMeta.style.viewTransitionName = 'course-meta';
+    setMorphName(detailContainer.querySelector('.course-detail-view'), 'course-shell');
+    setMorphName(detailContainer.querySelector('.detail-code'), 'course-code');
+    setMorphName(detailContainer.querySelector('.detail-name'), 'course-name');
+    setMorphName(detailContainer.querySelector('.card-badge-urgent'), 'course-badge');
+    setMorphName(detailContainer.querySelector('.detail-meta'), 'course-meta');
   });
 
   // 动画完成后清理 view-transition-name
@@ -1758,16 +1826,11 @@ function showGridView() {
 
   // ── FIRST: 在详情视图上标记共享元素 ──
   const detailContainer = document.getElementById('course-detail-container');
-  const detailCard = detailContainer.querySelector('.course-detail-view');
-  if (detailCard) detailCard.style.viewTransitionName = 'course-shell';
-  const dCode = detailContainer.querySelector('.detail-code');
-  const dName = detailContainer.querySelector('.detail-name');
-  const dBadge = detailContainer.querySelector('.card-badge-urgent');
-  const dMeta = detailContainer.querySelector('.detail-meta');
-  if (dCode) dCode.style.viewTransitionName = 'course-code';
-  if (dName) dName.style.viewTransitionName = 'course-name';
-  if (dBadge) dBadge.style.viewTransitionName = 'course-badge';
-  if (dMeta) dMeta.style.viewTransitionName = 'course-meta';
+  setMorphName(detailContainer.querySelector('.course-detail-view'), 'course-shell');
+  setMorphName(detailContainer.querySelector('.detail-code'), 'course-code');
+  setMorphName(detailContainer.querySelector('.detail-name'), 'course-name');
+  setMorphName(detailContainer.querySelector('.card-badge-urgent'), 'course-badge');
+  setMorphName(detailContainer.querySelector('.detail-meta'), 'course-meta');
 
   const transition = document.startViewTransition(() => {
     currentView = 'grid';
@@ -1796,15 +1859,11 @@ function showGridView() {
     // ── LAST: 在小卡片上标记对应的共享元素 ──
     const card = document.querySelector(`.course-card-grid[data-course-id="${prevCourseId}"]`);
     if (card) {
-      card.style.viewTransitionName = 'course-shell';
-      const cCode = card.querySelector('.card-code');
-      const cName = card.querySelector('.card-name');
-      const cBadge = card.querySelector('.card-badge-urgent');
-      const cMeta = card.querySelector('.card-meta');
-      if (cCode) cCode.style.viewTransitionName = 'course-code';
-      if (cName) cName.style.viewTransitionName = 'course-name';
-      if (cBadge) cBadge.style.viewTransitionName = 'course-badge';
-      if (cMeta) cMeta.style.viewTransitionName = 'course-meta';
+      setMorphName(card, 'course-shell');
+      setMorphName(card.querySelector('.card-code'), 'course-code');
+      setMorphName(card.querySelector('.card-name'), 'course-name');
+      setMorphName(card.querySelector('.card-badge-urgent'), 'course-badge');
+      setMorphName(card.querySelector('.card-meta'), 'course-meta');
     }
   });
 
@@ -1969,8 +2028,8 @@ function beginComplete(item, id, cid) {
 function finishComplete(item, id, cid) {
   spawnBurstDots(item);
   item.classList.add('bursting');
-  // 略長於 .45s 爆開動畫，結束後重繪：已完成的會被濾掉、計數/圓餅/側欄一起更新
-  setTimeout(() => rerenderDetailAndNav(cid), COMPLETE_BURST_MS);
+  // 碎點爆跑完才重繪：已完成的會被濾掉、計數/圓餅/側欄一起更新
+  afterBurst(item, () => rerenderDetailAndNav(cid));
 }
 
 function cancelComplete(item, id, cid) {
@@ -2022,8 +2081,8 @@ function beginCompleteWeek(card, id, cid, celebrate = false) {
 function finishCompleteWeek(card, id, cid, celebrate = false) {
   spawnBurstDots(card);
   card.classList.add('bursting');
-  // 已完成者會被 applyFilters 濾掉；重繪週 section＋側欄＋左欄（用 _currentData，避免閃白）
-  setTimeout(() => rerenderWeekAndNav(celebrate), COMPLETE_BURST_MS);
+  // 碎點爆跑完才重繪：已完成者會被 applyFilters 濾掉；重繪週 section＋側欄＋左欄（用 _currentData，避免閃白）
+  afterBurst(card, () => rerenderWeekAndNav(celebrate));
 }
 
 function cancelCompleteWeek(card, id) {
@@ -2040,7 +2099,26 @@ function cancelCompleteWeek(card, id) {
   if (chk) { chk.dataset.done = 'false'; chk.setAttribute('aria-label', tr('markDone')); }
 }
 
+// 碎點爆跑完才執行 fn（#39：等動畫真的結束，不再手抄一個會和 CSS 漂移的時長）：
+// 等這一列（或週卡）上正在跑的 complete-burst（列淡出）與 complete-dot（碎點）全部 finished；
+// 沒有任何一段在跑（減少動態的週卡）就立刻執行；動畫被取消（節點被提前移除）也算結束；
+// COMPLETE_BURST_MS 保底（分頁在背景時動畫事件可能延遲）
+function afterBurst(item, fn) {
+  const anims = item.getAnimations({ subtree: true })
+    .filter((a) => a.animationName === 'complete-burst' || a.animationName === 'complete-dot');
+  let done = false;
+  const run = () => {
+    if (done) return;
+    done = true;
+    clearTimeout(timer);
+    fn();
+  };
+  const timer = setTimeout(run, COMPLETE_BURST_MS);
+  Promise.allSettled(anims.map((a) => a.finished)).then(run);
+}
+
 function spawnBurstDots(item) {
+  if (reduceMotion()) return;   // 減少動態：碎點是位移，不產生（列本身的淡出保留，#0）
   const n = 10;
   for (let i = 0; i < n; i++) {
     const dot = document.createElement('span');
@@ -2252,7 +2330,7 @@ function renderCourseDetailSection(course, asgns, groups, scores) {
 let _dragCtx = null;                 // 進行中的拖曳（全域僅允許一場）
 
 const DRAG_LIFT_PX = 4;              // 移動超過此距離才視為拖曳（否則當一般點擊）
-const DRAG_SETTLE_MS = 240;          // 落點／返回動畫時長
+const DRAG_SETTLE_MS = MOTION.reflow.duration;   // 落點／返回飛行時長（--reflow，#39）
 const DRAG_EDGE_ZONE = 56;           // 距捲動容器上下緣此距離內自動捲動
 const DRAG_EDGE_SPEED = 14;          // 自動捲動每 frame 最大位移
 
@@ -2338,7 +2416,10 @@ function liftRow(ctx) {
 function positionClone(ctx) {
   const dx = ctx.lastX - ctx.startX;
   const dy = ctx.lastY - ctx.startY;
-  ctx.clone.style.transform = `translate(${dx}px, ${dy}px) scale(1.02) rotate(0.4deg)`;
+  // 抬起感（微放大＋微傾）是縮放與旋轉：減少動態時只跟隨游標（直接操作保留，#0）
+  ctx.clone.style.transform = reduceMotion()
+    ? `translate(${dx}px, ${dy}px)`
+    : `translate(${dx}px, ${dy}px) scale(1.02) rotate(0.4deg)`;
 }
 
 function updateDropState(ctx) {
@@ -2443,14 +2524,16 @@ function settleClone(ctx, targetRow, { flash = true, after = null } = {}) {
     targetRow.scrollIntoView({ block: 'nearest' });
     to = targetRow.getBoundingClientRect();
   }
-  if (!to || (!to.width && !to.height)) {          // 落點不存在/不可見（如已繳交過濾）→ 原地淡出
-    clone.style.transition = `opacity ${DRAG_SETTLE_MS}ms ease`;
+  // 落點不存在/不可見（如已繳交過濾）→ 原地淡出；減少動態時一律不飛行、原地淡出（落點閃色保留，#0）
+  if (reduceMotion() || !to || (!to.width && !to.height)) {
+    clone.style.transition = cssTransition('opacity', MOTION.fade);
     clone.style.opacity = '0';
-    setTimeout(finish, DRAG_SETTLE_MS + 30);
+    setTimeout(finish, MOTION.fade.duration + 30);
     return;
   }
   targetRow.classList.add('drag-arriving');
-  clone.style.transition = `transform ${DRAG_SETTLE_MS}ms cubic-bezier(0.2, 0.7, 0.2, 1), width ${DRAG_SETTLE_MS}ms ease, height ${DRAG_SETTLE_MS}ms ease`;
+  // 位置走 --reflow；寬高仍隨飛行改變（#41 會拿掉寬高、改成只飛位置）
+  clone.style.transition = `${cssTransition('transform', MOTION.reflow)}, width ${DRAG_SETTLE_MS}ms ease, height ${DRAG_SETTLE_MS}ms ease`;
   clone.style.transform = `translate(${to.left - ctx.base.left}px, ${to.top - ctx.base.top}px)`;
   clone.style.width = to.width + 'px';
   clone.style.height = to.height + 'px';

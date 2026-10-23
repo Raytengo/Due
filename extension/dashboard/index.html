@@ -65,6 +65,33 @@
       --warm: #b09050;
       --purple: #a86070;
       --overdue: #b3452c;
+
+      /* ── 動效 token（Animate UI；一個角色一個值，popup.html 宣告同一組，見 docs/motion-review-2026-10-22.md #39）──
+         JS 端（WAAPI／setTimeout／inline transition）用 dashboard.js 的 MOTION，數值與此同步：改一邊要改另一邊。
+         減少動態時位移/縮放類 token 歸零（見檔尾 prefers-reduced-motion 區塊）。 */
+      --ease-color: cubic-bezier(0.25, 0.1, 0.25, 1);     /* ease.color：hover 換色、highlight 出現/消失 */
+      --ease-out: cubic-bezier(0.23, 1, 0.32, 1);         /* ease.out：進場／出場、淡入淡出 */
+      --ease-soft: cubic-bezier(0.215, 0.61, 0.355, 1);   /* ease.soft：選單、disclosure 展開 */
+      --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);     /* ease.inOut：兩頁一起移動（push） */
+      --ease-ring: cubic-bezier(0.16, 1, 0.3, 1);         /* 進度環弧與分子 tick（使用者拍板，只命名、數值不動） */
+      --t-color: 200ms var(--ease-color);                 /* transition.color */
+      --t-fade: 200ms var(--ease-out);                    /* transition.fade */
+      --t-swap: 150ms var(--ease-out);                    /* transition.swap */
+      --t-reveal: 300ms var(--ease-out);                  /* transition.reveal */
+      --t-menu: 220ms var(--ease-soft);                   /* transition.menu */
+      --t-disclosure: 350ms var(--ease-soft);             /* transition.disclosure */
+      /* spring（stiffness/damping → CSS linear()；由 skill 的 css-timing 轉出） */
+      --spring-press: 400ms linear(0, 0.0261, 0.0935, 0.188, 0.2977, 0.4132, 0.5271, 0.6343, 0.7313, 0.8159, 0.8872, 0.9452, 0.9906, 1.0244, 1.048, 1.063, 1.0709, 1.0732, 1.0713, 1.0663, 1.0594, 1.0514, 1.0429, 1.0346, 1.0267, 1.0196, 1.0134, 1.0082, 1.004, 1.0007, 0.9982, 0.9965, 1, 0.9948, 0.9946, 0.9948, 1, 1, 1, 1);   /* spring.press 550/30 */
+      --spring-highlight: 300ms linear(0, 0.0233, 0.0813, 0.1598, 0.2483, 0.3396, 0.4288, 0.5126, 0.5894, 0.658, 0.7183, 0.7704, 0.8149, 0.8524, 0.8837, 0.9094, 0.9303, 0.9472, 0.9607, 0.9713, 0.9796, 0.986, 0.9908, 0.9944, 0.997, 0.9988, 1.0001, 1.001, 1.0015, 1);   /* spring.highlight 500/40 */
+      --reflow: var(--spring-highlight);                  /* spring.reflow（同為 500/40）：補位、落點 */
+      --spring-selection: 500ms linear(0, 0.0141, 0.0509, 0.1035, 0.1663, 0.2349, 0.306, 0.3769, 0.4459, 0.5115, 0.573, 0.6297, 0.6814, 0.728, 0.7696, 0.8064, 0.8387, 0.8668, 0.8911, 0.9119, 0.9296, 0.9445, 0.957, 0.9673, 0.9758, 0.9827, 0.9882, 0.9926, 0.9961, 0.9987, 1.0007, 1.0021, 1.0031, 1.0038, 1.0041, 1, 1, 1, 1.004, 1.0038, 1.0035, 1.0032, 1.0029, 1.0026, 1.0023, 1.002, 1.0017, 1.0015, 1, 1);   /* spring.selection 300/30 */
+      --ring: 800ms var(--ease-ring);                     /* 進度環弧 */
+      --ring-tick: 400ms var(--ease-ring);                /* 進度環分子變動的微上滑 tick */
+      /* 位移／縮放量（減少動態時歸零或 1） */
+      --lift: -2px;                                       /* 卡片 hover 上浮 */
+      --scale-press: 0.97;                                /* scale.press：按鈕按下 */
+      --scale-choice: 0.985;                              /* scale.choice：整張卡片／整列按下 */
+      --modal-from: scale(0.96);                          /* modal 進出場的起點縮放 */
     }
 
     * {
@@ -157,11 +184,13 @@
       padding: 8px 12px;
       cursor: pointer;
       color: var(--dark);
-      transition: background 0.12s, color 0.12s;
+      transition: background-color var(--t-color), color var(--t-color);
     }
 
-    .side-nav-item:hover {
-      background: var(--bg);
+    @media (hover: hover) and (pointer: fine) {
+      .side-nav-item:hover {
+        background: var(--bg);
+      }
     }
 
     .side-nav-item.active {
@@ -239,7 +268,7 @@
       background: transparent;
       width: 100%;
       text-align: left;
-      transition: background 0.12s;
+      transition: background-color var(--t-color);
       position: relative;
       user-select: none;   /* 雙擊重命名時不選取課名文字 */
     }
@@ -248,8 +277,10 @@
       display: none;
     }
 
-    .nav-course-item:hover {
-      background: var(--bg);
+    @media (hover: hover) and (pointer: fine) {
+      .nav-course-item:hover {
+        background: var(--bg);
+      }
     }
 
     .nav-course-item.active {
@@ -327,13 +358,15 @@
       background: var(--bg);
       color: var(--muted);
       cursor: pointer;
-      transition: all 0.12s;
+      transition: border-color var(--t-color), color var(--t-color);   /* 不列 outline：focus ring 第一幀就完整（#26） */
       text-align: center;
     }
 
-    .btn-sync:hover {
-      border-color: var(--orange);
-      color: var(--orange);
+    @media (hover: hover) and (pointer: fine) {
+      .btn-sync:hover {
+        border-color: var(--orange);
+        color: var(--orange);
+      }
     }
 
     .btn-sync.sync-error {
@@ -377,12 +410,14 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: all 0.12s;
+      transition: border-color var(--t-color), color var(--t-color), background-color var(--t-color);
     }
 
-    .btn-theme-toggle:hover {
-      border-color: var(--orange);
-      color: var(--orange);
+    @media (hover: hover) and (pointer: fine) {
+      .btn-theme-toggle:hover {
+        border-color: var(--orange);
+        color: var(--orange);
+      }
     }
 
     .btn-theme-toggle.open {
@@ -457,12 +492,14 @@
       align-items: center;
       justify-content: space-between;
       cursor: pointer;
-      transition: background 0.12s, color 0.12s;
+      transition: background-color var(--t-color), color var(--t-color);
     }
 
-    .settings-menu-item:hover {
-      background: var(--surface);
-      color: var(--orange);
+    @media (hover: hover) and (pointer: fine) {
+      .settings-menu-item:hover {
+        background: var(--surface);
+        color: var(--orange);
+      }
     }
 
     .settings-submenu {
@@ -477,7 +514,7 @@
       visibility: hidden;
       pointer-events: none;
       z-index: 9999;
-      transition: opacity 0.16s ease, visibility 0.16s ease;
+      transition: opacity var(--t-menu), visibility var(--t-menu);
     }
 
     .settings-submenu.submenu-visible {
@@ -497,12 +534,14 @@
       font-size: 12px;
       font-family: 'DM Sans', sans-serif;
       cursor: pointer;
-      transition: background 0.12s, color 0.12s;
+      transition: background-color var(--t-color), color var(--t-color);
     }
 
-    .settings-submenu button:hover {
-      background: var(--surface);
-      color: var(--orange);
+    @media (hover: hover) and (pointer: fine) {
+      .settings-submenu button:hover {
+        background: var(--surface);
+        color: var(--orange);
+      }
     }
 
     /* ── Main Content ── */
@@ -552,11 +591,13 @@
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      transition: color 0.12s;
+      transition: color var(--t-color);
     }
 
-    .detail-back-tab:hover {
-      color: var(--orange);
+    @media (hover: hover) and (pointer: fine) {
+      .detail-back-tab:hover {
+        color: var(--orange);
+      }
     }
 
     .page-tabs.detail-mode .detail-back-tab {
@@ -577,13 +618,15 @@
       text-transform: uppercase;
       letter-spacing: 0.05em;
       cursor: pointer;
-      transition: all 0.15s;
+      transition: border-color var(--t-color), color var(--t-color);
       white-space: nowrap;
     }
 
-    .btn-add-assignment:hover {
-      border-color: var(--dark);
-      color: var(--dark);
+    @media (hover: hover) and (pointer: fine) {
+      .btn-add-assignment:hover {
+        border-color: var(--dark);
+        color: var(--dark);
+      }
     }
 
     #main-section {
@@ -672,7 +715,7 @@
       stroke: var(--green);
       stroke-width: 20;
       stroke-linecap: round;
-      transition: stroke-dashoffset .8s cubic-bezier(0.16, 1, 0.3, 1);
+      transition: stroke-dashoffset var(--ring);
     }
 
     .wk-ring-center {
@@ -710,7 +753,7 @@
 
     .wk-ring-frac b.tick {
       display: inline-block;
-      animation: wk-frac-tick .4s cubic-bezier(0.16, 1, 0.3, 1) both;
+      animation: wk-frac-tick var(--ring-tick) both;
     }
 
     .wk-ring-cap {
@@ -740,19 +783,23 @@
       padding: 8px 12px;
       border-radius: 7px;
       cursor: pointer;
-      transition: background 0.12s;
+      transition: background-color var(--t-color);
     }
 
-    .wk-sum-row:hover {
-      background: rgba(217, 119, 87, 0.06);
+    @media (hover: hover) and (pointer: fine) {
+      .wk-sum-row:hover {
+        background: rgba(217, 119, 87, 0.06);
+      }
     }
 
     .wk-sum-row.is-overdue {
       background: color-mix(in srgb, var(--overdue) 8%, transparent);
     }
 
-    .wk-sum-row.is-overdue:hover {
-      background: color-mix(in srgb, var(--overdue) 13%, transparent);
+    @media (hover: hover) and (pointer: fine) {
+      .wk-sum-row.is-overdue:hover {
+        background: color-mix(in srgb, var(--overdue) 13%, transparent);
+      }
     }
 
     .wk-sum-num {
@@ -812,8 +859,10 @@
       border-radius: 3px;
     }
 
-    .week-right::-webkit-scrollbar-thumb:hover {
-      background: var(--mid);
+    @media (hover: hover) and (pointer: fine) {
+      .week-right::-webkit-scrollbar-thumb:hover {
+        background: var(--mid);
+      }
     }
 
     .week-group {
@@ -884,11 +933,13 @@
       display: flex;
       flex-direction: column;
       gap: 6px;
-      transition: border-color 0.12s;
+      transition: border-color var(--t-color);
     }
 
-    .week-task-card:hover {
-      border-color: var(--orange);
+    @media (hover: hover) and (pointer: fine) {
+      .week-task-card:hover {
+        border-color: var(--orange);
+      }
     }
 
     /* 週卡片右上角完成勾選圈（視覺沿用 .assignment-check，改為 absolute 定位）
@@ -989,7 +1040,7 @@
       background: transparent;
       cursor: pointer;
       position: relative;
-      transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+      transition: background-color var(--t-color), border-color var(--t-color), box-shadow var(--t-color);
     }
 
     /* 擴大點擊/hover 範圍：圓圈外約 7px（仍小於與文字的 12px 間距，不壓到字） */
@@ -1001,10 +1052,12 @@
     }
 
     /* 進入範圍即「亮起」：綠框 + 微綠填充 + 柔光暈（暗示可點範圍比圓圈大一圈） */
-    .assignment-check:hover {
-      border-color: var(--green);
-      background: color-mix(in srgb, var(--green) 12%, transparent);
-      box-shadow: 0 0 0 4px color-mix(in srgb, var(--green) 10%, transparent);
+    @media (hover: hover) and (pointer: fine) {
+      .assignment-check:hover {
+        border-color: var(--green);
+        background: color-mix(in srgb, var(--green) 12%, transparent);
+        box-shadow: 0 0 0 4px color-mix(in srgb, var(--green) 10%, transparent);
+      }
     }
 
     .assignment-check[data-done="true"] {
@@ -1098,12 +1151,14 @@
     .assignment-title-link {
       display: inline;
       cursor: pointer;
-      transition: color 0.15s;
+      transition: color var(--t-color);
     }
 
-    .assignment-title-link:hover {
-      color: var(--orange);
-      text-decoration: underline;
+    @media (hover: hover) and (pointer: fine) {
+      .assignment-title-link:hover {
+        color: var(--orange);
+        text-decoration: underline;
+      }
     }
 
     .assignment-group {
@@ -1364,11 +1419,13 @@
       font-size: 12px;
       text-align: right;
       outline: none;
-      transition: border-color 0.12s;
+      transition: border-color var(--t-color);
     }
 
+    /* focus 邊框是唯一的焦點指示：第一幀就到位、不淡入（blur 時才走上面的淡回，#26） */
     .grade-calc-pts input:focus {
       border-color: var(--orange);
+      transition: none;
     }
 
     .grade-calc-possible {
@@ -1391,13 +1448,15 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      transition: all 0.12s;
+      transition: border-color var(--t-color), color var(--t-color), background-color var(--t-color);
     }
 
-    .btn-delete-custom-assignment:hover {
-      border-color: var(--orange);
-      color: var(--orange);
-      background: rgba(217, 119, 87, 0.08);
+    @media (hover: hover) and (pointer: fine) {
+      .btn-delete-custom-assignment:hover {
+        border-color: var(--orange);
+        color: var(--orange);
+        background: rgba(217, 119, 87, 0.08);
+      }
     }
 
     .assignment-item.custom-assignment .assignment-title {
@@ -1439,7 +1498,7 @@
       max-height: calc(100vh - 64px);
       position: relative;
       box-shadow: 0 24px 64px rgba(20, 20, 19, 0.18);
-      animation: welcomeIn 0.28s ease;
+      animation: welcomeIn 0.28s var(--ease-out);
       display: flex;
       flex-direction: column;
       overflow: hidden;
@@ -1480,20 +1539,22 @@
       align-items: center;
       justify-content: center;
       border-radius: 6px;
-      transition: background 0.15s, color 0.15s;
+      transition: background-color var(--t-color), color var(--t-color);
       z-index: 2;
     }
 
-    .welcome-close:hover {
-      background: var(--surface);
-      color: var(--dark);
+    @media (hover: hover) and (pointer: fine) {
+      .welcome-close:hover {
+        background: var(--surface);
+        color: var(--dark);
+      }
     }
 
     .welcome-track {
       display: flex;
       width: 500%;
       height: 100%;
-      transition: transform 0.38s cubic-bezier(0.4, 0, 0.2, 1);
+      transition: transform 380ms var(--ease-in-out);   /* route：兩頁一起移動（push）用 ease.inOut */
     }
 
     .welcome-step {
@@ -1732,7 +1793,7 @@
       height: 6px;
       border-radius: 50%;
       background: var(--border);
-      transition: background 0.2s, width 0.2s;
+      transition: background-color var(--t-color), width var(--t-color);
       cursor: pointer;
     }
 
@@ -1749,16 +1810,18 @@
       font-weight: 400;
       font-size: 13px;
       cursor: pointer;
-      transition: all 0.15s;
+      transition: background-color var(--t-color), border-color var(--t-color), color var(--t-color);
       border: 1px solid var(--dark);
       background: var(--dark);
       color: var(--bg);
       white-space: nowrap;
     }
 
-    .welcome-btn:hover {
-      background: #2a2a27;
-      border-color: #2a2a27;
+    @media (hover: hover) and (pointer: fine) {
+      .welcome-btn:hover {
+        background: #2a2a27;
+        border-color: #2a2a27;
+      }
     }
 
     .welcome-btn.sec {
@@ -1767,9 +1830,11 @@
       color: var(--muted);
     }
 
-    .welcome-btn.sec:hover {
-      border-color: var(--orange);
-      color: var(--orange);
+    @media (hover: hover) and (pointer: fine) {
+      .welcome-btn.sec:hover {
+        border-color: var(--orange);
+        color: var(--orange);
+      }
     }
 
     .welcome-btn.ora {
@@ -1778,9 +1843,11 @@
       color: #fff;
     }
 
-    .welcome-btn.ora:hover {
-      background: #c4683f;
-      border-color: #c4683f;
+    @media (hover: hover) and (pointer: fine) {
+      .welcome-btn.ora:hover {
+        background: #c4683f;
+        border-color: #c4683f;
+      }
     }
 
     /* ── Welcome feature item: allow text wrap ── */
@@ -1800,12 +1867,14 @@
       color: var(--orange);
       text-decoration: none;
       border-bottom: 1px solid transparent;
-      transition: border-color 0.15s;
+      transition: border-color var(--t-color);
       cursor: pointer;
     }
 
-    .welcome-inline-link:hover {
-      border-bottom-color: var(--orange);
+    @media (hover: hover) and (pointer: fine) {
+      .welcome-inline-link:hover {
+        border-bottom-color: var(--orange);
+      }
     }
 
     /* ── Welcome step 4：拖曳示意圖 ── */
@@ -2212,7 +2281,7 @@
       font-size: 14px;
       padding: 10px 12px;
       outline: none;
-      transition: border-color 0.12s;
+      transition: border-color var(--t-color);
     }
 
     .custom-assignment-field textarea {
@@ -2221,10 +2290,12 @@
       line-height: 1.6;
     }
 
+    /* focus 邊框是唯一的焦點指示：第一幀就到位、不淡入（blur 時才淡回，#26） */
     .custom-assignment-field input:focus,
     .custom-assignment-field select:focus,
     .custom-assignment-field textarea:focus {
       border-color: var(--orange);
+      transition: none;
     }
 
     .custom-assignment-error {
@@ -2273,14 +2344,16 @@
       flex-direction: column;
       min-height: 0;
       cursor: pointer;
-      transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+      transition: border-color var(--t-color), box-shadow var(--t-color), transform 0.2s ease;
     }
 
 
-    .course-card-grid:hover {
-      border-color: var(--orange);
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-      transform: translateY(-2px);
+    @media (hover: hover) and (pointer: fine) {
+      .course-card-grid:hover {
+        border-color: var(--orange);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        transform: translateY(var(--lift));
+      }
     }
 
 
@@ -2464,12 +2537,14 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: all 0.1s;
+      transition: border-color var(--t-color), color var(--t-color), opacity var(--t-color);
     }
 
-    .card-pager-btn:hover:not(:disabled) {
-      border-color: var(--orange);
-      color: var(--orange);
+    @media (hover: hover) and (pointer: fine) {
+      .card-pager-btn:hover:not(:disabled) {
+        border-color: var(--orange);
+        color: var(--orange);
+      }
     }
 
     .card-pager-btn:disabled {
@@ -2522,11 +2597,13 @@
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      transition: color 0.12s;
+      transition: color var(--t-color);
     }
 
-    .detail-back:hover {
-      color: var(--orange);
+    @media (hover: hover) and (pointer: fine) {
+      .detail-back:hover {
+        color: var(--orange);
+      }
     }
 
     /* Detail Top — mirrors .card-top */
@@ -2573,15 +2650,30 @@
       padding: 2px 4px;
       border-radius: 4px;
       opacity: 0;
-      transition: opacity 0.15s, color 0.15s;
+      transition: opacity var(--t-color), color var(--t-color);
     }
 
-    .detail-name:hover .btn-rename-course {
+    @media (hover: hover) and (pointer: fine) {
+      .detail-name:hover .btn-rename-course {
+        opacity: 1;
+      }
+
+      .btn-rename-course:hover {
+        color: var(--dark);
+      }
+    }
+
+    /* 鉛筆平常隱形、只靠 hover 叫出 → 鍵盤 Tab 到它時第一幀就看得見（不淡入，#5）；
+       沒有可 hover 的指標（觸控）時以 0.6 常駐，不必先點課名才找得到（#11） */
+    .btn-rename-course:focus-visible {
       opacity: 1;
+      transition: none;
     }
 
-    .btn-rename-course:hover {
-      color: var(--dark);
+    @media not all and (hover: hover) and (pointer: fine) {
+      .btn-rename-course {
+        opacity: 0.6;
+      }
     }
 
     .course-rename-input {
@@ -2716,13 +2808,15 @@
       font-size: 11px;
       font-weight: 300;
       cursor: pointer;
-      transition: border-color 0.15s, color 0.15s;
+      transition: border-color var(--t-color), color var(--t-color);
       letter-spacing: 0.02em;
     }
 
-    .btn-edit-weights:hover {
-      border-color: var(--orange);
-      color: var(--orange);
+    @media (hover: hover) and (pointer: fine) {
+      .btn-edit-weights:hover {
+        border-color: var(--orange);
+        color: var(--orange);
+      }
     }
 
     .detail-right-panel {
@@ -2749,8 +2843,10 @@
       border-radius: 3px;
     }
 
-    .detail-right-panel::-webkit-scrollbar-thumb:hover {
-      background: var(--mid);
+    @media (hover: hover) and (pointer: fine) {
+      .detail-right-panel::-webkit-scrollbar-thumb:hover {
+        background: var(--mid);
+      }
     }
 
     .detail-assignments-label {
@@ -2781,11 +2877,13 @@
       font-size: 11px;
       letter-spacing: 0.03em;
       color: var(--muted);
-      transition: color 0.12s;
+      transition: color var(--t-color);
     }
 
-    .hidden-items-toggle:hover {
-      color: var(--orange);
+    @media (hover: hover) and (pointer: fine) {
+      .hidden-items-toggle:hover {
+        color: var(--orange);
+      }
     }
 
     .hidden-items-arrow {
@@ -2839,17 +2937,37 @@
       opacity: 0.45;
       cursor: grab;
       touch-action: none;
-      transition: opacity 0.12s, color 0.12s;
+      transition: opacity var(--t-color), color var(--t-color);
     }
 
-    .hidden-item-row:hover .drag-grip,
-    .assignment-item:hover .drag-grip {
+    @media (hover: hover) and (pointer: fine) {
+      .hidden-item-row:hover .drag-grip,
+      .assignment-item:hover .drag-grip {
+        opacity: 0.85;
+      }
+
+      .drag-grip:hover {
+        color: var(--orange);
+        opacity: 1;
+      }
+    }
+
+    /* 鍵盤焦點在該列（:has(:focus-visible)＝只算鍵盤）時握把跟 hover 一樣亮起；
+       握把本身拿到焦點時全亮、第一幀就到位（#6 會把它改成 button）；
+       觸控時以 0.85 常駐（#11） */
+    :is(.hidden-item-row, .assignment-item):has(:focus-visible) .drag-grip {
       opacity: 0.85;
     }
 
-    .drag-grip:hover {
-      color: var(--orange);
+    :is(.hidden-item-row, .assignment-item) .drag-grip:focus-visible {
       opacity: 1;
+      transition: none;
+    }
+
+    @media not all and (hover: hover) and (pointer: fine) {
+      .drag-grip {
+        opacity: 0.85;
+      }
     }
 
     .drag-grip:active {
@@ -2975,7 +3093,10 @@
       flex-shrink: 0;
     }
 
-    /* ── View Transitions — Card ↔ Detail Morph ── */
+    /* ── View Transitions — Card ↔ Detail Morph ──
+       具名 deviation（#39）：group 曲線保留 cubic-bezier(0.22,1,0.36,1)（≈ ease.out）、0.28s。
+       B2 對 morph 的角色曲線是 ease.inOut、recipe 是 spring.dialog 750ms，但這是高頻 drill-down，
+       起步慢的曲線看起來像延遲、750ms 又太長。減少動態時 JS 不命名共享元素（見 setMorphName），只剩 root crossfade。 */
     ::view-transition-group(course-shell),
     ::view-transition-group(course-code),
     ::view-transition-group(course-name),
@@ -3108,10 +3229,10 @@
       background: var(--bg);
       color: var(--dark);
       outline: none;
-      transition: border-color 0.12s;
+      transition: border-color var(--t-color);
     }
 
-    .weight-edit-name:focus { border-color: var(--orange); }
+    .weight-edit-name:focus { border-color: var(--orange); transition: none; }
 
     .weight-edit-pct {
       width: 64px;
@@ -3124,10 +3245,10 @@
       color: var(--dark);
       text-align: right;
       outline: none;
-      transition: border-color 0.12s;
+      transition: border-color var(--t-color);
     }
 
-    .weight-edit-pct:focus { border-color: var(--orange); }
+    .weight-edit-pct:focus { border-color: var(--orange); transition: none; }
 
     .weight-edit-del {
       border: none;
@@ -3137,14 +3258,16 @@
       cursor: pointer;
       padding: 2px 4px;
       border-radius: 4px;
-      transition: color 0.12s;
+      transition: color var(--t-color);
       flex-shrink: 0;
       display: inline-flex;
       align-items: center;
       justify-content: center;
     }
 
-    .weight-edit-del:hover { color: var(--orange); }
+    @media (hover: hover) and (pointer: fine) {
+      .weight-edit-del:hover { color: var(--orange); }
+    }
 
     .weight-edit-add {
       margin: 0 20px 12px;
@@ -3156,11 +3279,13 @@
       font-family: 'DM Sans', sans-serif;
       font-size: 12px;
       cursor: pointer;
-      transition: border-color 0.12s, color 0.12s;
+      transition: border-color var(--t-color), color var(--t-color);
       flex-shrink: 0;
     }
 
-    .weight-edit-add:hover { border-color: var(--orange); color: var(--orange); }
+    @media (hover: hover) and (pointer: fine) {
+      .weight-edit-add:hover { border-color: var(--orange); color: var(--orange); }
+    }
 
     .weight-edit-footer {
       display: flex;
@@ -3203,11 +3328,13 @@
       padding: 4px 0;
       text-decoration: underline;
       text-underline-offset: 2px;
-      transition: color 0.12s;
+      transition: color var(--t-color);
       white-space: nowrap;
     }
 
-    .weight-edit-reset:hover { color: var(--orange); }
+    @media (hover: hover) and (pointer: fine) {
+      .weight-edit-reset:hover { color: var(--orange); }
+    }
 
     .weight-edit-cancel {
       padding: 7px 16px;
@@ -3220,10 +3347,12 @@
       text-transform: uppercase;
       letter-spacing: 0.05em;
       cursor: pointer;
-      transition: border-color 0.12s, color 0.12s;
+      transition: border-color var(--t-color), color var(--t-color);
     }
 
-    .weight-edit-cancel:hover { border-color: var(--orange); color: var(--orange); }
+    @media (hover: hover) and (pointer: fine) {
+      .weight-edit-cancel:hover { border-color: var(--orange); color: var(--orange); }
+    }
 
     .weight-edit-save {
       padding: 7px 20px;
@@ -3236,10 +3365,12 @@
       text-transform: uppercase;
       letter-spacing: 0.05em;
       cursor: pointer;
-      transition: opacity 0.12s;
+      transition: opacity var(--t-color);
     }
 
-    .weight-edit-save:hover { opacity: 0.8; }
+    @media (hover: hover) and (pointer: fine) {
+      .weight-edit-save:hover { opacity: 0.8; }
+    }
 
 
 
@@ -3253,6 +3384,19 @@
     .week-task-card:focus-visible {
       outline: 2px solid var(--orange);
       outline-offset: 2px;
+    }
+
+    /* 視覺隱藏、仍在 accessibility tree（螢幕閱讀器播報區 #a11y-status 等用，見 dashboard.js announce） */
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      margin: -1px;
+      padding: 0;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+      border: 0;
     }
 
     /* ── 自訂作業「編輯」鈕（與刪除✕並排；風格比照刪除鈕）── */
@@ -3273,13 +3417,15 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      transition: all 0.12s;
+      transition: border-color var(--t-color), color var(--t-color), background-color var(--t-color);
     }
 
-    .btn-edit-custom-assignment:hover {
-      border-color: var(--orange);
-      color: var(--orange);
-      background: rgba(217, 119, 87, 0.08);
+    @media (hover: hover) and (pointer: fine) {
+      .btn-edit-custom-assignment:hover {
+        border-color: var(--orange);
+        color: var(--orange);
+        background: rgba(217, 119, 87, 0.08);
+      }
     }
 
     /* ── 自製確認對話框（取代 window.confirm；風格比照其他 modal）── */
@@ -3347,9 +3493,11 @@
       color: var(--muted);
     }
 
-    .btn-confirm-cancel:hover {
-      border-color: var(--orange);
-      color: var(--orange);
+    @media (hover: hover) and (pointer: fine) {
+      .btn-confirm-cancel:hover {
+        border-color: var(--orange);
+        color: var(--orange);
+      }
     }
 
     .btn-confirm-ok {
@@ -3358,8 +3506,10 @@
       color: #fff;
     }
 
-    .btn-confirm-ok:hover {
-      opacity: 0.88;
+    @media (hover: hover) and (pointer: fine) {
+      .btn-confirm-ok:hover {
+        opacity: 0.88;
+      }
     }
 
     /* ── 響應式斷點：窄視窗降欄、縮 sidebar、縮 padding ──
@@ -3394,10 +3544,77 @@
         overflow-y: visible;
       }
     }
+
+    /* ── 減少動態（prefers-reduced-motion，見 docs/motion-review-2026-10-22.md #0）──
+       保留：淡入淡出、顏色、撤銷倒數條（期限 meter，不算位移）、.bursting 的 opacity、drag-arrived 閃色、
+             View Transition 的 root crossfade、:focus-visible 外框。
+       拿掉：位移、縮放、旋轉、尺寸動畫；無限循環改成只閃透明度或停止。
+       CSS 管不到的（WAAPI、scrollTo、View Transition 共享元素命名、拖曳 clone 的 inline transform）
+       由 dashboard.js 的 reduceMotion() 處理，兩邊必須一起改：只在這裡把 .wk-ring-bar 設 transition:none
+       會讓 transitionend 永遠不觸發，落點迸發與「全部完成」會一起消失。
+       放在檔尾：與各規則同特異度時靠順序勝出。 */
+    @keyframes rm-fade {
+      from { opacity: 0; }
+    }
+
+    @keyframes dot-pulse {
+      0%, 80%, 100% { opacity: 0.4; }
+      40% { opacity: 1; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      :root {
+        --lift: 0px;
+        --scale-press: 1;
+        --scale-choice: 1;
+        --modal-from: none;
+      }
+
+      /* 進場位移 → 只淡入 */
+      #main-section.arrive > *,
+      .wk-ring-frac b.tick,
+      .welcome-card {
+        animation-name: rm-fade;
+      }
+
+      /* 碎點／慶祝粒子是位移：不顯示（JS 也不產生，見 spawnBurstDots／celebrateRingArrival） */
+      .complete-burst-dot,
+      .wk-celebrate-dot {
+        display: none;
+      }
+
+      /* 弧直接到位（JS 不等 transitionend）、chevron 不轉、教學頁直接換 */
+      .wk-ring-bar,
+      .hidden-items-arrow,
+      .welcome-track {
+        transition: none;
+      }
+
+      /* 尺寸動畫拿掉，只留換色 */
+      .welcome-dot {
+        transition: background-color var(--t-color);
+      }
+
+      .detail-assignments-list.drop-active,
+      .hidden-items.drop-active {
+        transition: background-color var(--t-color);
+      }
+
+      /* loop（A4）：同步中的點保留 1.2s 節奏但只閃不跳；skeleton 掃光停止 */
+      .sync-dots span {
+        animation-name: dot-pulse;
+      }
+
+      .skel {
+        animation: none;
+      }
+    }
   </style>
 </head>
 
 <body>
+  <!-- 螢幕閱讀器播報區：頁面一開始就掛好（live region 要先存在，之後寫入的文字才會被念出）；寫入一律走 dashboard.js 的 announce() -->
+  <div id="a11y-status" class="sr-only" role="status" aria-live="polite"></div>
   <div class="layout">
 
     <!-- ── Left Sidebar ── -->
