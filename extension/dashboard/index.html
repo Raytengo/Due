@@ -189,13 +189,36 @@
 
     /* Sidebar main nav */
     .side-nav {
+      position: relative;   /* 滑動 indicator 的定位基準；項目的 offsetTop 也以此為準（#47） */
       display: flex;
       flex-direction: column;
       gap: 2px;
       margin-bottom: 22px;
     }
 
+    /* 學期待辦／課程共用一塊 active 底色（indicator recipe，#47）：換頁時沿 spring.selection 從上一項滑到下一項，
+       不再是兩處底色各自淡出淡入。位置由 dashboard.js placeSideNavIndicator() 寫入 --y／--h；
+       沒有 active 項（課程詳情、已繳交）時 .is-off 原地淡出（transition.color）。用獨立的 translate 屬性，
+       按下 active 項時的 scale（#24）才疊得上去、以 indicator 自己的中心縮放。減少動態：位置直接到位（檔尾） */
+    .side-nav-indicator {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 0;
+      height: var(--h, 0px);
+      translate: 0 var(--y, 0px);
+      border-radius: 6px;
+      background: rgba(217, 119, 87, 0.09);
+      pointer-events: none;
+      transition: translate var(--spring-selection), opacity var(--t-color), scale var(--spring-press);
+    }
+
+    .side-nav-indicator.is-off {
+      opacity: 0;
+    }
+
     .side-nav-item {
+      position: relative;   /* 疊在 indicator 之上（兩者皆定位、z-index auto，DOM 順序在後） */
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -208,7 +231,7 @@
       padding: 8px 12px;
       cursor: pointer;
       color: var(--dark);
-      transition: background-color var(--t-color), color var(--t-color);
+      transition: background-color var(--t-color), color var(--t-color), scale var(--spring-press);
     }
 
     @media (hover: hover) and (pointer: fine) {
@@ -220,6 +243,13 @@
     .side-nav-item.active {
       background: rgba(217, 119, 87, 0.09);
       color: var(--orange);
+    }
+
+    /* 學期待辦／課程的 active 底色改由 indicator 畫（#47），本身不再上底色（含 hover）。
+       .has-indicator 由 placeSideNavIndicator() 第一次定位時加上：在那之前（JS 還沒跑的第一次繪製）底色仍畫在項目上，
+       載入那一幀就看得到選取。「已繳交」是獨立的過濾切換，保留上面自己的 .active 底色 */
+    .side-nav.has-indicator > .side-nav-item[data-page].active {
+      background: transparent;
     }
 
     /* 沒有課程時停用（課程／已繳交）：淡化、不給 hover（title 說明原因，見 setNoCoursesMode） */
@@ -292,7 +322,7 @@
       background: transparent;
       width: 100%;
       text-align: left;
-      transition: background-color var(--t-color);
+      transition: background-color var(--t-color), scale var(--spring-press);
       position: relative;
       user-select: none;   /* 雙擊重命名時不選取課名文字 */
     }
@@ -398,7 +428,7 @@
       font-size: 11px;
       letter-spacing: 0.03em;
       color: var(--muted);
-      transition: color var(--t-color);
+      transition: color var(--t-color), scale var(--spring-press);
     }
 
     @media (hover: hover) and (pointer: fine) {
@@ -431,7 +461,7 @@
       background: var(--bg);
       color: var(--muted);
       cursor: pointer;
-      transition: border-color var(--t-color), color var(--t-color);   /* 不列 outline：focus ring 第一幀就完整（#26） */
+      transition: border-color var(--t-color), color var(--t-color), scale var(--spring-press);   /* 不列 outline：focus ring 第一幀就完整（#26）；scale＝按壓（#24） */
       text-align: center;
     }
 
@@ -511,7 +541,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: border-color var(--t-color), color var(--t-color), background-color var(--t-color);
+      transition: border-color var(--t-color), color var(--t-color), background-color var(--t-color), scale var(--spring-press);
     }
 
     @media (hover: hover) and (pointer: fine) {
@@ -725,7 +755,7 @@
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      transition: color var(--t-color);
+      transition: color var(--t-color), scale var(--spring-press);
     }
 
     @media (hover: hover) and (pointer: fine) {
@@ -752,7 +782,7 @@
       text-transform: uppercase;
       letter-spacing: 0.05em;
       cursor: pointer;
-      transition: border-color var(--t-color), color var(--t-color);
+      transition: border-color var(--t-color), color var(--t-color), scale var(--spring-press);
       white-space: nowrap;
     }
 
@@ -912,7 +942,7 @@
       padding: 8px 12px;
       border-radius: 7px;
       cursor: pointer;
-      transition: background-color var(--t-color);
+      transition: background-color var(--t-color), scale var(--spring-press);
     }
 
     @media (hover: hover) and (pointer: fine) {
@@ -1065,12 +1095,18 @@
       display: flex;
       flex-direction: column;
       gap: 6px;
-      transition: border-color var(--t-color);
+      /* 整張卡可點（開課程詳情）：與課程卡同一組 card recipe（#25）——框與陰影走 transition.color，
+         上浮走 spring.highlight（滑鼠離開立即 retarget），按下走 spring.press（#24）。上浮／按下用獨立的
+         translate／scale 屬性：互相疊加，也不跟 FLIP 補位與出場層的 WAAPI transform 打架 */
+      cursor: pointer;
+      transition: border-color var(--t-color), box-shadow var(--t-color), translate var(--spring-highlight), scale var(--spring-press);
     }
 
     @media (hover: hover) and (pointer: fine) {
-      .week-task-card:hover {
+      .week-task-card:not(.bursting):hover {
         border-color: var(--orange);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        translate: 0 var(--lift);
       }
     }
 
@@ -1127,6 +1163,8 @@
 
     /* Assignment List */
     .assignment-item {
+      position: relative;    /* hover 底色層（::before）與撤銷倒數條的定位基準，不影響版面 */
+      isolation: isolate;    /* ::before 的 z-index:-1 留在列自己的堆疊脈絡裡：畫在內容下面、不掉到清單底色後面 */
       display: flex;
       align-items: flex-start;
       justify-content: space-between;
@@ -1134,6 +1172,34 @@
       border-bottom: 1px solid var(--border);
       cursor: pointer;
       line-height: 1.8;
+      transition: scale var(--spring-press);   /* 整列按下（#24） */
+    }
+
+    /* 整列可點（展開描述）：hover 時淺色底（#37，card recipe 的 row）。畫在溢出層，不改版面——
+       左右各外擴 8px，剛好落在 .detail-right-panel 的 8px 側邊留白內；列下面是 --bg，用 --surface 才看得見。
+       拖曳中、出場中、殘影、落地閃色（.drag-arrived，游標通常就停在落點上）時不亮，閃示才看得見 */
+    .assignment-item::before {
+      content: '';
+      position: absolute;
+      inset: 0 -8px;
+      border-radius: 6px;
+      background: var(--surface);
+      opacity: 0;
+      transition: opacity var(--t-color);
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+      body:not(.drag-active) .assignment-item:not(.bursting):not(.drag-source):not(.drag-clone):not(.drag-arrived):hover::before {
+        opacity: 1;
+      }
+    }
+
+    /* 完成離場的列：底色層停在離場當下的值，隨整列一起淡出（不在出場第一幀切掉；見 dashboard.js freezeHoverLook） */
+    .assignment-item.exit-frozen::before {
+      opacity: var(--hover-lit, 0);
+      transition: none;
     }
 
     .assignment-item:last-child {
@@ -1233,7 +1299,7 @@
       from { transform: scaleX(1); }
       to   { transform: scaleX(0); }
     }
-    .assignment-item.completing { position: relative; }   /* 倒數條的定位基準（不影響版面） */
+    /* 倒數條的定位基準：.assignment-item 本身已是 position:relative（見上方 Assignment List） */
     /* 爆開中的列/週卡（離場殘影交給 exitInPlace，展開著的描述也一起離場）：不可再互動或拖曳 */
     .bursting { pointer-events: none; }
     .complete-countdown {
@@ -1519,7 +1585,7 @@
       font-size: 13px;
       letter-spacing: 0.04em;
       cursor: pointer;
-      transition: background-color var(--t-color);
+      transition: background-color var(--t-color), scale var(--spring-press);
     }
 
     @media (hover: hover) and (pointer: fine) {
@@ -1559,6 +1625,14 @@
       text-transform: uppercase;
       letter-spacing: 0.08em;
       color: var(--mid);
+      transition: color var(--t-color);
+    }
+
+    /* 標頭整條可點（開合）：hover 時標題轉橘（#37） */
+    @media (hover: hover) and (pointer: fine) {
+      .grade-calc-header:hover .grade-calc-title {
+        color: var(--orange);
+      }
     }
 
     .grade-calc-final-display {
@@ -1731,7 +1805,7 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      transition: border-color var(--t-color), color var(--t-color), background-color var(--t-color);
+      transition: border-color var(--t-color), color var(--t-color), background-color var(--t-color), scale var(--spring-press);
     }
 
     @media (hover: hover) and (pointer: fine) {
@@ -1846,7 +1920,7 @@
       align-items: center;
       justify-content: center;
       border-radius: 6px;
-      transition: background-color var(--t-color), color var(--t-color);
+      transition: background-color var(--t-color), color var(--t-color), scale var(--spring-press);
       z-index: 2;
     }
 
@@ -2082,6 +2156,13 @@
       border-radius: 3px;
     }
 
+    /* 可點的圓點（跳到該步）：未選中的 hover 加深（#37，換色走上面的 background-color transition） */
+    @media (hover: hover) and (pointer: fine) {
+      .welcome-dot:not(.active):hover {
+        background: var(--mid);
+      }
+    }
+
     .welcome-btn {
       padding: 8px 18px;
       border-radius: 6px;
@@ -2089,7 +2170,7 @@
       font-weight: 400;
       font-size: 13px;
       cursor: pointer;
-      transition: background-color var(--t-color), border-color var(--t-color), color var(--t-color);
+      transition: background-color var(--t-color), border-color var(--t-color), color var(--t-color), scale var(--spring-press);
       border: 1px solid var(--dark);
       background: var(--dark);
       color: var(--bg);
@@ -2484,6 +2565,16 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      transition: border-color var(--t-color), color var(--t-color), scale var(--spring-press);
+    }
+
+    /* 原本沒有 hover（#37）：比照其他外框鈕，橘框橘字 */
+    @media (hover: hover) and (pointer: fine) {
+      .custom-assignment-close:hover,
+      .weight-edit-close:hover {
+        border-color: var(--orange);
+        color: var(--orange);
+      }
     }
 
     .custom-assignment-form {
@@ -2565,6 +2656,7 @@
       text-transform: uppercase;
       letter-spacing: 0.05em;
       cursor: pointer;
+      transition: border-color var(--t-color), color var(--t-color), opacity var(--t-color), scale var(--spring-press);
     }
 
     .btn-custom-cancel {
@@ -2579,6 +2671,18 @@
       color: var(--bg);
     }
 
+    /* 取消／儲存原本沒有 hover（#37）：取消比照外框鈕橘框橘字，儲存（實心）比照確認鈕降一點不透明 */
+    @media (hover: hover) and (pointer: fine) {
+      .btn-custom-cancel:hover {
+        border-color: var(--orange);
+        color: var(--orange);
+      }
+
+      .btn-custom-save:hover {
+        opacity: 0.88;
+      }
+    }
+
     /* ── Card Grid ── */
     .course-card-grid {
       border: 1px solid var(--border);
@@ -2589,7 +2693,9 @@
       flex-direction: column;
       min-height: 0;
       cursor: pointer;
-      transition: border-color var(--t-color), box-shadow var(--t-color), transform 0.2s ease;
+      /* card recipe（#25，與週卡同一組）：框與陰影走 transition.color，上浮走 spring.highlight（原本 transform 0.2s ease
+         ＝顏色曲線），按下走 spring.press（#24）。上浮改寫在獨立的 translate 屬性：按下的 scale 疊上去，不會互相覆蓋 */
+      transition: border-color var(--t-color), box-shadow var(--t-color), translate var(--spring-highlight), scale var(--spring-press);
     }
 
 
@@ -2597,7 +2703,7 @@
       .course-card-grid:hover {
         border-color: var(--orange);
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-        transform: translateY(var(--lift));
+        translate: 0 var(--lift);
       }
     }
 
@@ -2838,7 +2944,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: border-color var(--t-color), color var(--t-color), opacity var(--t-color);
+      transition: border-color var(--t-color), color var(--t-color), opacity var(--t-color), scale var(--spring-press);
     }
 
     @media (hover: hover) and (pointer: fine) {
@@ -2954,7 +3060,7 @@
       padding: 2px 4px;
       border-radius: 4px;
       opacity: 0;
-      transition: opacity var(--t-color), color var(--t-color);
+      transition: opacity var(--t-color), color var(--t-color), scale var(--spring-press);
     }
 
     @media (hover: hover) and (pointer: fine) {
@@ -3118,7 +3224,7 @@
       font-size: 11px;
       font-weight: 300;
       cursor: pointer;
-      transition: border-color var(--t-color), color var(--t-color);
+      transition: border-color var(--t-color), color var(--t-color), scale var(--spring-press);
       letter-spacing: 0.02em;
     }
 
@@ -3211,7 +3317,7 @@
       letter-spacing: 0.03em;
       color: var(--muted);
       text-align: left;
-      transition: color var(--t-color);
+      transition: color var(--t-color), scale var(--spring-press);
     }
 
     @media (hover: hover) and (pointer: fine) {
@@ -3224,6 +3330,7 @@
        與數量同一段行內文字，窄欄時自然換行並對齊在箭頭之後 */
     .hidden-items-note {
       color: var(--mid);
+      transition: color var(--t-color);   /* hover 時跟著開關轉橘：淡入，不是一幀切上去（#37） */
     }
 
     .hidden-items-note::before {
@@ -3647,7 +3754,7 @@
       cursor: pointer;
       padding: 2px 4px;
       border-radius: 4px;
-      transition: color var(--t-color);
+      transition: color var(--t-color), scale var(--spring-press);
       flex-shrink: 0;
       display: inline-flex;
       align-items: center;
@@ -3668,7 +3775,7 @@
       font-family: 'DM Sans', sans-serif;
       font-size: 12px;
       cursor: pointer;
-      transition: border-color var(--t-color), color var(--t-color);
+      transition: border-color var(--t-color), color var(--t-color), scale var(--spring-press);
       flex-shrink: 0;
     }
 
@@ -3718,7 +3825,7 @@
       padding: 4px 0;
       text-decoration: underline;
       text-underline-offset: 2px;
-      transition: color var(--t-color);
+      transition: color var(--t-color), scale var(--spring-press);
       white-space: nowrap;
     }
 
@@ -3737,7 +3844,7 @@
       text-transform: uppercase;
       letter-spacing: 0.05em;
       cursor: pointer;
-      transition: border-color var(--t-color), color var(--t-color);
+      transition: border-color var(--t-color), color var(--t-color), scale var(--spring-press);
     }
 
     @media (hover: hover) and (pointer: fine) {
@@ -3755,7 +3862,7 @@
       text-transform: uppercase;
       letter-spacing: 0.05em;
       cursor: pointer;
-      transition: opacity var(--t-color);
+      transition: opacity var(--t-color), scale var(--spring-press);
     }
 
     @media (hover: hover) and (pointer: fine) {
@@ -3858,7 +3965,7 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      transition: border-color var(--t-color), color var(--t-color), background-color var(--t-color);
+      transition: border-color var(--t-color), color var(--t-color), background-color var(--t-color), scale var(--spring-press);
     }
 
     @media (hover: hover) and (pointer: fine) {
@@ -3934,6 +4041,8 @@
       text-transform: uppercase;
       letter-spacing: 0.05em;
       cursor: pointer;
+      /* 兩顆的 hover（橘框橘字／降不透明）原本沒有過渡、一幀切上去（#37）；scale＝按壓（#24） */
+      transition: border-color var(--t-color), color var(--t-color), opacity var(--t-color), scale var(--spring-press);
     }
 
     .btn-confirm-cancel {
@@ -4050,6 +4159,38 @@
       }
     }
 
+    /* ── 按壓回饋（#24，press recipe）──
+       :active 在 pointerdown 那一幀就生效，是放開之前唯一的「收到了」訊號（A5）。按鈕縮到 scale.press 0.97、
+       整張卡片／整列縮到 scale.choice 0.985，都走 spring.press（各元件 transition 清單裡的 scale）；hover 只換色／框／陰影，
+       不縮放（B4）。用獨立的 scale 屬性：不蓋掉 .btn-rename-course 的 translateY(-50%)、卡片 hover 的 translate、
+       FLIP 補位與出場層的 WAAPI transform。勾選圈不縮（用填色回應）、拖曳握把不縮（用 grabbing 游標回應）、
+       設定選單項目不縮（用 highlight 回應）。卡片／列用 :has 擋掉「按的是裡面的按鈕卻整張一起縮」。
+       鍵盤 Enter／Space 走 click()，不觸發 :active——動作本身（morph、展開）就是回饋。減少動態：兩個 scale token 為 1（檔尾） */
+    :is(.btn-sync, .btn-theme-toggle, .btn-add-assignment, .detail-back-tab, .canvas-candidate-btn, .state-msg-action,
+      .card-pager-btn, .btn-edit-weights, .btn-rename-course, .hidden-items-toggle,
+      .btn-delete-custom-assignment, .btn-edit-custom-assignment,
+      .welcome-btn, .welcome-close,
+      .custom-assignment-close, .weight-edit-close, .custom-assignment-actions button, .confirm-actions button,
+      .weight-edit-add, .weight-edit-del, .weight-edit-reset, .weight-edit-cancel, .weight-edit-save):active:not(:disabled) {
+      scale: var(--scale-press);
+    }
+
+    /* 分頁鈕另擋 :disabled:hover：觸控 tap 時 :active 會在 click 之後還留一小段（最短 active 時間），翻到最後／第一頁那顆
+       在 click 裡變 disabled、不再算 :active，祖先卡片卻還在 active 鏈上 → 整張卡空縮一下（卡片並不會開）。tap 的點仍是 :hover */
+    .course-card-grid:active:not(:has(.card-pager-btn:active, .card-pager-btn:disabled:hover)),
+    .week-task-card:active:not(.bursting):not(:has(.assignment-check:active)),
+    .wk-sum-row:active,
+    .side-nav-item:active:not(:disabled),
+    .nav-course-item:active,
+    .assignment-item:active:not(.bursting):not(:has(:is(button, .assignment-title-link):active)) {
+      scale: var(--scale-choice);
+    }
+
+    /* 按下的是 active 的學期待辦／課程：底色在 indicator 上（#47），跟著項目一起縮，整列看起來是同一塊 */
+    .side-nav:has(> .side-nav-item[data-page].active:active:not(:disabled)) > .side-nav-indicator {
+      scale: var(--scale-choice);
+    }
+
     /* ── 減少動態（prefers-reduced-motion，見 docs/motion-review-2026-10-22.md #0）──
        保留：淡入淡出、顏色、撤銷倒數條（期限 meter，不算位移）、完成項目離場的 opacity、due／撤銷淡換、勾號畫出、drag-arrived 閃色、
              View Transition 的 root crossfade、:focus-visible 外框。
@@ -4121,6 +4262,11 @@
         transition: background-color var(--t-color);
       }
 
+      /* 側欄 indicator（#47）：不滑，位置直接到位；淡出／淡入（is-off）保留 */
+      .side-nav-indicator {
+        transition: opacity var(--t-color);
+      }
+
       /* toast 只淡入淡出、不上滑 6px */
       .due-toast,
       .due-toast.show {
@@ -4164,6 +4310,7 @@
         </div>
 
         <nav class="side-nav" id="side-nav">
+          <span class="side-nav-indicator is-off" id="side-nav-indicator" aria-hidden="true"></span>
           <button class="side-nav-item active" data-page="week" id="nav-week">
             <span class="side-nav-name" id="nav-week-label">學期待辦</span>
             <span class="side-nav-count" id="nav-week-count"></span>

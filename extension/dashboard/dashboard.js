@@ -1566,11 +1566,14 @@ function landCustomAssignment(id) {
   }
   if (!row) return;
   row.scrollIntoView({ block: 'nearest' });
+  // 列／卡片自己的 CSS 過渡（hover 框色、上浮、按壓，#24／#25）在落地的 900ms 內照樣生效：接在 inline 清單前面，
+  // 否則游標剛好停在落點上時，hover 會在這段期間一幀切上去
+  const cssBase = getComputedStyle(row).transition;
   row.style.transition = 'none';
   row.style.opacity = '0';
   if (!reduceMotion()) row.style.transform = 'translateY(8px)';
   row.getBoundingClientRect();
-  row.style.transition = `${cssTransition('opacity', MOTION.fade)}, ${cssTransition('transform', MOTION.reflow)}`;
+  row.style.transition = `${cssBase ? `${cssBase}, ` : ''}${cssTransition('opacity', MOTION.fade)}, ${cssTransition('transform', MOTION.reflow)}`;
   row.style.opacity = '';
   row.style.transform = '';
   // 底色閃示只給詳情列（底色透明）：週卡有自己的 var(--bg) 底，閃示動畫跑完會一幀跳回原底色
@@ -2038,6 +2041,66 @@ function updateSideNav() {
     const key = showSubmitted ? 'submittedBtn' : (currentPage === 'week' ? 'tabWeek' : 'tabCourses');
     titleEl.textContent = tr(key);
   }
+
+  placeSideNavIndicator();
+}
+
+// ── 側欄主導航的滑動 indicator（#47，indicator recipe）──
+// 學期待辦／課程共用一塊底色（index.html .side-nav-indicator）：active 換項時寫入新的 --y／--h，
+// CSS 的 translate 沿 spring.selection 從上一項滑到下一項（spatial：選取移動了）。
+// 沒有 active 項（課程詳情、已繳交）→ .is-off 原地淡出，位置不動。
+// 從 is-off 恢復 → 先 transition:none 把位置寫到新項、forced reflow 提交（不用 rAF），再清掉 inline transition、
+// 移除 is-off：只有 opacity 會過渡＝在新位置原地淡入，不會從舊位置滑過來。
+// 第一次定位（頁面載入）連 opacity 一起直接到位，不淡入。同一項重複呼叫（計數更新等）不會動。減少動態：CSS 拿掉 translate 過渡
+let _navIndicatorPlaced = false;
+function placeSideNavIndicator() {
+  const ind = document.getElementById('side-nav-indicator');
+  if (!ind) return;
+  const act = document.querySelector('#nav-week.active, #nav-courses.active');
+  const first = !_navIndicatorPlaced;   // 載入後第一次（重新整理停在課程詳情時第一次沒有 active 項，之後回清單照常淡入）
+  _navIndicatorPlaced = true;
+  if (first) {
+    // 載入：靜態 HTML 把 .active 寫死在「學期待辦」，JS 跑起來前的第一次繪製可能已畫出它的底色。重新整理停在課程／已繳交／
+    // 課程詳情時，updateSideNav 剛把 active 換走——這一次的換項一律不過渡（各項底色直接到位），否則學期待辦的底色會花 200ms
+    // 淡掉、跟已經在新項上的 indicator（或已繳交自己的底色）疊成兩層
+    const items = [...ind.parentElement.querySelectorAll('.side-nav-item')];
+    items.forEach((el) => { el.style.transition = 'none'; });
+    placeIndicatorAt(ind, act, true);
+    ind.getBoundingClientRect();                 // forced reflow：換項的底色先落定，再還原過渡
+    items.forEach((el) => { el.style.transition = ''; });
+    return;
+  }
+  placeIndicatorAt(ind, act, false);
+}
+
+function placeIndicatorAt(ind, act, first) {
+  if (!act) {
+    ind.classList.add('is-off');
+    return;
+  }
+  const y = `${act.offsetTop}px`;
+  const h = `${act.offsetHeight}px`;
+  if (first || ind.classList.contains('is-off')) {
+    // 接手：JS 跑起來之前（靜態 HTML 的第一次繪製）active 底色畫在項目自己身上；.has-indicator 之後改由 indicator 畫。
+    // 同一幀交棒、項目的底色不過渡，不會兩層疊色再淡掉
+    const nav = ind.parentElement;
+    const claim = !nav.classList.contains('has-indicator');
+    ind.style.transition = 'none';
+    if (claim) {
+      nav.classList.add('has-indicator');
+      act.style.transition = 'none';
+    }
+    ind.style.setProperty('--y', y);
+    ind.style.setProperty('--h', h);
+    if (first) ind.classList.remove('is-off');   // 載入：直接出現
+    ind.getBoundingClientRect();                 // forced reflow：位置（與載入時的 opacity）先落定
+    ind.style.transition = '';
+    if (claim) act.style.transition = '';
+    ind.classList.remove('is-off');              // 恢復：只剩 opacity 會過渡 → 原地淡入
+    return;
+  }
+  ind.style.setProperty('--y', y);
+  ind.style.setProperty('--h', h);
 }
 
 // ── 學期待辦 ↔ 課程 切換（#15）──
@@ -3295,6 +3358,32 @@ function burstLayer() {
   return layer;
 }
 
+// 出場殘影維持「使用者最後看到的樣子」（#19 × #24／#25／#37）：完成的那張卡／那一列通常還在游標底下（剛點完勾選圈），
+// 但進了出場層就不再 :hover（.bursting 不吃指標、節點也搬了家）、CSS 過渡也隨搬家取消——hover 的橘框、陰影、2px 上浮、
+// 作業列的淺色底層會在出場第一幀切回靜止（整組離場時組裡的卡還會往下跳 2px）。搬之前把當下的計算值釘成 inline：
+// 節點自己的 translate／scale 已經含在 exitInPlace 量到的 rect 裡（holder 定在那裡），只釘子孫的；
+// 作業列的底色在 ::before 上，用 --hover-lit 帶過去（index.html .assignment-item.exit-frozen::before）
+const EXIT_FREEZE_SEL = '.week-task-card, .assignment-item, .wk-sum-row';
+function freezeHoverLook(n) {
+  [n, ...n.querySelectorAll(EXIT_FREEZE_SEL)].forEach((el) => {
+    if (!el.matches(EXIT_FREEZE_SEL)) return;
+    const cs = getComputedStyle(el);
+    if (el.classList.contains('week-task-card')) {
+      el.style.borderColor = cs.borderTopColor;
+      el.style.boxShadow = cs.boxShadow;
+    } else if (el.classList.contains('wk-sum-row')) {
+      el.style.backgroundColor = cs.backgroundColor;
+    } else {
+      el.style.setProperty('--hover-lit', getComputedStyle(el, '::before').opacity);
+      el.classList.add('exit-frozen');
+    }
+    if (el !== n) {
+      el.style.translate = cs.translate;
+      el.style.scale = cs.scale;
+    }
+  });
+}
+
 // 原地出場（list recipe 的 popLayout）：節點立刻抽出版面（其他項目同一幀開始 FLIP 補位，不等它淡完），
 // 搬進出場層、釘在原本的視覺位置淡出＋縮到 0.96（transition.fade），跑完移除。離場節點 inert。
 // clipEl：節點原本所在的捲動容器，殘影裁在它的可視範圍內（不會畫到容器外）；null＝不裁切。
@@ -3317,6 +3406,7 @@ function exitInPlace(nodes, clipEl) {
     clip.style.inset = '0';
   }
   // 先全部量完（視覺位置，含進行中的補位 transform）再搬，避免搬第一個時其他節點的位置跟著變
+  nodes.forEach(freezeHoverLook);
   const boxes = nodes.map((n) => ({
     n, r: n.getBoundingClientRect(), w: n.offsetWidth, h: n.offsetHeight,
     hadPrev: !!n.previousElementSibling, hadNext: !!n.nextElementSibling,
@@ -5304,6 +5394,10 @@ if (_bootLoc) {
 }
 _historyReady = true;
 history.replaceState(_appLocation(), '');
+
+// 側欄 active 與滑動 indicator 先依（還原後的）頁面落定：第一次繪製就有底色，不等 storage 讀完；
+// 重新整理停在「課程」時 indicator 直接在課程，不會在載入時從學期待辦滑過去（#47）
+updateSideNav();
 
 loadData();
 
