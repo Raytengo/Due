@@ -152,6 +152,9 @@ const I18N = {
     markDone: '標記完成',
     markUndone: '取消完成',
     undoComplete: '撤銷',
+    // 螢幕閱讀器播報（#3）：{name} 換成作業名稱
+    a11yCompleted: '已完成「{name}」，1.5 秒內再按一次可撤銷',
+    a11yUndone: '已撤銷',
     // week section
     within7Days: '7天內',
     within30Days: '8-30天',
@@ -274,6 +277,8 @@ const I18N = {
     markDone: '标记完成',
     markUndone: '取消完成',
     undoComplete: '撤销',
+    a11yCompleted: '已完成「{name}」，1.5 秒内再按一次可撤销',
+    a11yUndone: '已撤销',
     within7Days: '7天内',
     within30Days: '8-30天',
     beyond30Days: '30天以上',
@@ -393,6 +398,8 @@ const I18N = {
     markDone: 'Mark done',
     markUndone: 'Mark undone',
     undoComplete: 'Undo',
+    a11yCompleted: 'Completed “{name}”. Press again within 1.5 seconds to undo.',
+    a11yUndone: 'Undone',
     within7Days: 'Due ≤ 7d',
     within30Days: '8-30 days',
     beyond30Days: 'Later (30d+)',
@@ -704,14 +711,21 @@ function findGroup(assignment, groups) {
 
 let showSubmitted = false;
 
-// ── 完成過渡動畫（碎點爆）狀態 ──
+// ── 完成過渡動畫（撤銷窗 → 碎點爆＋原地出場＋FLIP 補位）狀態 ──
 const COMPLETE_DELAY_MS = 1500;       // 勾選後的撤銷窗口（毫秒）
-const COMPLETE_BURST_MS = 560;        // 碎點爆的保底計時：正常由 afterBurst 等動畫真的跑完（列 0.4s、碎點 0.5s）才重繪
-const _completeTimers = {};           // assignmentId -> setTimeout id
+const EXIT_SCALE = 0.96;              // 離場縮到的比例（list recipe：淡出＋縮到 0.96）
+const _completeTimers = {};           // assignmentId -> 撤銷窗 setTimeout id（每項各自一個，互不清除）
 
-// 清掉所有殘留完成計時器（重繪/切頁前呼叫，course detail 與 week 卡共用）
+// 清掉所有殘留完成計時器（整段重繪/切頁前呼叫，course detail 與 week 卡共用；完成流程本身不呼叫）
 function clearCompleteTimers() {
   Object.keys(_completeTimers).forEach((k) => { clearTimeout(_completeTimers[k]); delete _completeTimers[k]; });
+}
+
+// 「已落地」的完成：撤銷窗內（_completeTimers 有這個 id）的項目畫面上還在清單裡，
+// 計數、組標題、進度環、側欄數字都先不算它完成；撤銷窗結束、節點離開清單的那一刻才一起更新（#12）。
+// 整段重繪前一律 clearCompleteTimers()，所以重繪時與 isDone 相同。
+function isDoneLanded(a) {
+  return isDone(a) && !Object.prototype.hasOwnProperty.call(_completeTimers, String(a.id));
 }
 
 // 勾選圈點擊：依「外部事實完成」（已繳或考試已結束）翻轉對應 map（就地寫入 _currentData 與 storage）
@@ -818,6 +832,7 @@ function isNearAssignment(a) {
 }
 
 // 算出「本週概覽」進度環的分子/分母：所有課程作業中，未隱藏的近期作業，及其中已完成數
+// （分子只算已落地的完成：撤銷窗內的項目還在清單上，弧等它離場才前進）
 function computeNearProgress(courses, assignments) {
   const items = [];
   for (const course of courses) {
@@ -825,7 +840,7 @@ function computeNearProgress(courses, assignments) {
   }
   const nearItems = items.filter((a) => !isHidden(a) && isNearAssignment(a));
   const nearTotal = nearItems.length;
-  const nearDone = nearItems.filter((a) => isDone(a)).length;
+  const nearDone = nearItems.filter((a) => isDoneLanded(a)).length;
   return { nearDone, nearTotal };
 }
 
@@ -841,10 +856,11 @@ function applyFilters(asgns) {
   let result = asgns.filter((a) => !isHidden(a));
 
   // 默認隱藏已完成（含手動）；勾選「查看已繳交」後改為只顯示已完成
+  // 撤銷窗內的項目仍算在清單裡（isDoneLanded），完成後就地更新的計數才會與畫面一致
   if (showSubmitted) {
-    result = result.filter((a) => isDone(a));
+    result = result.filter((a) => isDoneLanded(a));
   } else {
-    result = result.filter((a) => !isDone(a));
+    result = result.filter((a) => !isDoneLanded(a));
   }
 
   return result;
@@ -1145,7 +1161,7 @@ function renderNav(courses, assignments) {
     const filtered = applyFilters(asgns);
     const pendingCount = filtered.length;
     const urgentCount = filtered.filter((a) => {
-      if (!a.due_at || isDone(a)) return false;
+      if (!a.due_at || isDoneLanded(a)) return false;
       const diff = new Date(a.due_at) - Date.now();
       return diff > 0 && diff <= 7 * 86400000;
     }).length;
@@ -1202,7 +1218,7 @@ function updateSideNav() {
   for (const c of courses) {
     for (const a of (assignments[c.id] || [])) {
       if (isHidden(a)) continue;  // 被收進稽核區者（未升級考試/簽到 ∪ 手動隱藏作業）不計數
-      if (isDone(a)) { doneCount++; continue; }
+      if (isDoneLanded(a)) { doneCount++; continue; }  // 撤銷窗內的仍算待辦（卡片還在清單上）
       // 與週待辦列表一致：無截止 ＋ 未來三組（urgent/soon/later）＋ 30 天窗內逾期；窗外逾期不計
       const u = DueTaskRules.urgency(a.due_at);
       if (u === 'overdue') {
@@ -1316,17 +1332,18 @@ const RING_R = 69;
 const RING_C = 2 * Math.PI * RING_R;
 
 // ── 進度環「落點迸發」慶祝（見 spec 2026-07-23 後記）──
-// 只在勾完最後一項近期作業、弧合攏落地的瞬間觸發（renderWeekSection 的 celebrateNow）；
+// 只在最後一項近期作業落地（撤銷窗結束、離開清單）、弧合攏的瞬間觸發（updateWeekRing）；
 // 之後維持全部完成狀態的重繪只靜態顯示「全部完成」，不重播。
 // 內容：環微彈＋分子 pop、多色碎點沿圓周外迸（切線初速＝旋轉能量）、中心淡入「全部完成」
 function celebrateRingArrival(ring) {
   if (!ring || !ring.isConnected) return;   // 等待落地期間被重繪換掉 → 略過
-  // 中心換字淡入「全部完成」（transition.reveal）：減少動態時也保留，它是唯一的完成訊號
+  // 中心換字淡入「全部完成」（transition.reveal）：減少動態時也保留，它是唯一的完成訊號；螢幕閱讀器同步念出（#3）
   const cap = ring.querySelector('.wk-ring-cap');
   if (cap) {
     cap.textContent = tr('weekAllDoneLabel');
     cap.animate([{ opacity: 0 }, { opacity: 1 }], MOTION.reveal);
   }
+  announce(tr('weekAllDoneLabel'));
   if (reduceMotion()) return;   // 減少動態：環與分子不縮放、不迸粒子（#0）
   const spring = 'cubic-bezier(0.34, 1.3, 0.5, 1)';
   ring.animate(
@@ -1362,7 +1379,27 @@ function celebrateRingArrival(ring) {
   }
 }
 
-function renderWeekSection(courses, assignments, celebrate = false) {
+// 週待辦五組（順序＝畫面順序）：data-group key → 標題 i18n key、標題色、摘要列色（整段渲染與完成後就地更新共用）
+const WEEK_GROUPS = [
+  { key: 'overdue', label: 'overdueGroup', color: 'color-overdue', sum: 'is-overdue' },
+  { key: 'urgent', label: 'within7Days', color: 'color-urgent', sum: 'is-urgent' },
+  { key: 'soon', label: 'within30Days', color: 'color-soon', sum: 'is-soon' },
+  { key: 'later', label: 'beyond30Days', color: 'color-later', sum: 'is-later' },
+  { key: 'nodue', label: 'noDueDate', color: 'color-nodue', sum: 'is-nodue' },
+];
+
+function weekGroupTitleText(key, n) {
+  const g = WEEK_GROUPS.find((x) => x.key === key);
+  return `${g ? tr(g.label) : ''} (${n})`;
+}
+
+// 截止日期與「↩ 撤銷」從一開始就疊在同一格（.due-slot）：撤銷窗只切 .completing 原地淡換，
+// 不插入／移除節點、不 display:none，列與卡片尺寸完全不變，其他項目不被推動（#13）
+function dueSlotHtml(labelHtml) {
+  return `<div class="due-slot">${labelHtml}<div class="complete-undo-hint" aria-hidden="true">↩ ${esc(tr('undoComplete'))}</div></div>`;
+}
+
+function renderWeekSection(courses, assignments) {
   const el = document.getElementById('main-section');
   // 重繪前清掉殘留的完成計時器（切頁/重繪時避免週卡幽靈 callback）
   clearCompleteTimers();
@@ -1415,21 +1452,15 @@ function renderWeekSection(courses, assignments, celebrate = false) {
   // 分子變動時給數字一個微上滑 tick（與弧的過渡同曲線）；首次渲染不 tick
   const fracTick = _prevRingDone !== null && _prevRingDone !== nearDone;
   _prevRingDone = nearDone;
-  // 全部完成狀態與慶祝旗標：celebrate 由「勾完最後一項近期作業」的鏈路傳入，render 端即時核對
+  // 全部完成狀態：整段重繪一律靜態顯示「全部完成」；落地瞬間的慶祝只發生在完成後的就地更新（updateWeekRing）
   const allNearDone = nearTotal > 0 && nearDone === nearTotal;
-  const celebrateNow = celebrate && allNearDone;
-  // 慶祝時中心先維持「本週完成」、落地瞬間才換字淡入；非慶祝的全部完成重繪直接靜態顯示「全部完成」
-  const capText = (allNearDone && !celebrateNow) ? tr('weekAllDoneLabel') : tr('weekDoneLabel');
+  const capText = allNearDone ? tr('weekAllDoneLabel') : tr('weekDoneLabel');
+
+  const buckets = { overdue, urgent, soon, later, nodue: noDue };
 
   // 分級摘要列（只顯示 count>0；逾期紅色，點擊跳到右側對應區塊）
-  const sumRows = [
-    { key: 'overdue', cls: 'is-overdue', label: tr('overdueGroup'), n: overdue.length },
-    { key: 'urgent', cls: 'is-urgent', label: tr('within7Days'), n: urgent.length },
-    { key: 'soon', cls: 'is-soon', label: tr('within30Days'), n: soon.length },
-    { key: 'later', cls: 'is-later', label: tr('beyond30Days'), n: later.length },
-    { key: 'nodue', cls: 'is-nodue', label: tr('noDueDate'), n: noDue.length },
-  ].filter((r) => r.n > 0)
-    .map((r) => `<button class="wk-sum-row ${r.cls}" data-scroll-group="${r.key}"><span class="wk-sum-num">${r.n}</span><span class="wk-sum-label">${esc(r.label)}</span></button>`)
+  const sumRows = WEEK_GROUPS.filter((g) => buckets[g.key].length > 0)
+    .map((g) => `<button class="wk-sum-row ${g.sum}" data-scroll-group="${g.key}"><span class="wk-sum-num">${buckets[g.key].length}</span><span class="wk-sum-label">${esc(tr(g.label))}</span></button>`)
     .join('');
 
   // 單張週卡片（含右上角完成勾選圈；勾選圈狀態沿用 .assignment-check 語言）
@@ -1443,15 +1474,16 @@ function renderWeekSection(courses, assignments, celebrate = false) {
         <button class="assignment-check week-task-check" data-assignment-id="${esc(String(a.id))}" data-course-id="${a._course.id}" data-done="${done ? 'true' : 'false'}" data-ext-done="${extDone ? 'true' : 'false'}" aria-label="${esc(checkLabel)}"></button>
         <div class="week-task-course">${esc(getCourseName(a._course))}</div>
         <div class="week-task-title">${esc(a.name)}</div>
-        <div class="week-task-due ${uClass}">${formatDue(a.due_at)}</div>
+        ${dueSlotHtml(`<div class="week-task-due ${uClass}">${formatDue(a.due_at)}</div>`)}
       </div>`;
   };
 
-  const renderGroup = (title, list, colorClass, groupKey) => {
+  const renderGroup = (g) => {
+    const list = buckets[g.key];
     if (list.length === 0) return '';
     return `
-      <div class="week-group" data-group="${groupKey}">
-        <div class="week-group-title ${colorClass}">${title} (${list.length})</div>
+      <div class="week-group" data-group="${g.key}">
+        <div class="week-group-title ${g.color}">${weekGroupTitleText(g.key, list.length)}</div>
         <div class="week-task-grid">
           ${list.map(renderWeekCard).join('')}
         </div>
@@ -1459,13 +1491,7 @@ function renderWeekSection(courses, assignments, celebrate = false) {
   };
 
   // 逾期組置頂；分隔線只夾在相鄰的非空組之間
-  const groupsHTML = [
-    renderGroup(tr('overdueGroup'), overdue, 'color-overdue', 'overdue'),
-    renderGroup(tr('within7Days'), urgent, 'color-urgent', 'urgent'),
-    renderGroup(tr('within30Days'), soon, 'color-soon', 'soon'),
-    renderGroup(tr('beyond30Days'), later, 'color-later', 'later'),
-    renderGroup(tr('noDueDate'), noDue, 'color-nodue', 'nodue'),
-  ].filter(h => h).join('<div class="week-divider"></div>');
+  const groupsHTML = WEEK_GROUPS.map(renderGroup).filter(h => h).join('<div class="week-divider"></div>');
 
   el.innerHTML = `
     <div class="week-panel">
@@ -1499,21 +1525,6 @@ function renderWeekSection(courses, assignments, celebrate = false) {
     _barEl.style.strokeDashoffset = `${targetOffset}`;
   }
 
-  // 慶祝：等弧合攏「落地」的 transitionend 才引爆；弧已在終點（無過渡可等）則直接引爆
-  // 減少動態時弧沒有過渡（transition:none → transitionend 永遠不來），也直接引爆
-  if (celebrateNow && _barEl) {
-    const _ringEl = el.querySelector('.wk-ring');
-    if (reduceMotion() || Math.abs(prevOffset - targetOffset) < 0.5) {
-      celebrateRingArrival(_ringEl);
-    } else {
-      _barEl.addEventListener('transitionend', function h(e) {
-        if (e.propertyName !== 'stroke-dashoffset') return;
-        _barEl.removeEventListener('transitionend', h);
-        celebrateRingArrival(_ringEl);
-      });
-    }
-  }
-
   // 勾選圈：依 Canvas 事實翻轉，未完成→完成走 1.5 秒撤銷窗口動畫（stopPropagation 不開詳情）
   el.querySelectorAll('.week-task-check').forEach((btn) => {
     btn.addEventListener('click', (e) => {
@@ -1523,16 +1534,15 @@ function renderWeekSection(courses, assignments, celebrate = false) {
       const cid = parseInt(btn.dataset.courseId, 10);
       if (card && card.classList.contains('bursting')) return;        // 爆開中不互動
       if (card && card.classList.contains('completing')) {            // 撤銷窗口內 → 取消
-        cancelCompleteWeek(card, id, cid);
+        cancelCompleteWeek(card, id);
         return;
       }
       toggleCompletion(btn.dataset.extDone === 'true', id);
       const a = ((_currentData.assignments || {})[cid] || []).find((x) => String(x.id) === id);
       const nowDone = a ? isDone(a) : false;
       if (nowDone && card) {
-        const { nearDone: _nd, nearTotal: _nt } = computeNearProgress(_currentData.courses || [], _currentData.assignments || {});
-        const celebrate = _nt > 0 && _nd === _nt;   // 這次勾選讓近期作業全部完成 → 落地時引爆慶祝
-        beginCompleteWeek(card, id, cid, celebrate);
+        // 慶祝不在點擊當下決定：連勾最後幾項時要等最後一項落地才判斷（updateWeekRing）
+        beginCompleteWeek(card, id);
       } else {
         rerenderWeekAndNav();
       }
@@ -1544,7 +1554,7 @@ function renderWeekSection(courses, assignments, celebrate = false) {
       if (card.classList.contains('bursting')) return;                // 爆開中不互動
       if (card.classList.contains('completing')) {                    // 撤銷窗口內 → 點卡片任意處取消
         const chk = card.querySelector('.assignment-check');
-        if (chk) cancelCompleteWeek(card, String(chk.dataset.assignmentId), parseInt(chk.dataset.courseId, 10));
+        if (chk) cancelCompleteWeek(card, String(chk.dataset.assignmentId));
         return;
       }
       const courseId = parseInt(card.dataset.courseId, 10);
@@ -1992,143 +2002,419 @@ function startSidebarRename(courseId) {
   input.addEventListener('blur', commit);
 }
 
-// ── 完成過渡動畫：3 秒撤銷窗口 → 碎點爆 ──
+// ── 完成過渡：1.5 秒撤銷窗 → 碎點爆＋原地出場＋FLIP 補位 ──
+// 完成後不再整段 innerHTML 重建：只把完成的那一項抽出清單，其餘就地更新（計數、組標題、摘要列、進度環、側欄），
+// 所以捲動位置、展開的描述／成績計算器、其他仍在撤銷窗內的項目（各自獨立的計時器）都保得住（#12）。
+// 時間線（詳情列與週卡相同）：
+//   勾選 → .completing：勾選圈填綠、勾號畫出（#46）、due 與「↩ 撤銷」原地淡換、底部倒數條（#13，尺寸不變）；播報（#3）
+//   1.5 秒到 → 焦點交給鄰居（#1）→ 碎點從勾選圈迸出（#20）→ 節點抽出版面、在出場層淡出＋縮到 0.96（#19），
+//             同一幀其他項目沿 spring.reflow 滑進空位（#18）、計數與進度環就地更新；最後一項落地且弧合攏 → 慶祝
 function rerenderDetailAndNav(cid) {
   const { courses = [], assignments = {}, assignmentGroups = {}, scores = {} } = _currentData;
   const course = courses.find((c) => c.id === cid);
   if (course) renderCourseDetailSection(course, assignments[cid] || [], assignmentGroups[cid] || [], scores);
   renderNav(courses, assignments);
-  updateSideNav();   // 升級/降級、完成勾選後同步刷新側欄頂部計數（待辦/已完成）
+  updateSideNav();   // 升級/降級、標回未完成後同步刷新側欄頂部計數（待辦/已完成）
 }
 
-function beginComplete(item, id, cid) {
-  const chk = item.querySelector('.assignment-check');
-  if (chk) { chk.dataset.done = 'true'; chk.setAttribute('aria-label', tr('markUndone')); } // 不重繪，手動點綠
-  item.classList.add('completing');
-  const right = item.querySelector('.assignment-right');
-  if (right && !right.querySelector('.complete-undo-hint')) {
-    const hint = document.createElement('div');
-    hint.className = 'complete-undo-hint';
-    hint.textContent = '↩ ' + tr('undoComplete');
-    right.insertBefore(hint, right.firstChild);
+// 撤銷窗的視覺狀態（詳情列與週卡共用）：只切 class 與勾選圈屬性，不插入／移除會佔位的節點（#13）；
+// 倒數條是 absolute 疊在框內底部，不佔位
+function markCompleting(host) {
+  const chk = host.querySelector('.assignment-check');
+  if (chk) {
+    chk.dataset.done = 'true';                       // 不重繪，手動點綠
+    chk.setAttribute('aria-label', tr('markUndone'));
+    chk.classList.add('just-checked');               // 只有「勾下去的這一下」播勾號畫出（#46），重繪出來就已勾選的不播
   }
-  // 底部撤銷倒數條：3 秒縮短歸零 → 觸發爆開（時長依 COMPLETE_DELAY_MS）
-  if (!item.querySelector('.complete-countdown')) {
+  host.classList.add('completing');
+  if (!host.querySelector('.complete-countdown')) {
     const bar = document.createElement('div');
     bar.className = 'complete-countdown';
     bar.style.animation = `complete-countdown ${COMPLETE_DELAY_MS / 1000}s linear forwards`;
-    item.appendChild(bar);
+    host.appendChild(bar);
   }
-  _completeTimers[id] = setTimeout(() => {
-    delete _completeTimers[id];
-    finishComplete(item, id, cid);
-  }, COMPLETE_DELAY_MS);
+  const name = (host.querySelector('.week-task-title, .assignment-title') || {}).textContent || '';
+  announce(tr('a11yCompleted').replace('{name}', name.trim()));
 }
 
+function unmarkCompleting(host) {
+  host.classList.remove('completing');
+  const bar = host.querySelector('.complete-countdown');
+  if (bar) bar.remove();
+  const chk = host.querySelector('.assignment-check');
+  if (chk) {
+    chk.dataset.done = 'false';
+    chk.setAttribute('aria-label', tr('markDone'));
+    chk.classList.remove('just-checked');
+  }
+  announce(tr('a11yUndone'));
+}
+
+function beginComplete(item, id, cid) {
+  markCompleting(item);
+  _completeTimers[id] = setTimeout(() => finishComplete(item, id, cid), COMPLETE_DELAY_MS);
+}
+
+// 撤銷窗結束：這一列離開清單，課程詳情其餘部分就地更新
 function finishComplete(item, id, cid) {
-  spawnBurstDots(item);
+  delete _completeTimers[id];                        // 從這一刻起算「已落地」（計數一起更新）
+  const list = item.closest('.detail-assignments-list');
+  const view = item.closest('.course-detail-view');
+  if (!item.isConnected || !list || !view) return;  // 撤銷窗內整段重繪過（換課等）→ 節點已不在畫面上
+  const scroller = scrollParentOf(item);
+
+  // ① 焦點交接：下一列，沒有就上一列，再沒有就清單標題（#1）
+  const rows = [...list.querySelectorAll('.assignment-item')];
+  const i = rows.indexOf(item);
+  const restoreFocus = handOffFocus(item, rows[i + 1] || rows[i - 1], view.querySelector('.detail-assignments-label'), list);
+
+  // ② 碎點從勾選圈迸出
+  spawnBurstDots(item.querySelector('.assignment-check'));
   item.classList.add('bursting');
-  // 碎點爆跑完才重繪：已完成的會被濾掉、計數/圓餅/側欄一起更新
-  afterBurst(item, () => rerenderDetailAndNav(cid));
+
+  // ③ 離場：這一列；描述展開著就一起離場（收合的描述 display:none，直接移除）
+  const desc = item.nextElementSibling && item.nextElementSibling.classList.contains('assignment-desc')
+    ? item.nextElementSibling : null;
+  const leaving = [item];
+  if (desc && desc.classList.contains('open')) leaving.push(desc);
+  const scrollTop = scroller ? scroller.scrollTop : 0;
+  // leaf：捲動容器裡的每一塊（捲到底時移除會讓 scrollTop 被夾小，上方的成績計算器、標題——窄版面連圓餅欄——
+  // 也跟著位移，一起滑）
+  const first = flipSnapshot(view.querySelectorAll(
+    '.detail-left-panel, .detail-right-panel > .grade-calc, .detail-assignments-label, .assignment-item, .assignment-desc.open, .hidden-items'),
+  leaving);
+  exitInPlace(leaving, scroller);
+  if (desc && !leaving.includes(desc)) desc.remove();
+
+  // ④ 就地更新：空清單提示、header 待辦數／緊急 badge、側欄
+  if (!list.querySelector('.assignment-item')) list.insertAdjacentHTML('beforeend', detailListEmptyHtml());
+  if (scroller && scroller.scrollTop !== scrollTop) scroller.scrollTop = scrollTop;
+  updateDetailHeader(view, cid);
+  updateSideNav();
+  renderNav(_currentData.courses || [], _currentData.assignments || {});
+
+  // ⑤ 剩下的列滑進空位
+  flipPlay(first);
+  restoreFocus();
 }
 
-function cancelComplete(item, id, cid) {
+function cancelComplete(item, id) {
   if (_completeTimers[id]) { clearTimeout(_completeTimers[id]); delete _completeTimers[id]; }
   const chk = item.querySelector('.assignment-check');
   revertCompletion(chk && chk.dataset.extDone === 'true', id);
-  // 就地還原（不整段重繪，避免影響其他進行中的動畫）
-  item.classList.remove('completing');
-  const hint = item.querySelector('.complete-undo-hint');
-  if (hint) hint.remove();
-  const bar = item.querySelector('.complete-countdown');
-  if (bar) bar.remove();
-  if (chk) { chk.dataset.done = 'false'; chk.setAttribute('aria-label', tr('markDone')); }
+  unmarkCompleting(item);   // 就地還原（不整段重繪，其他撤銷窗照跑）
 }
 
-// ── 週卡片完成過渡（平行於 assignment-item 版；共用 COMPLETE_* 常數與 spawnBurstDots）──
-function rerenderWeekAndNav(celebrate = false) {
+// ── 週卡片完成過渡（平行於 assignment-item 版；共用撤銷窗視覺、出場層、FLIP、碎點）──
+function rerenderWeekAndNav() {
   const { courses = [], assignments = {} } = _currentData;
-  renderWeekSection(courses, assignments, celebrate);
+  renderWeekSection(courses, assignments);
   updateSideNav();
   renderNav(courses, assignments);
 }
 
-function beginCompleteWeek(card, id, cid, celebrate = false) {
-  const chk = card.querySelector('.assignment-check');
-  if (chk) { chk.dataset.done = 'true'; chk.setAttribute('aria-label', tr('markUndone')); }
-  card.classList.add('completing');
-  // due 文字位置換成「↩ 撤銷」hint（沿用 .complete-undo-hint 樣式）
-  const due = card.querySelector('.week-task-due');
-  if (due && !card.querySelector('.complete-undo-hint')) {
-    due.style.display = 'none';
-    const hint = document.createElement('div');
-    hint.className = 'complete-undo-hint';
-    hint.textContent = '↩ ' + tr('undoComplete');
-    due.parentNode.insertBefore(hint, due);
-  }
-  if (!card.querySelector('.complete-countdown')) {
-    const bar = document.createElement('div');
-    bar.className = 'complete-countdown';
-    bar.style.animation = `complete-countdown ${COMPLETE_DELAY_MS / 1000}s linear forwards`;
-    card.appendChild(bar);
-  }
-  _completeTimers[id] = setTimeout(() => {
-    delete _completeTimers[id];
-    finishCompleteWeek(card, id, cid, celebrate);
-  }, COMPLETE_DELAY_MS);
+function beginCompleteWeek(card, id) {
+  markCompleting(card);
+  _completeTimers[id] = setTimeout(() => finishCompleteWeek(card, id), COMPLETE_DELAY_MS);
 }
 
-function finishCompleteWeek(card, id, cid, celebrate = false) {
-  spawnBurstDots(card);
+// 撤銷窗結束：這張卡離開清單，週視圖其餘部分就地更新
+function finishCompleteWeek(card, id) {
+  delete _completeTimers[id];                        // 從這一刻起算「已落地」（計數、進度環一起更新）
+  const panel = card.closest('.week-panel');
+  const right = card.closest('.week-right');
+  const group = card.closest('.week-group');
+  if (!card.isConnected || !panel || !right || !group) return;   // 撤銷窗內整段重繪過 → 節點已不在畫面上
+  const grid = card.parentElement;
+  const groupKey = group.dataset.group;
+  const remaining = grid.querySelectorAll('.week-task-card').length - 1;   // 這組剩下的張數（含其他仍在撤銷窗內的）
+
+  // ① 焦點交接：同組下一張 → 下一組第一張 → 上一張 → #page-title（#1）
+  const cards = [...right.querySelectorAll('.week-task-card')];
+  const i = cards.indexOf(card);
+  const restoreFocus = handOffFocus(card, cards[i + 1] || cards[i - 1], document.getElementById('page-title'), right);
+
+  // ② 碎點從勾選圈迸出
+  spawnBurstDots(card.querySelector('.assignment-check'));
   card.classList.add('bursting');
-  // 碎點爆跑完才重繪：已完成者會被 applyFilters 濾掉；重繪週 section＋側欄＋左欄（用 _currentData，避免閃白）
-  afterBurst(card, () => rerenderWeekAndNav(celebrate));
+
+  // ③ 離場：這組只剩這張 → 整組（標題＋一條相鄰分隔線）與左欄摘要列一起離場
+  const leaving = [card];
+  const sumLeaving = [];
+  const sumRow = panel.querySelector(`.wk-sum-row[data-scroll-group="${groupKey}"]`);
+  if (remaining === 0) {
+    leaving[0] = group;
+    const prev = group.previousElementSibling;
+    const next = group.nextElementSibling;
+    const divider = (prev && prev.classList.contains('week-divider')) ? prev
+      : (next && next.classList.contains('week-divider')) ? next : null;
+    if (divider) leaving.push(divider);
+    if (sumRow) sumLeaving.push(sumRow);
+  }
+  const scrollTop = right.scrollTop;
+  const first = flipSnapshot(
+    panel.querySelectorAll('.week-task-card, .week-group-title, .week-divider, .wk-sum-row'),
+    [...leaving, ...sumLeaving]);
+  exitInPlace(leaving, right);
+  exitInPlace(sumLeaving, null);   // 左欄不捲動，不需裁切
+
+  // ④ 就地更新：組標題 (N)、摘要列數字、空狀態、進度環、側欄
+  if (remaining > 0) {
+    const title = group.querySelector('.week-group-title');
+    if (title) title.textContent = weekGroupTitleText(groupKey, remaining);
+    const num = sumRow && sumRow.querySelector('.wk-sum-num');
+    if (num) num.textContent = remaining;
+  }
+  if (!right.querySelector('.week-group')) {
+    right.insertAdjacentHTML('beforeend', `<div class="week-group-empty">${tr('noTasks')}</div>`);
+    right.lastElementChild.animate([{ opacity: 0 }, { opacity: 1 }], MOTION.reveal);
+  }
+  const breakdown = panel.querySelector('.wk-breakdown');
+  if (breakdown && !breakdown.querySelector('.wk-sum-row')) breakdown.remove();
+  if (right.scrollTop !== scrollTop) right.scrollTop = scrollTop;
+  updateWeekRing();
+  updateSideNav();
+  renderNav(_currentData.courses || [], _currentData.assignments || {});
+
+  // ⑤ 剩下的卡片、組標題、分隔線、摘要列滑進空位
+  flipPlay(first);
+  restoreFocus();
 }
 
 function cancelCompleteWeek(card, id) {
   if (_completeTimers[id]) { clearTimeout(_completeTimers[id]); delete _completeTimers[id]; }
   const chk = card.querySelector('.assignment-check');
   revertCompletion(chk && chk.dataset.extDone === 'true', id);
-  card.classList.remove('completing');
-  const hint = card.querySelector('.complete-undo-hint');
-  if (hint) hint.remove();
-  const due = card.querySelector('.week-task-due');
-  if (due) due.style.display = '';
-  const bar = card.querySelector('.complete-countdown');
-  if (bar) bar.remove();
-  if (chk) { chk.dataset.done = 'false'; chk.setAttribute('aria-label', tr('markDone')); }
+  unmarkCompleting(card);
 }
 
-// 碎點爆跑完才執行 fn（#39：等動畫真的結束，不再手抄一個會和 CSS 漂移的時長）：
-// 等這一列（或週卡）上正在跑的 complete-burst（列淡出）與 complete-dot（碎點）全部 finished；
-// 沒有任何一段在跑（減少動態的週卡）就立刻執行；動畫被取消（節點被提前移除）也算結束；
-// COMPLETE_BURST_MS 保底（分頁在背景時動畫事件可能延遲）
-function afterBurst(item, fn) {
-  const anims = item.getAnimations({ subtree: true })
-    .filter((a) => a.animationName === 'complete-burst' || a.animationName === 'complete-dot');
-  let done = false;
-  const run = () => {
-    if (done) return;
-    done = true;
-    clearTimeout(timer);
+// ── 進度環就地更新（#12）──
+// 只改 stroke-dashoffset：既有 0.8s 過渡從目前位置重新導向（不換節點，不從頭播）；分子 tick、aria-label 同步。
+// 慶祝在「最後一項近期作業落地」時判斷：分子剛到分母、上次顯示的還沒到 → 等弧合攏才引爆。
+// 撤銷窗內的項目不算（computeNearProgress 只數已落地的），所以連勾最後兩項時由後落地的那一項觸發
+function updateWeekRing() {
+  const ring = document.querySelector('#main-section .wk-ring');
+  const bar = ring && ring.querySelector('.wk-ring-bar');
+  if (!bar) return;
+  const { nearDone, nearTotal } = computeNearProgress(_currentData.courses || [], _currentData.assignments || {});
+  const target = RING_C * (1 - (nearTotal > 0 ? nearDone / nearTotal : 0));
+  const prevOffset = parseFloat(getComputedStyle(bar).strokeDashoffset);
+  bar.style.strokeDashoffset = `${target}`;
+  const prevDone = _prevRingDone;
+  _prevRingDone = nearDone;
+  ring.setAttribute('aria-label', `${tr('weekDoneLabel')} ${nearDone}/${nearTotal}`);
+  const frac = ring.querySelector('.wk-ring-frac');
+  const b = frac && frac.querySelector('b');
+  if (b && prevDone !== nearDone) {
+    b.textContent = nearDone;
+    b.classList.remove('tick');
+    b.getBoundingClientRect();   // forced reflow：重播 tick（不用 rAF）
+    b.classList.add('tick');
+  }
+  const allDone = nearTotal > 0 && nearDone === nearTotal;
+  const cap = ring.querySelector('.wk-ring-cap');
+  if (allDone && prevDone !== null && prevDone < nearTotal) {
+    whenRingLands(bar, prevOffset, target, () => celebrateRingArrival(ring));   // cap 由慶祝換字
+  } else if (cap && !(allDone && prevDone === nearTotal)) {
+    // 已經全部完成時（之後落地的是非近期卡）不碰 cap：它要嘛已是「全部完成」，要嘛正等弧落地的慶祝換字淡入，
+    // 這裡先換會讓「全部完成」在弧合攏前就出現、慶祝時再閃一次
+    cap.textContent = tr(allDone ? 'weekAllDoneLabel' : 'weekDoneLabel');
+  }
+}
+
+// 等弧真的停在 target 才執行 fn。沿用同一個 .wk-ring-bar，上一段過渡（被重新導向前）的 transitionend 可能晚到，
+// 只認停在 target 的那一次；減少動態（transition:none，transitionend 永遠不來）或弧已在終點 → 立刻執行
+function whenRingLands(bar, prevOffset, target, fn) {
+  if (reduceMotion() || !Number.isFinite(prevOffset) || Math.abs(prevOffset - target) < 0.5) { fn(); return; }
+  const h = (e) => {
+    if (e.propertyName !== 'stroke-dashoffset') return;
+    if (Math.abs(parseFloat(getComputedStyle(bar).strokeDashoffset) - target) > 0.5) return;
+    bar.removeEventListener('transitionend', h);
     fn();
   };
-  const timer = setTimeout(run, COMPLETE_BURST_MS);
-  Promise.allSettled(anims.map((a) => a.finished)).then(run);
+  bar.addEventListener('transitionend', h);
 }
 
-function spawnBurstDots(item) {
-  if (reduceMotion()) return;   // 減少動態：碎點是位移，不產生（列本身的淡出保留，#0）
+// ── 完成後的就地更新：課程詳情 header ──
+// 待辦數與緊急數（renderCourseDetailSection 與完成後的就地更新共用；撤銷窗內的項目仍算待辦）
+function detailCounts(asgns) {
+  const filtered = applyFilters(asgns);
+  // 緊急＝7 天內到期「且未完成」——已完成（含已繳交視圖）不算緊急
+  const urgentCount = filtered.filter((a) => {
+    if (!a.due_at || isDoneLanded(a)) return false;
+    const diff = new Date(a.due_at) - Date.now();
+    return diff > 0 && diff <= 7 * 86400000;
+  }).length;
+  return { pendingCount: filtered.length, urgentCount };
+}
+
+function detailMetaText(n) {
+  return `${n}${tr(showSubmitted ? 'completedItems' : 'pendingItems')}`;
+}
+
+function detailListEmptyHtml() {
+  return `<div class="detail-list-empty">${noItemsLabel()}</div>`;
+}
+
+function updateDetailHeader(view, cid) {
+  const { pendingCount, urgentCount } = detailCounts(((_currentData.assignments || {})[cid]) || []);
+  const meta = view.querySelector('.detail-meta');
+  if (meta) meta.textContent = detailMetaText(pendingCount);
+  const badge = view.querySelector('.detail-top-row .card-badge-urgent');
+  if (badge) {   // 同一個節點改內容（保留 View Transition 命名），0 件時保留佔位、不念出
+    badge.textContent = `${urgentCount}${tr('urgentItems')}`;
+    badge.classList.toggle('is-placeholder', !urgentCount);
+    if (urgentCount) badge.removeAttribute('aria-hidden');
+    else badge.setAttribute('aria-hidden', 'true');
+  }
+}
+
+// ── 焦點交接（#1，A17）──
+// 離場的項目若持有焦點，在它離場（碎點爆開始）時交給鄰居的勾選圈，沒有鄰居就交給 fallback（tabindex=-1 的標題）。
+// 不在點擊當下移：撤銷窗內在同一個勾選圈按 Enter／Space 就是鍵盤的撤銷路徑。
+// 回傳 restore()：就地更新之後再確認一次，萬一鄰居被重繪換掉，用 assignment id（不是節點）在 scope 內找回來。
+// scope 必須是目前這個清單（週：.week-right；詳情：.detail-assignments-list）：開詳情時 #main-section 只是隱藏，
+// 裡面的週卡勾選圈帶著同一個 id 且在 DOM 前面，用 document 查會找到看不見、focus 不上去的那顆
+function handOffFocus(host, neighbour, fallback, scope) {
+  if (!host.contains(document.activeElement)) return () => {};
+  const target = (neighbour && neighbour.querySelector('.assignment-check')) || fallback;
+  const targetId = target && target.dataset.assignmentId;
+  if (target) target.focus({ preventScroll: true });
+  return () => {
+    const active = document.activeElement;
+    if (active && active !== document.body && active.isConnected && !host.contains(active)) return;
+    const again = targetId && scope && scope.querySelector(`.assignment-check[data-assignment-id="${CSS.escape(targetId)}"]`);
+    const to = (again && again.isConnected) ? again : fallback;
+    if (to && to.isConnected) to.focus({ preventScroll: true });
+  };
+}
+
+// 最近的捲動容器（週：.week-right；詳情：.detail-right-panel，窄版面時是外層）
+function scrollParentOf(el) {
+  for (let n = el.parentElement; n && n !== document.body; n = n.parentElement) {
+    const oy = getComputedStyle(n).overflowY;
+    if (oy === 'auto' || oy === 'scroll') return n;
+  }
+  return null;
+}
+
+// ── 出場層（#burst-layer：position:fixed、pointer-events:none，見 index.html）──
+// 碎點與出場殘影都畫在這層：不在任何捲動容器或正在淡出的列裡，碎點不會被列的淡出乘掉（#20）
+function burstLayer() {
+  let layer = document.getElementById('burst-layer');
+  if (!layer) {
+    layer = document.createElement('div');
+    layer.id = 'burst-layer';
+    layer.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(layer);
+  }
+  return layer;
+}
+
+// 原地出場（list recipe 的 popLayout）：節點立刻抽出版面（其他項目同一幀開始 FLIP 補位，不等它淡完），
+// 搬進出場層、釘在原本的視覺位置淡出＋縮到 0.96（transition.fade），跑完移除。離場節點 inert。
+// clipEl：節點原本所在的捲動容器，殘影裁在它的可視範圍內（不會畫到容器外）；null＝不裁切。
+// 減少動態：只淡出、不縮放（#0）
+function exitInPlace(nodes, clipEl) {
+  if (!nodes.length) return;
+  const clip = document.createElement('div');
+  clip.className = 'exit-clip';
+  let ox = 0;
+  let oy = 0;
+  if (clipEl) {
+    const r = clipEl.getBoundingClientRect();
+    ox = r.left + clipEl.clientLeft;
+    oy = r.top + clipEl.clientTop;
+    Object.assign(clip.style, {
+      left: `${ox}px`, top: `${oy}px`,
+      width: `${clipEl.clientWidth}px`, height: `${clipEl.clientHeight}px`, overflow: 'hidden',
+    });
+  } else {
+    clip.style.inset = '0';
+  }
+  // 先全部量完（視覺位置，含進行中的補位 transform）再搬，避免搬第一個時其他節點的位置跟著變
+  const boxes = nodes.map((n) => ({
+    n, r: n.getBoundingClientRect(), w: n.offsetWidth, h: n.offsetHeight,
+    hadPrev: !!n.previousElementSibling, hadNext: !!n.nextElementSibling,
+  }));
+  burstLayer().prepend(clip);   // 在碎點下面
+  const anims = boxes.map(({ n, r, w, h, hadPrev, hadNext }) => {
+    n.getAnimations().forEach((a) => a.cancel());           // 進行中的補位：位置已含在 r 裡
+    const bar = n.querySelector('.complete-countdown');
+    if (bar) bar.remove();                                   // 搬家會重播 CSS 動畫：倒數條與勾號畫出都先拿掉（勾號留最終狀態）
+    n.querySelectorAll('.just-checked').forEach((c) => c.classList.remove('just-checked'));
+    n.inert = true;
+    // 用 holder 保住原本的 :first-child／:last-child 狀態（組的 padding、列的底線不會在殘影裡跳）
+    const holder = document.createElement('div');
+    Object.assign(holder.style, {
+      position: 'absolute', left: `${r.left - ox}px`, top: `${r.top - oy}px`, width: `${w}px`, height: `${h}px`,
+    });
+    if (hadPrev) holder.appendChild(document.createElement('i')).hidden = true;
+    holder.appendChild(n);
+    if (hadNext) holder.appendChild(document.createElement('i')).hidden = true;
+    Object.assign(n.style, { width: `${w}px`, height: `${h}px`, margin: '0' });
+    clip.appendChild(holder);
+    return holder.animate(
+      [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: reduceMotion() ? 'none' : `scale(${EXIT_SCALE})` }],
+      { duration: MOTION.fade.duration, easing: MOTION.fade.easing, fill: 'forwards' });
+  });
+  const done = () => clip.remove();
+  Promise.all(anims.map((a) => a.finished)).then(done, done);
+  setTimeout(done, MOTION.fade.duration + 300);   // 保底（分頁在背景時 finished 可能延後）
+}
+
+// ── FLIP 補位（#18）──
+// 改 DOM 前 flipSnapshot 記下 leaf 元素的視覺位置 → 改 DOM → flipPlay 再量，有位移的從舊位置沿 spring.reflow 滑回
+// （只動 transform，不拉伸）。WAAPI＋id:'reflow'：不靠 rAF 或 transition 觸發，分頁隱藏也安全；
+// 再次觸發時舊位置是含進行中 transform 的視覺位置，cancel 後從那裡接續（A12）。
+// 只傳 leaf（卡片、列、標題、分隔線），不要同時傳容器和它裡面的項目，否則會位移兩次。
+// 減少動態：不量不滑，直接到位（#0）
+function flipSnapshot(els, exclude = []) {
+  const first = new Map();
+  if (reduceMotion()) return first;
+  els.forEach((el) => {
+    if (exclude.some((x) => x === el || x.contains(el))) return;
+    first.set(el, el.getBoundingClientRect());
+  });
+  return first;
+}
+
+function flipPlay(first) {
+  const moves = [];
+  first.forEach((r0, el) => {
+    if (!el.isConnected) return;
+    el.getAnimations().forEach((a) => { if (a.id === 'reflow') a.cancel(); });
+    const r1 = el.getBoundingClientRect();
+    const dx = r0.left - r1.left;
+    const dy = r0.top - r1.top;
+    if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) moves.push([el, dx, dy]);
+  });
+  moves.forEach(([el, dx, dy]) => {
+    el.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }],
+      { duration: MOTION.reflow.duration, easing: MOTION.reflow.easing, id: 'reflow' });
+  });
+}
+
+// 碎點爆：從被點的勾選圈中心迸出，畫在出場層（#20）；角度、距離 42–60px、數量、顏色不變
+function spawnBurstDots(chk) {
+  if (reduceMotion() || !chk) return;   // 減少動態：碎點是位移，不產生（#0）
+  const c = chk.getBoundingClientRect();
+  const cx = c.left + c.width / 2;
+  const cy = c.top + c.height / 2;
+  const layer = burstLayer();
   const n = 10;
   for (let i = 0; i < n; i++) {
     const dot = document.createElement('span');
     const ang = (Math.PI * 2 * i) / n;
     const dist = 42 + ((i * 13) % 18);
     dot.className = 'complete-burst-dot';
+    dot.style.left = `${cx}px`;
+    dot.style.top = `${cy}px`;
     dot.style.setProperty('--dx', `${Math.round(Math.cos(ang) * dist)}px`);
     dot.style.setProperty('--dy', `${Math.round(Math.sin(ang) * dist)}px`);
     dot.style.background = i % 2 ? 'var(--green)' : 'var(--orange)';
-    item.appendChild(dot);
+    dot.addEventListener('animationend', () => dot.remove());
+    layer.appendChild(dot);
   }
 }
 
@@ -2148,15 +2434,8 @@ function renderCourseDetailSection(course, asgns, groups, scores) {
     return new Date(a.due_at) - new Date(b.due_at);
   });
 
-  // 緊急＝7 天內到期「且未完成」——已完成（含已繳交視圖）不算緊急
-  const urgentCount = filtered.filter((a) => {
-    if (!a.due_at || isDone(a)) return false;
-    const diff = new Date(a.due_at) - Date.now();
-    return diff > 0 && diff <= 7 * 86400000;
-  }).length;
-
-  const pendingCount = filtered.length;
-  const detailMeta = `${pendingCount}${tr(showSubmitted ? 'completedItems' : 'pendingItems')}`;
+  const { pendingCount, urgentCount } = detailCounts(asgns);
+  const detailMeta = detailMetaText(pendingCount);
   const detailUrgentBadge = urgentCount
     ? `<div class="card-badge-urgent">${urgentCount}${tr('urgentItems')}</div>`
     : `<div class="card-badge-urgent is-placeholder" aria-hidden="true">0${tr('urgentItems')}</div>`;
@@ -2189,9 +2468,9 @@ function renderCourseDetailSection(course, asgns, groups, scores) {
         </div>
         <div class="detail-right-panel">
           ${gradeCalcHtml}
-          <div class="detail-assignments-label">${currentListLabel()}</div>
+          <div class="detail-assignments-label" tabindex="-1">${currentListLabel()}</div>
           <div class="detail-assignments-list" data-course-id="${course.id}" data-drophint="${esc(tr('dropToShow'))}">
-            ${assignmentRows || `<div style="padding:12px 0;color:var(--mid);font-size:13px;">${noItemsLabel()}</div>`}
+            ${assignmentRows || detailListEmptyHtml()}
           </div>
           ${hiddenHtml}
         </div>
@@ -2217,7 +2496,7 @@ function renderCourseDetailSection(course, asgns, groups, scores) {
       if (item.classList.contains('bursting')) return;      // 爆開中不互動
       if (item.classList.contains('completing')) {           // 撤銷窗口內 → 點列取消
         const chk = item.querySelector('.assignment-check');
-        if (chk) cancelComplete(item, String(chk.dataset.assignmentId), parseInt(chk.dataset.courseId, 10));
+        if (chk) cancelComplete(item, String(chk.dataset.assignmentId));
         return;
       }
       const desc = item.nextElementSibling;
@@ -2258,7 +2537,7 @@ function renderCourseDetailSection(course, asgns, groups, scores) {
       const cid = parseInt(btn.dataset.courseId, 10);
       if (item && item.classList.contains('bursting')) return;   // 爆開中不互動
       if (item && item.classList.contains('completing')) {        // 撤銷窗口內 → 取消
-        cancelComplete(item, id, cid);
+        cancelComplete(item, id);
         return;
       }
       // 依 Canvas 事實分流：已繳 → 翻轉「標回未完成」覆蓋；未繳 → 翻轉手動完成（就地更新，避免閃白）
@@ -2266,7 +2545,7 @@ function renderCourseDetailSection(course, asgns, groups, scores) {
       const a = ((_currentData.assignments || {})[cid] || []).find((x) => String(x.id) === id);
       const nowDone = a ? isDone(a) : false;
       if (nowDone && !showSubmitted && item) {
-        // 待辦視圖勾選完成 → 3 秒撤銷窗口 → 碎點爆 → 移除
+        // 待辦視圖勾選完成 → 1.5 秒撤銷窗口 → 碎點爆＋原地出場 → 其餘就地更新
         beginComplete(item, id, cid);
       } else {
         // 標回未完成：直接重繪（待辦視圖跳回清單；已繳視圖離開清單）
@@ -2872,7 +3151,7 @@ function renderAssignmentRow(a, groups, courseId) {
         ${groupName ? `<div class="assignment-group">${esc(groupName)}</div>` : ''}
       </div>
       <div class="assignment-right">
-        <div class="due-label ${uClass}">${dueLabelFor(a)}</div>
+        ${dueSlotHtml(`<div class="due-label ${uClass}">${dueLabelFor(a)}</div>`)}
         ${gradeHtml}
         ${submitted ? `<div class="submitted-badge">${tr('submittedBadge')}</div>` : ''}
         ${isCustom

@@ -74,12 +74,14 @@
       --ease-soft: cubic-bezier(0.215, 0.61, 0.355, 1);   /* ease.soft：選單、disclosure 展開 */
       --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);     /* ease.inOut：兩頁一起移動（push） */
       --ease-ring: cubic-bezier(0.16, 1, 0.3, 1);         /* 進度環弧與分子 tick（使用者拍板，只命名、數值不動） */
+      --ease-draw: cubic-bezier(0, 0, 0.58, 1);           /* ease.draw：勾號畫出 */
       --t-color: 200ms var(--ease-color);                 /* transition.color */
       --t-fade: 200ms var(--ease-out);                    /* transition.fade */
       --t-swap: 150ms var(--ease-out);                    /* transition.swap */
       --t-reveal: 300ms var(--ease-out);                  /* transition.reveal */
       --t-menu: 220ms var(--ease-soft);                   /* transition.menu */
       --t-disclosure: 350ms var(--ease-soft);             /* transition.disclosure */
+      --t-check: 300ms var(--ease-draw);                  /* transition.check：勾號在填色後畫出（delay 200ms 另寫，同 popup） */
       /* spring（stiffness/damping → CSS linear()；由 skill 的 css-timing 轉出） */
       --spring-press: 400ms linear(0, 0.0261, 0.0935, 0.188, 0.2977, 0.4132, 0.5271, 0.6343, 0.7313, 0.8159, 0.8872, 0.9452, 0.9906, 1.0244, 1.048, 1.063, 1.0709, 1.0732, 1.0713, 1.0663, 1.0594, 1.0514, 1.0429, 1.0346, 1.0267, 1.0196, 1.0134, 1.0082, 1.004, 1.0007, 0.9982, 0.9965, 1, 0.9948, 0.9946, 0.9948, 1, 1, 1, 1);   /* spring.press 550/30 */
       --spring-highlight: 300ms linear(0, 0.0233, 0.0813, 0.1598, 0.2483, 0.3396, 0.4288, 0.5126, 0.5894, 0.658, 0.7183, 0.7704, 0.8149, 0.8524, 0.8837, 0.9094, 0.9303, 0.9472, 0.9607, 0.9713, 0.9796, 0.986, 0.9908, 0.9944, 0.997, 0.9988, 1.0001, 1.001, 1.0015, 1);   /* spring.highlight 500/40 */
@@ -952,9 +954,9 @@
       margin: 0;
     }
 
-    /* 撤銷窗口內，卡片內的「↩ 撤銷」hint 維持內容寬度（不隨 flex column 撐滿） */
-    .week-task-card .complete-undo-hint {
-      align-self: flex-start;
+    /* 撤銷窗口內裁切卡片內容：底部倒數條沿內側圓角走，不凸出外框（#44；碎點畫在 #burst-layer，不受裁切） */
+    .week-task-card.completing {
+      overflow: clip;
     }
 
     /* 頂部兩行文字讓出勾選圈空間，避免疊字 */
@@ -1077,11 +1079,19 @@
       transform: rotate(45deg);
     }
 
-    /* 完成過渡：底部撤銷倒數條歸零後「原地碎點爆」（不放大不縮小） */
-    @keyframes complete-burst {
-      from { opacity: 1; }
-      to   { opacity: 0; }
+    /* 勾號畫出（#46）：底色在點下去那一幀就開始填（上面的 background-color 過渡），勾號在填色之後
+       由短邊往長邊畫出（transition.check，delay 200ms，同 popup）。只在「勾下去的這一下」播（.just-checked），
+       重繪出來就已勾選的框不播；這是揭示不是位移，減少動態時保留 */
+    @keyframes check-draw {
+      from { clip-path: inset(100% 0 0 0); }
+      to   { clip-path: inset(0); }
     }
+    .assignment-check.just-checked[data-done="true"]::after {
+      animation: check-draw var(--t-check) 200ms both;
+    }
+
+    /* 完成過渡：撤銷倒數條歸零 → 碎點從勾選圈迸出、項目原地淡出縮小、其餘 FLIP 補位
+       （出場與補位由 dashboard.js 的 exitInPlace／flipPlay 以 WAAPI 執行） */
     @keyframes complete-dot {
       to { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0.3); }
     }
@@ -1089,10 +1099,8 @@
       from { transform: scaleX(1); }
       to   { transform: scaleX(0); }
     }
-    .assignment-item.completing { position: relative; }
-    .assignment-item.bursting {
-      animation: complete-burst 0.4s ease-out forwards;
-    }
+    .assignment-item.completing { position: relative; }   /* 倒數條的定位基準（不影響版面） */
+    .bursting { pointer-events: none; }
     .complete-countdown {
       position: absolute;
       left: 0;
@@ -1102,21 +1110,59 @@
       background: var(--orange);
       transform-origin: left;
     }
+
+    /* 截止日期與「↩ 撤銷」從一開始就疊在同一格（.due-slot）：撤銷窗只切 .completing 淡換
+       （transition.swap＋blur.icon），格子尺寸從頭到尾不變，列與卡片不長高、其他項目不被推動（#13）。
+       只有淡入淡出與 blur，減少動態時保留 */
+    .due-slot {
+      display: grid;
+    }
+    .assignment-right .due-slot {
+      justify-items: end;
+    }
+    .week-task-card .due-slot {
+      justify-items: start;
+    }
+    .due-slot > * {
+      grid-area: 1 / 1;
+      align-self: center;
+      transition: opacity var(--t-swap), filter var(--t-swap);
+    }
     .complete-undo-hint {
       font-family: 'DM Mono', monospace;
       font-size: 12px;
       color: var(--orange);
       background: var(--surface);
       border-radius: 999px;
-      padding: 2px 10px;
-      margin-bottom: 4px;
+      padding: 0 10px;
+      opacity: 0;
+      filter: blur(2px);
+    }
+    .completing .due-slot > .complete-undo-hint {
+      opacity: 1;
+      filter: none;
+    }
+    .completing .due-slot > :not(.complete-undo-hint) {
+      opacity: 0;
+      filter: blur(2px);
+    }
+
+    /* 出場層：碎點與離場殘影畫在這裡（fixed、不吃指標；見 dashboard.js burstLayer／exitInPlace）。
+       不在捲動容器或淡出中的列裡：碎點不會被列的淡出乘掉，也不會被容器裁切（#20） */
+    #burst-layer {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 50;
+    }
+    #burst-layer .exit-clip {
+      position: absolute;
     }
     .complete-burst-dot {
       position: absolute;
-      left: 26px;
-      top: 50%;
       width: 7px;
       height: 7px;
+      margin: -3.5px 0 0 -3.5px;   /* 點的中心對齊勾選圈中心（left/top 由 JS 寫入） */
       border-radius: 50%;
       pointer-events: none;
       animation: complete-dot 0.5s ease-out forwards;
@@ -2858,6 +2904,13 @@
       margin: 24px 0 10px;
     }
 
+    /* 清單沒有作業時的提示（整段渲染與完成最後一項後的就地更新共用） */
+    .detail-list-empty {
+      padding: 12px 0;
+      color: var(--mid);
+      font-size: 13px;
+    }
+
     /* ── 已自動隱藏稽核清單（考試・簽到）── */
     .hidden-items {
       margin-top: 12px;
@@ -3546,7 +3599,7 @@
     }
 
     /* ── 減少動態（prefers-reduced-motion，見 docs/motion-review-2026-10-22.md #0）──
-       保留：淡入淡出、顏色、撤銷倒數條（期限 meter，不算位移）、.bursting 的 opacity、drag-arrived 閃色、
+       保留：淡入淡出、顏色、撤銷倒數條（期限 meter，不算位移）、完成項目離場的 opacity、due／撤銷淡換、勾號畫出、drag-arrived 閃色、
              View Transition 的 root crossfade、:focus-visible 外框。
        拿掉：位移、縮放、旋轉、尺寸動畫；無限循環改成只閃透明度或停止。
        CSS 管不到的（WAAPI、scrollTo、View Transition 共享元素命名、拖曳 clone 的 inline transform）
@@ -3615,6 +3668,8 @@
 <body>
   <!-- 螢幕閱讀器播報區：頁面一開始就掛好（live region 要先存在，之後寫入的文字才會被念出）；寫入一律走 dashboard.js 的 announce() -->
   <div id="a11y-status" class="sr-only" role="status" aria-live="polite"></div>
+  <!-- 出場層：完成時的碎點與離場殘影（純裝飾，見 dashboard.js burstLayer） -->
+  <div id="burst-layer" aria-hidden="true"></div>
   <div class="layout">
 
     <!-- ── Left Sidebar ── -->
@@ -3676,7 +3731,7 @@
     <main class="main-content" id="main-content">
       <div class="page-tabs" id="page-tabs">
         <button class="detail-back-tab" id="detail-back-btn" style="display: none;"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg><span class="detail-back-label">返回</span></button>
-        <h2 class="page-title" id="page-title">學期待辦</h2>
+        <h2 class="page-title" id="page-title" tabindex="-1">學期待辦</h2>
         <button class="btn-add-assignment" id="btn-add-assignment">+ 新增作業</button>
       </div>
       <div id="main-section"></div>
