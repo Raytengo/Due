@@ -4,8 +4,14 @@ const GROUP_COLORS = [
   '#a86070', '#7a9ba8', '#b08060', '#6a7c5d',
 ];
 
-// 拖曳握把（grip-vertical，用於可拖曳的考試/簽到列：升級/降級）；緊跟在作業名稱後、為唯一拖曳起點
-const DRAG_GRIP = '<span class="drag-grip" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="15" cy="18" r="1.4"/></svg></span>';
+// 拖曳握把（grip-vertical，用於可拖曳的考試/簽到列：升級/降級）；緊跟在作業名稱後、為唯一拖曳起點。
+// 是真的 <button>（#6）：鍵盤 Tab 停得到、Enter／Space 直接移動（keyboardMove），名稱說明按下去會去哪
+// dir：'promote'（已隱藏 → 作業清單）｜'demote'（作業清單 → 已隱藏），與列的 data-drag 相同
+const DRAG_GRIP_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="15" cy="18" r="1.4"/></svg>';
+function dragGripHtml(dir) {
+  const label = tr(dir === 'promote' ? 'a11yShowItem' : 'a11yHideItem');
+  return `<button type="button" class="drag-grip" aria-label="${esc(label)}">${DRAG_GRIP_SVG}</button>`;
+}
 
 // ── 動效 token（鏡像 index.html :root 的 --t-*／--spring-*／--reflow／--ring，見 docs/motion-review-2026-10-22.md #39）──
 // 每個 token 都是 { duration(ms), easing }：WAAPI 直接當 options 用 el.animate(kf, MOTION.reveal)；
@@ -155,6 +161,11 @@ const I18N = {
     // 螢幕閱讀器播報（#3）：{name} 換成作業名稱
     a11yCompleted: '已完成「{name}」，1.5 秒內再按一次可撤銷',
     a11yUndone: '已撤銷',
+    // 隱藏／還原的鍵盤路徑（#6）：握把按鈕名稱與移動後的播報
+    a11yShowItem: '移回作業清單',
+    a11yHideItem: '移到已隱藏',
+    a11yMovedToList: '「{name}」已移回作業清單',
+    a11yMovedToHidden: '「{name}」已移到已隱藏',
     // week section
     within7Days: '7天內',
     within30Days: '8-30天',
@@ -279,6 +290,10 @@ const I18N = {
     undoComplete: '撤销',
     a11yCompleted: '已完成「{name}」，1.5 秒内再按一次可撤销',
     a11yUndone: '已撤销',
+    a11yShowItem: '移回作业清单',
+    a11yHideItem: '移到已隐藏',
+    a11yMovedToList: '「{name}」已移回作业清单',
+    a11yMovedToHidden: '「{name}」已移到已隐藏',
     within7Days: '7天内',
     within30Days: '8-30天',
     beyond30Days: '30天以上',
@@ -400,6 +415,10 @@ const I18N = {
     undoComplete: 'Undo',
     a11yCompleted: 'Completed “{name}”. Press again within 1.5 seconds to undo.',
     a11yUndone: 'Undone',
+    a11yShowItem: 'Move back to list',
+    a11yHideItem: 'Move to hidden',
+    a11yMovedToList: '“{name}” moved back to the list',
+    a11yMovedToHidden: '“{name}” moved to hidden',
     within7Days: 'Due ≤ 7d',
     within30Days: '8-30 days',
     beyond30Days: 'Later (30d+)',
@@ -520,75 +539,140 @@ function applyUILanguage() {
   applyWelcomeTranslations();
   const tutorialBtn = document.getElementById('menu-open-tutorial');
   if (tutorialBtn) tutorialBtn.innerHTML = `${tr('menuTutorial')} <span>↗</span>`;
-  const menuLanguageLabel = document.getElementById('menu-language-label');
-  if (menuLanguageLabel) {
-    menuLanguageLabel.innerHTML = `${tr('languageLabel')}
-      <div class="settings-submenu">
-        <button id="menu-language-zh-tw">${tr('langZhTw')}</button>
-        <button id="menu-language-zh-cn">${tr('langZhCn')}</button>
-        <button id="menu-language-en">${tr('langEn')}</button>
-      </div>`;
-    bindLanguageMenuActions();
+  // 語言選單：就地改文字與 aria-checked（子選單節點只有一份、listener 只綁一次；不重建就不會留下孤兒節點，#10）
+  setText('menu-language-text', 'languageLabel');
+  setText('menu-language-zh-tw', 'langZhTw');
+  setText('menu-language-zh-cn', 'langZhCn');
+  setText('menu-language-en', 'langEn');
+  document.querySelectorAll('#menu-language-submenu [data-lang]').forEach((b) => {
+    b.setAttribute('aria-checked', String(b.dataset.lang === _uiLanguage));
+  });
+}
+
+// ── 語言子選單（#10／N1）──
+// 點擊開關：「語言」按一下打開、再按一下（或選好語言、點選單外、Esc／←、母選單關閉）才收；
+// 不再靠 hover＋180ms 延遲關閉——滑鼠不小心移開不會把它關掉，觸控點一下也不會卡住。
+// 打開（點擊、Enter／Space／→）時焦點放到第一個語言；Tab／Shift+Tab 與 ↑↓／Home／End 在語言間移動，
+// 走出最後一個（Tab）或第一個（Shift+Tab）就收回、接回母選單的順序；Esc／← 收回並把焦點還給「語言」。
+// 只在載入時綁一次（applyUILanguage 只改文字）
+function languageSubmenuEls() {
+  return {
+    label: document.getElementById('menu-language-label'),
+    submenu: document.getElementById('menu-language-submenu'),
+  };
+}
+
+function isLanguageSubmenuOpen() {
+  const { submenu } = languageSubmenuEls();
+  return !!(submenu && submenu.classList.contains('submenu-visible'));
+}
+
+function openLanguageSubmenu({ focusItem = false } = {}) {
+  const { label, submenu } = languageSubmenuEls();
+  if (!label || !submenu) return;
+  // 依「語言」那一列定位（fixed，相對 viewport）：右側 8px、垂直置中
+  const rect = label.getBoundingClientRect();
+  const midY = rect.top + rect.height / 2;
+  submenu.style.top = `${midY - submenu.offsetHeight / 2}px`;
+  submenu.style.left = `${rect.right + 8}px`;
+  submenu.classList.add('submenu-visible');
+  label.setAttribute('aria-expanded', 'true');
+  if (focusItem) {
+    // 第一個語言（menu button 慣例；目前的語言另有 aria-checked）。.submenu-visible 的 visibility 是 0s 切換，這裡已經 focus 得上去
+    const first = submenu.querySelector('[role="menuitemradio"]');
+    if (first) first.focus();
   }
 }
 
+function closeLanguageSubmenu({ refocus = false } = {}) {
+  const { label, submenu } = languageSubmenuEls();
+  if (!submenu) return;
+  const hadFocus = submenu.contains(document.activeElement);
+  submenu.classList.remove('submenu-visible');
+  if (label) label.setAttribute('aria-expanded', 'false');
+  // 焦點在子選單裡時一定要搬走：收合淡出後它是 visibility:hidden，焦點會掉到 <body>
+  if ((refocus || hadFocus) && label && label.offsetParent !== null) label.focus();
+}
+
+// 統一的設定選單關閉（setLang、外部點擊、齒輪、Claude 用量、使用教學共用）：母選單與 <body> 層的子選單一起收。
+// 焦點原本在選單或子選單裡（鍵盤操作）→ 還給 ⚙，否則它會留在 display:none 的項目上、或隨節點消失掉到 <body>
+function closeSettingsMenu() {
+  const menu = document.getElementById('settings-menu');
+  const btn = document.getElementById('settings-menu-btn');
+  const { submenu } = languageSubmenuEls();
+  const active = document.activeElement;
+  const hadFocus = !!active && ((menu && menu.contains(active)) || (submenu && submenu.contains(active)));
+  if (submenu) submenu.classList.remove('submenu-visible');
+  const { label } = languageSubmenuEls();
+  if (label) label.setAttribute('aria-expanded', 'false');
+  if (menu) menu.classList.remove('open');
+  if (btn) btn.classList.remove('open');
+  if (hadFocus && btn) btn.focus();
+}
+
 function bindLanguageMenuActions() {
-  const menuLanguageLabel = document.getElementById('menu-language-label');
-  const menuLanguageSubmenu = menuLanguageLabel
-    ? menuLanguageLabel.querySelector('.settings-submenu')
-    : null;
-  const menuLanguageZhTw = document.getElementById('menu-language-zh-tw');
-  const menuLanguageZhCn = document.getElementById('menu-language-zh-cn');
-  const menuLanguageEn = document.getElementById('menu-language-en');
-  let closeTimer = null;
-
-  // Move submenu to <body> so position:fixed is in the true root stacking context,
-  // unaffected by any ancestor's transform/opacity/will-change stacking context
-  if (menuLanguageSubmenu && menuLanguageSubmenu.parentElement !== document.body) {
-    document.body.appendChild(menuLanguageSubmenu);
-  }
-
-  const openSubmenu = () => {
-    if (!menuLanguageLabel || !menuLanguageSubmenu) return;
-    if (closeTimer) { clearTimeout(closeTimer); closeTimer = null; }
-    const rect = menuLanguageLabel.getBoundingClientRect();
-    const midY = rect.top + rect.height / 2;
-    const submenuH = menuLanguageSubmenu.offsetHeight;
-    menuLanguageSubmenu.style.top = `${midY - submenuH / 2}px`;
-    menuLanguageSubmenu.style.left = `${rect.right + 8}px`;
-    menuLanguageSubmenu.classList.add('submenu-visible');
-  };
-
-  const closeSubmenuLater = () => {
-    if (!menuLanguageSubmenu) return;
-    if (closeTimer) clearTimeout(closeTimer);
-    closeTimer = setTimeout(() => {
-      menuLanguageSubmenu.classList.remove('submenu-visible');
-    }, 180);
-  };
+  const { label, submenu } = languageSubmenuEls();
+  if (!label || !submenu) return;
 
   const setLang = (lang) => {
     _uiLanguage = lang;
     chrome.storage.local.set({ uiLanguage: lang });
     applyUILanguage();
     updateClaudeUsageMenuLabel();
+    closeSettingsMenu();
     loadData();
-    if (settingsMenu) settingsMenu.classList.remove('open');
-    if (settingsMenuBtn) settingsMenuBtn.classList.remove('open');
   };
 
-  if (menuLanguageZhTw) menuLanguageZhTw.onclick = () => setLang('zh-TW');
-  if (menuLanguageZhCn) menuLanguageZhCn.onclick = () => setLang('zh-CN');
-  if (menuLanguageEn) menuLanguageEn.onclick = () => setLang('en');
-  if (menuLanguageLabel) {
-    menuLanguageLabel.onmouseenter = openSubmenu;
-    menuLanguageLabel.onmouseleave = closeSubmenuLater;
-  }
-  if (menuLanguageSubmenu) {
-    menuLanguageSubmenu.onmouseenter = openSubmenu;
-    menuLanguageSubmenu.onmouseleave = closeSubmenuLater;
-  }
+  submenu.querySelectorAll('[data-lang]').forEach((b) => {
+    b.addEventListener('click', () => setLang(b.dataset.lang));
+  });
+
+  // click 涵蓋滑鼠、觸控與鍵盤的 Enter／Space（按鈕原生）：開著就收、收著就開並把焦點放進子選單
+  // （滑鼠點擊後的程式 focus 不會畫焦點框；接著按方向鍵也直接在語言間移動）
+  label.addEventListener('click', () => {
+    if (isLanguageSubmenuOpen()) closeLanguageSubmenu();
+    else openLanguageSubmenu({ focusItem: true });
+  });
+  label.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      openLanguageSubmenu({ focusItem: true });
+    } else if (e.key === 'ArrowLeft' && isLanguageSubmenuOpen()) {
+      e.preventDefault();
+      closeLanguageSubmenu({ refocus: true });
+    }
+  });
+
+  submenu.addEventListener('keydown', (e) => {
+    const items = [...submenu.querySelectorAll('[role="menuitemradio"]')];
+    const i = items.indexOf(document.activeElement);
+    if (e.key === 'Escape' || e.key === 'ArrowLeft') {
+      e.preventDefault();
+      e.stopPropagation();   // 不讓全域 Esc（關 overlay）也處理這一下
+      closeLanguageSubmenu({ refocus: true });
+    } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      const step = e.key === 'ArrowDown' ? 1 : -1;
+      items[(i + step + items.length) % items.length]?.focus();
+    } else if (e.key === 'Home' || e.key === 'End') {
+      e.preventDefault();
+      (e.key === 'Home' ? items[0] : items[items.length - 1])?.focus();
+    } else if (e.key === 'Tab') {
+      // 語言之間照 Tab 順序走（瀏覽器原生）；走出邊界時子選單在 <body> 層、DOM 順序不在選單裡 →
+      // 收回並接回母選單：Tab 出最後一個 → 「語言」的下一項，Shift+Tab 出第一個 → 「語言」
+      const out = e.shiftKey ? i <= 0 : i >= items.length - 1;
+      if (!out) return;
+      e.preventDefault();
+      closeLanguageSubmenu({ refocus: true });
+      if (!e.shiftKey) {
+        const next = label.nextElementSibling;
+        if (next && typeof next.focus === 'function') next.focus();
+      }
+    }
+  });
 }
+
+bindLanguageMenuActions();
 
 // ── 全域資料快取（供事件處理器使用） ──
 let _currentData = {};
@@ -967,7 +1051,9 @@ function saveCustomAssignmentFromForm(e) {
         }
         chrome.storage.local.set({ customAssignments }, () => {
           closeCustomAssignmentModal();
-          loadData();
+          // 重建會拆掉 modal 剛把焦點還回去的那顆「編輯」→ 用 id 找回同一列的新按鈕（換了課程就不在這頁，退到清單標題）
+          const cssId = CSS.escape(String(updated.id));
+          loadData(() => refocusInDetail([`.btn-edit-custom-assignment[data-assignment-id="${cssId}"]`]));
         });
       });
     } else {
@@ -989,6 +1075,17 @@ function saveCustomAssignmentFromForm(e) {
 }
 
 function deleteCustomAssignment(courseId, assignmentId) {
+  // 刪除後焦點交給鄰居（#8）：先記下這一列的下一列（沒有就上一列）的 id，重建後用 id 找回它的勾選圈
+  const cssId = CSS.escape(String(assignmentId));
+  const delBtn = document.querySelector(`#course-detail-container .btn-delete-custom-assignment[data-assignment-id="${cssId}"]`);
+  const row = delBtn && delBtn.closest('.assignment-item');
+  const rows = row ? [...row.parentElement.querySelectorAll('.assignment-item')] : [];
+  const i = rows.indexOf(row);
+  const neighbour = i >= 0 ? (rows[i + 1] || rows[i - 1]) : null;
+  const neighbourChk = neighbour && neighbour.querySelector('.assignment-check');
+  const neighbourSel = neighbourChk
+    ? `.detail-assignments-list .assignment-check[data-assignment-id="${CSS.escape(neighbourChk.dataset.assignmentId)}"]`
+    : null;
   // 以自製確認對話框取代原生 window.confirm 對話框（見 openConfirmDialog）
   openConfirmDialog({
     title: tr('deleteCustomTitle'),
@@ -1001,7 +1098,7 @@ function deleteCustomAssignment(courseId, assignmentId) {
         customAssignments[key] = (customAssignments[key] || [])
           .filter((assignment) => String(assignment.id) !== String(assignmentId));
         if (!customAssignments[key].length) delete customAssignments[key];
-        chrome.storage.local.set({ customAssignments }, loadData);
+        chrome.storage.local.set({ customAssignments }, () => loadData(() => refocusInDetail([neighbourSel])));
       });
     },
   });
@@ -1156,6 +1253,9 @@ function renderNav(courses, assignments) {
     return nextDue(a.id) - nextDue(b.id);
   });
 
+  // 重建會拆掉持有焦點的側欄項（完成落地、改名、升降級都會呼叫這裡）→ 重建後把焦點還給同一課的新按鈕（#8）
+  const focusedCourse = navEl.contains(document.activeElement) ? document.activeElement.dataset.targetCourse : null;
+
   navEl.innerHTML = sorted.map((c) => {
     const asgns = assignments[c.id] || [];
     const filtered = applyFilters(asgns);
@@ -1197,6 +1297,11 @@ function renderNav(courses, assignments) {
       }
     });
   });
+
+  if (focusedCourse) {
+    const again = navEl.querySelector(`.nav-course-item[data-target-course="${focusedCourse}"]`);
+    if (again) again.focus({ preventScroll: true });
+  }
 }
 
 // ── 側欄主導航（active 狀態、數量、頁面標題） ──
@@ -1587,7 +1692,12 @@ function renderCardGrid(courses, assignments, assignmentGroups) {
     });
   });
 
-  el.querySelectorAll('.card-pager-btn').forEach((btn) => {
+  bindCardPager(el);
+}
+
+// 分頁鈕 listener（renderCardGrid 綁一次；換頁時按鈕節點保留，不必重綁，見 updateCardPage）
+function bindCardPager(root) {
+  root.querySelectorAll('.card-pager-btn').forEach((btn) => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       updateCardPage(parseInt(btn.dataset.courseId, 10), parseInt(btn.dataset.dir, 10));
@@ -1639,16 +1749,7 @@ function renderCardBottom(courseId, sorted, pageIdx) {
   const page = Math.min(pageIdx, totalPages - 1);
   const visible = sorted.slice(page * pageSize, (page + 1) * pageSize);
 
-  const rows = visible.length
-    ? visible.map((a) => {
-        const uClass = urgencyClass(a.due_at, isExam(a), isDone(a));
-        return `
-          <div class="card-row">
-            <div class="card-row-title">${esc(a.name)}</div>
-            <div class="card-row-due ${uClass}">${dueLabelFor(a)}</div>
-          </div>`;
-      }).join('')
-    : `<div class="card-empty">${cardEmptyLabel()}</div>`;
+  const rows = renderCardRows(visible);
 
   const pager = totalPages > 1 ? `
     <div class="card-pager">
@@ -1660,7 +1761,24 @@ function renderCardBottom(courseId, sorted, pageIdx) {
   return `<div class="card-bottom"><div class="card-rows-container">${rows}</div>${pager}</div>`;
 }
 
+// 卡片作業列（renderCardBottom 首次渲染與 updateCardPage 換頁共用）
+function renderCardRows(visible) {
+  return visible.length
+    ? visible.map((a) => {
+        const uClass = urgencyClass(a.due_at, isExam(a), isDone(a));
+        return `
+          <div class="card-row">
+            <div class="card-row-title">${esc(a.name)}</div>
+            <div class="card-row-due ${uClass}">${dueLabelFor(a)}</div>
+          </div>`;
+      }).join('')
+    : `<div class="card-empty">${cardEmptyLabel()}</div>`;
+}
+
 // ── 分頁切換（局部重繪） ──
+// 只換 .card-rows-container 的內容；頁碼文字與兩顆分頁鈕的 disabled 就地更新——分頁鈕節點保留，
+// 鍵盤可以連按 Enter 一路翻頁（整段 outerHTML 重建會把持有焦點的按鈕拆掉、焦點掉到 <body>，#8）。
+// listener 在 renderCardGrid 綁一次就好。翻到第一頁／最後一頁時，持有焦點的那顆會變 disabled → 焦點先交給另一顆
 function updateCardPage(courseId, dir) {
   const asgns = (_currentData.assignments || {})[courseId] || [];
   const filtered = applyFilters(asgns).sort((a, b) => {
@@ -1679,15 +1797,30 @@ function updateCardPage(courseId, dir) {
 
   const card = document.querySelector(`.course-card-grid[data-course-id="${courseId}"]`);
   if (!card) return;
-  const newBottom = renderCardBottom(courseId, filtered, next);
-  card.querySelector('.card-bottom').outerHTML = newBottom;
-
-  card.querySelectorAll('.card-pager-btn').forEach((btn) => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      updateCardPage(parseInt(btn.dataset.courseId, 10), parseInt(btn.dataset.dir, 10));
-    });
-  });
+  const rowsEl = card.querySelector('.card-rows-container');
+  const prevBtn = card.querySelector('.card-pager-btn[data-dir="-1"]');
+  const nextBtn = card.querySelector('.card-pager-btn[data-dir="1"]');
+  const info = card.querySelector('.card-pager-info');
+  if (!rowsEl || !prevBtn || !nextBtn) {
+    // 結構不完整（理論上不會：有分頁鈕才會走到這裡）→ 退回整段重建並重綁
+    const bottom = card.querySelector('.card-bottom');
+    if (!bottom) return;
+    bottom.outerHTML = renderCardBottom(courseId, filtered, next);
+    bindCardPager(card);
+    return;
+  }
+  rowsEl.innerHTML = renderCardRows(filtered.slice(next * pageSize, (next + 1) * pageSize));
+  if (info) info.textContent = `${next + 1} / ${totalPages}`;
+  const prevOff = next === 0;
+  const nextOff = next >= totalPages - 1;
+  const active = document.activeElement;
+  if (prevOff && active === prevBtn) { nextBtn.disabled = false; nextBtn.focus({ preventScroll: true }); }
+  if (nextOff && active === nextBtn) { prevBtn.disabled = false; prevBtn.focus({ preventScroll: true }); }
+  prevBtn.disabled = prevOff;
+  nextBtn.disabled = nextOff;
+  // 只剩一頁（兩顆都 disabled）時退回卡片本身
+  const now = document.activeElement;
+  if ((now === prevBtn || now === nextBtn) && now.disabled) card.focus({ preventScroll: true });
 }
 
 // View Transition 共享元素命名（卡片 ↔ 詳情 morph）。減少動態時不命名：沒有 morph 的位移與縮放，
@@ -1932,31 +2065,50 @@ function startCourseRename(courseId) {
     if (renameBtn) renameBtn.style.visibility = '';
   };
 
+  // 焦點（#8）：輸入框被換回 span 時焦點會掉到 <body> → 只有 Enter／Escape 收尾時還給鉛筆；
+  // blur 觸發的 commit 不動焦點（使用者已經 Tab 或點去別處，不要搶回來）
+  const refocusPencil = () => {
+    if (renameBtn && renameBtn.isConnected) renameBtn.focus({ preventScroll: true });
+  };
+
   let committed = false;
-  const commit = () => {
+  // handoff：blur 收尾時焦點要去的元素（e.relatedTarget）；若它是側欄項，會被下面的 renderNav 重建拆掉 → 交給重建後的同一課
+  const commit = ({ refocus = false, handoff = null } = {}) => {
     if (committed) return;
     committed = true;
     const newName = input.value.trim();
     const displayName = newName || (course ? course.name : '');
     restore(displayName);
+    if (refocus) refocusPencil();
 
     persistCourseName(courseId, newName, course);
 
     const { courses = [], assignments = {} } = _currentData;
     renderNav(courses, assignments);
+    refocusRebuiltNavItem(handoff);
   };
 
-  const cancel = () => {
+  const cancel = ({ refocus = false } = {}) => {
     if (committed) return;
     committed = true;
     restore(currentName);
+    if (refocus) refocusPencil();
   };
 
   input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') commit();
-    if (e.key === 'Escape') cancel();
+    // preventDefault：焦點在 keydown 裡換到鉛筆按鈕，不擋的話這次 Enter 的 keypress 會落在鉛筆上、又把改名打開
+    if (e.key === 'Enter') { e.preventDefault(); commit({ refocus: true }); }
+    if (e.key === 'Escape') { e.preventDefault(); cancel({ refocus: true }); }
   });
-  input.addEventListener('blur', commit);
+  input.addEventListener('blur', (e) => commit({ handoff: e.relatedTarget }));
+}
+
+// 改名的 blur 收尾（#8）：blur 當下焦點還沒落到下一個元素（activeElement 是 <body>），renderNav 認不出要保留誰；
+// 用 blur 的 relatedTarget 判斷——它若是被重建拆掉的側欄項，就聚焦重建後的同一課
+function refocusRebuiltNavItem(handoff) {
+  if (!handoff || handoff.isConnected || !handoff.dataset || !handoff.dataset.targetCourse) return;
+  const again = document.querySelector(`.nav-course-item[data-target-course="${handoff.dataset.targetCourse}"]`);
+  if (again) again.focus({ preventScroll: true });
 }
 
 // 寫入課程自訂名稱（單一真相：_currentData + chrome.storage.local.courseNames）；
@@ -1991,19 +2143,27 @@ function startSidebarRename(courseId) {
   input.focus();
   input.select();
 
-  const rerenderNav = () => {
+  // refocus（#8）：只有 Enter／Escape 收尾時把焦點放回重建出來的同一課側欄項；blur 觸發的不動焦點
+  // handoff：blur 收尾時焦點要去的元素（e.relatedTarget，例如 Tab 到下一個側欄項）——它會被這次重建拆掉，交給重建後的同一課
+  const rerenderNav = (refocus = false, handoff = null) => {
     const { courses = [], assignments = {} } = _currentData;
     renderNav(courses, assignments);   // 重繪還原按鈕（commit 後即套用新名）
+    if (refocus) {
+      const again = document.querySelector(`.nav-course-item[data-target-course="${courseId}"]`);
+      if (again) again.focus({ preventScroll: true });
+    } else {
+      refocusRebuiltNavItem(handoff);
+    }
   };
 
   let committed = false;
-  const commit = () => {
+  const commit = ({ refocus = false, handoff = null } = {}) => {
     if (committed) return;
     committed = true;
     const newName = input.value.trim();
     const displayName = newName || (course ? course.name : '');
     persistCourseName(courseId, newName, course);
-    rerenderNav();
+    rerenderNav(refocus, handoff);
     // 若右側正顯示同一課，順手同步詳情標題（只改文字、不整段重繪，避免打斷成績計算器/捲動）
     if (currentView === 'course' && currentCourseId === courseId) {
       const dName = document.querySelector('#course-detail-container .detail-name-text');
@@ -2011,17 +2171,18 @@ function startSidebarRename(courseId) {
     }
   };
 
-  const cancel = () => {
+  const cancel = ({ refocus = false } = {}) => {
     if (committed) return;
     committed = true;
-    rerenderNav();   // 還原原本按鈕（不寫入）
+    rerenderNav(refocus);   // 還原原本按鈕（不寫入）
   };
 
   input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') commit();
-    if (e.key === 'Escape') cancel();
+    // preventDefault：焦點換到側欄項按鈕後，這次 Enter 的 keypress 不會落在它身上而打開課程詳情
+    if (e.key === 'Enter') { e.preventDefault(); commit({ refocus: true }); }
+    if (e.key === 'Escape') { e.preventDefault(); cancel({ refocus: true }); }
   });
-  input.addEventListener('blur', commit);
+  input.addEventListener('blur', (e) => commit({ handoff: e.relatedTarget }));
 }
 
 // ── 完成過渡：1.5 秒撤銷窗 → 碎點爆＋原地出場＋FLIP 補位 ──
@@ -2480,7 +2641,7 @@ function renderCourseDetailSection(course, asgns, groups, scores) {
         </div>
         <div class="detail-name">
           <span class="detail-name-text" tabindex="-1">${esc(getCourseName(course))}</span>
-          <button class="btn-rename-course" data-course-id="${course.id}" title="${tr('renameCourse')}"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg></button>
+          <button class="btn-rename-course" data-course-id="${course.id}" title="${tr('renameCourse')}" aria-label="${esc(tr('renameCourse'))}"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg></button>
         </div>
         <div class="detail-meta">${detailMeta}</div>
       </div>
@@ -2519,10 +2680,7 @@ function renderCourseDetailSection(course, asgns, groups, scores) {
         if (chk) cancelComplete(item, String(chk.dataset.assignmentId));
         return;
       }
-      const desc = item.nextElementSibling;
-      if (desc && desc.classList.contains('assignment-desc')) {
-        desc.classList.toggle('open');
-      }
+      toggleAssignmentDesc(item);
     });
   });
 
@@ -2609,7 +2767,7 @@ function renderCourseDetailSection(course, asgns, groups, scores) {
     btn.addEventListener('click', () => {
       const wrap = btn.closest('.hidden-items');
       if (!wrap) return;
-      wrap.classList.toggle('open');
+      setHiddenItemsOpen(wrap, !wrap.classList.contains('open'));
     });
   });
 
@@ -2620,6 +2778,15 @@ function renderCourseDetailSection(course, asgns, groups, scores) {
   if (el.querySelector('.grade-calc')) {
     recalculateGrades(course.id, { persist: false });
   }
+}
+
+// 作業描述開關（整列點擊與鍵盤 .assignment-desc-toggle 共用同一條，#7）：切 .open 並同步 aria-expanded
+function toggleAssignmentDesc(item) {
+  const desc = item.nextElementSibling;
+  if (!desc || !desc.classList.contains('assignment-desc')) return;
+  const open = desc.classList.toggle('open');
+  const toggle = item.querySelector('.assignment-desc-toggle');
+  if (toggle) toggle.setAttribute('aria-expanded', String(open));
 }
 
 // ── 拖曳升級（隱藏列→作業清單）／降級（升級列→稽核區）──
@@ -2651,7 +2818,34 @@ function setupHideablePromoteDrag(el) {
       e.stopPropagation();
       trackDragFrom(e, row, zones);
     });
+    // 鍵盤路徑（#6）：Enter／Space 直接把這一項移到另一區，走和放開滑鼠相同的 commitDrag → settleClone
+    // （preventDefault 擋掉按鈕原生的 click 與 Space 捲動；按住不放的 repeat 不重複移動）
+    grip.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (!e.repeat) keyboardMove(row, zones);
+    });
   });
+}
+
+// 鍵盤移動（#6）：和 trackDragFrom 同形狀的 ctx（已拿起、已在目標上），clone 從原列原地起飛，飛進重繪後的落點、落地閃一下——
+// 動效與滑鼠拖曳相同（A2）。這個 ctx 不指派給 _dragCtx、也不掛 window 監聽：commitDrag 裡的重繪會跑 abortActiveDrag()，
+// 若掛在 _dragCtx 上，clone 會在 settleClone 之前就被刪掉
+function keyboardMove(row, zones) {
+  if (_dragCtx) return;                                          // 滑鼠拖曳進行中
+  if (row.classList.contains('completing') || row.classList.contains('bursting')) return;
+  const dir = row.dataset.drag;
+  const target = dir === 'promote' ? zones.list : zones.hidden;
+  if (!target) return;
+  const ctx = {
+    row, dir, target, zones,
+    id: row.dataset.hideableId,
+    lifted: true, over: true, done: true,
+    clone: null, base: null,
+  };
+  makeDragClone(ctx);
+  commitDrag(ctx, { viaKeyboard: true });
 }
 
 function trackDragFrom(e, row, zones) {
@@ -2694,19 +2888,28 @@ function dragMove(ctx, ev) {
   maybeEdgeScroll(ctx);
 }
 
-// 「拿起」：以原列複製浮動 clone；原列留殘影、目標區亮起
-function liftRow(ctx) {
-  ctx.lifted = true;
+// 浮動 clone（拖曳與鍵盤移動共用）：疊在原列的位置；複本裡的勾選圈／握把是假的，
+// inert＋aria-hidden 讓 Tab 與螢幕閱讀器碰不到（#6）
+function makeDragClone(ctx) {
   const rect = ctx.row.getBoundingClientRect();
   ctx.base = rect;
   const clone = ctx.row.cloneNode(true);
   clone.classList.add('drag-clone');
+  clone.inert = true;
+  clone.setAttribute('aria-hidden', 'true');
   clone.style.width = rect.width + 'px';
   clone.style.height = rect.height + 'px';
   clone.style.left = rect.left + 'px';
   clone.style.top = rect.top + 'px';
   document.body.appendChild(clone);
   ctx.clone = clone;
+  return clone;
+}
+
+// 「拿起」：以原列複製浮動 clone；原列留殘影、目標區亮起
+function liftRow(ctx) {
+  ctx.lifted = true;
+  makeDragClone(ctx);
   ctx.row.classList.add('drag-source');
   ctx.target.classList.add('drop-active');
   document.body.classList.add('drag-active');
@@ -2781,9 +2984,15 @@ function endDrag(ctx, cancelled) {
 }
 
 // 命中：寫入隱藏/顯示（同步重繪詳情＋側欄）→ clone 飛入重繪後的實際落點
-function commitDrag(ctx) {
+// 焦點：鍵盤移動、或焦點本來就在被移動的那一列（例如先 Tab 到這一列、再用滑鼠拖；pointerdown 有 preventDefault，
+// 單純滑鼠按握把不會把焦點給它），重繪會把它拆掉 →
+// 交給落地那一列的握把（落在鎖定列就交給同區的鄰居，再沒有就交給該區的標題），並播報結果（#6）
+function commitDrag(ctx, { viaKeyboard = false } = {}) {
   const savedScroll = ctx.zones.scroller ? ctx.zones.scroller.scrollTop : 0;
   const hiddenWasOpen = !!(ctx.zones.hidden && ctx.zones.hidden.classList.contains('open'));
+  const keepFocus = viaKeyboard || ctx.row.contains(document.activeElement);
+  const item = ((_currentData.assignments || {})[currentCourseId] || []).find((x) => String(x.id) === String(ctx.id));
+  const name = item ? item.name : (ctx.row.querySelector('.assignment-title, .hidden-item-title')?.textContent || '').trim();
   setItemHiddenByDrag(ctx.id, ctx.dir === 'demote');
 
   const container = document.getElementById('course-detail-container');
@@ -2791,7 +3000,7 @@ function commitDrag(ctx) {
   if (scroller) scroller.scrollTop = savedScroll;  // 重繪會重置捲動位置 → 還原
   // 稽核區開合：降級後強制展開（讓使用者看到落點）；升級則維持拖曳前狀態
   const hidden = container.querySelector('.hidden-items');
-  if (hidden && (hiddenWasOpen || ctx.dir === 'demote')) hidden.classList.add('open');
+  if (hidden && (hiddenWasOpen || ctx.dir === 'demote')) setHiddenItemsOpen(hidden, true);
 
   const cssId = (window.CSS && CSS.escape) ? CSS.escape(String(ctx.id)) : String(ctx.id);
   let landed = null;
@@ -2801,7 +3010,32 @@ function commitDrag(ctx) {
   } else {
     landed = container.querySelector(`.hidden-item-row[data-hideable-id="${cssId}"]`);
   }
+  if (keepFocus) focusAfterMove(container, landed, ctx.dir);
+  announce(tr(ctx.dir === 'promote' ? 'a11yMovedToList' : 'a11yMovedToHidden').replace('{name}', name));
   settleClone(ctx, landed, { flash: true });
+}
+
+// 移動後的焦點落點：落地列的握把 → 同區最近一列有握把的（鎖定列沒有握把）→ 該區的標題／開關
+function focusAfterMove(container, landed, dir) {
+  const zone = dir === 'promote'
+    ? container.querySelector('.detail-assignments-list')
+    : container.querySelector('.hidden-items-list');
+  let to = landed && landed.querySelector('.drag-grip');
+  if (!to && zone) {
+    const rows = [...zone.querySelectorAll('.assignment-item, .hidden-item-row')];
+    const i = landed ? rows.indexOf(landed) : -1;
+    const near = i >= 0
+      ? [...rows.slice(i + 1), ...rows.slice(0, i).reverse()]
+      : rows;
+    const row = near.find((r) => r.querySelector('.drag-grip'));
+    to = row && row.querySelector('.drag-grip');
+  }
+  if (!to) {
+    to = dir === 'promote'
+      ? container.querySelector('.detail-assignments-label')
+      : container.querySelector('.hidden-items-toggle');
+  }
+  if (to) to.focus({ preventScroll: true });   // 捲動交給 settleClone 的 scrollIntoView（與飛行落點同一次）
 }
 
 // clone 飛入 targetRow 的位置後移除；targetRow 期間隱形、落地後亮一下（flash）
@@ -2857,6 +3091,14 @@ function abortActiveDrag() {
   if (ctx.target && ctx.target.isConnected) ctx.target.classList.remove('drop-active', 'drop-hover');
 }
 
+// 已隱藏區開合（按鈕點擊與拖曳／鍵盤降級後強制展開共用）：切 .open 並同步開關的 aria-expanded——
+// 鍵盤使用者要靠它知道裡面的列現在 Tab 得到（#6）
+function setHiddenItemsOpen(wrap, open) {
+  wrap.classList.toggle('open', open);
+  const btn = wrap.querySelector('.hidden-items-toggle');
+  if (btn) btn.setAttribute('aria-expanded', String(open));
+}
+
 // ── 已自動隱藏稽核清單（唯讀精簡列；考試/簽到；不顯示任何分數，見決策 3）──
 function renderHiddenItemsSection(items, groups, courseId) {
   // 排序：還沒到的（拖出會進待辦）在前依 due 升冪；已結束/已繳的放一起殿後、最近結束在前
@@ -2883,7 +3125,7 @@ function renderHiddenItemsSection(items, groups, courseId) {
     return `
       <div class="hidden-item-row${draggable ? '' : ' hidden-item-locked'}"${draggable ? ' data-drag="promote"' : ''} data-hideable-id="${esc(String(a.id))}">
         <div class="hidden-item-left">
-          <div class="hidden-item-title">${titleHtml}${draggable ? DRAG_GRIP : ''}</div>
+          <div class="hidden-item-title">${titleHtml}${draggable ? dragGripHtml('promote') : ''}</div>
           ${groupName ? `<div class="assignment-group">${esc(groupName)}</div>` : ''}
         </div>
         <div class="hidden-item-right">
@@ -2898,11 +3140,11 @@ function renderHiddenItemsSection(items, groups, courseId) {
   // 整個 .hidden-items 為「降級」放置目標（data-drophint 供 .drop-active::after 顯示提示）
   return `
     <div class="hidden-items" data-course-id="${courseId}" data-drophint="${esc(tr('dropToHide'))}">
-      <button class="hidden-items-toggle" data-course-id="${courseId}">
+      <button class="hidden-items-toggle" data-course-id="${courseId}" aria-expanded="false" aria-controls="hidden-items-list-${courseId}">
         <span class="hidden-items-arrow"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
         <span>${esc(tr('hiddenItemsToggle').replace('{n}', items.length))}</span>
       </button>
-      <div class="hidden-items-list">${listInner}</div>
+      <div class="hidden-items-list" id="hidden-items-list-${courseId}">${listInner}</div>
     </div>`;
 }
 
@@ -3146,6 +3388,10 @@ function renderAssignmentRow(a, groups, courseId) {
     ? `<span>${esc(a.name)}</span>`
     : `<span class="assignment-title-link" data-assignment-id="${a.id}" data-course-id="${courseId}">${esc(a.name)}</span>`;
   const customLabel = isCustom ? `<div class="custom-assignment-label">${tr('customAssignment')}</div>` : '';
+  // 描述開關（#7）：整列點擊展開描述，但列不可聚焦（裡面有勾選圈、握把、編輯/刪除，設成 role=button 會巢狀互動元件）→
+  // 在左欄放一顆透明、不吃指標事件的 <button> 蓋滿左欄：鍵盤 Tab 停得到，Enter／Space 的 click 冒泡到列，走同一個開關；
+  // 焦點框畫在左欄外緣。aria-expanded 由 toggleAssignmentDesc 同步，aria-controls 指向下方的描述
+  const descId = `desc-${esc(String(a.id))}`;
 
   // ── 完成勾選圈：一律可雙向切換；Canvas 已繳者切的是 manualUndone 覆蓋（見 spec 2026-07-21）──
   const checkLabel = done ? tr('markUndone') : tr('markDone');
@@ -3166,7 +3412,8 @@ function renderAssignmentRow(a, groups, courseId) {
     <div class="assignment-item${done ? ' submitted' : ''}${isCustom ? ' custom-assignment' : ''}${promotedHideable ? ' promoted-hideable' : ''}" data-drag="demote" data-hideable-id="${esc(String(a.id))}">
       ${checkHtml}
       <div class="assignment-left">
-        <div class="assignment-title">${titleHtml}${DRAG_GRIP}</div>
+        <button type="button" class="assignment-desc-toggle" aria-expanded="false" aria-controls="${descId}" aria-label="${esc(a.name)}"></button>
+        <div class="assignment-title">${titleHtml}${dragGripHtml('demote')}</div>
         ${customLabel}
         ${groupName ? `<div class="assignment-group">${esc(groupName)}</div>` : ''}
       </div>
@@ -3182,7 +3429,7 @@ function renderAssignmentRow(a, groups, courseId) {
           : ''}
       </div>
     </div>
-    <div class="assignment-desc">
+    <div class="assignment-desc" id="${descId}">
       <div class="assignment-desc-inner">${descInner}</div>
     </div>`;
 }
@@ -3278,7 +3525,8 @@ document.getElementById('sync-btn').addEventListener('click', () => {
 });
 
 // ── 讀取資料 ──
-function loadData() {
+// onRendered（選用）：畫面重建完之後呼叫——需要在重建後用 id 找回焦點的路徑用（自訂作業編輯／刪除，#8）
+function loadData(onRendered) {
   chrome.storage.local.get(
     ['lastSync', 'schoolName', 'canvasBaseUrl', 'courses', 'assignments', 'customAssignments', 'assignmentGroups', 'scores', 'courseNames', 'customWeights', 'manualDone', 'manualUndone', 'manualShown', 'manualHidden'],
     (data) => {
@@ -3310,8 +3558,24 @@ function loadData() {
         manualShown: data.manualShown || {},
         manualHidden: data.manualHidden || {},
       });
+      if (typeof onRendered === 'function') onRendered();
     }
   );
+}
+
+// 重建後把焦點放回（#8）：只在焦點真的掉了（<body> 或已被拆掉的節點）時才動，使用者已經移走的焦點不搶回來。
+// 依序試 selectors（在課程詳情內找），都沒有就用清單標題
+function refocusInDetail(selectors) {
+  const active = document.activeElement;
+  if (active && active !== document.body && active.isConnected) return;
+  const scope = document.getElementById('course-detail-container');
+  if (!scope || currentView !== 'course') return;
+  for (const sel of selectors) {
+    const el = sel && scope.querySelector(sel);
+    if (el) { el.focus(); return; }
+  }
+  const label = scope.querySelector('.detail-assignments-label');
+  if (label) label.focus({ preventScroll: true });
 }
 
 function updateClaudeUsageMenuLabel() {
@@ -3335,21 +3599,27 @@ const menuOpenTutorial = document.getElementById('menu-open-tutorial');
 if (settingsMenuBtn && settingsMenu) {
   settingsMenuBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    settingsMenu.classList.toggle('open');
-    settingsMenuBtn.classList.toggle('open', settingsMenu.classList.contains('open'));
-    if (!settingsMenu.classList.contains('open')) {
-      const menuLanguageLabel = document.getElementById('menu-language-label');
-      if (menuLanguageLabel) menuLanguageLabel.classList.remove('submenu-open');
+    if (settingsMenu.classList.contains('open')) {
+      closeSettingsMenu();
+    } else {
+      settingsMenu.classList.add('open');
+      settingsMenuBtn.classList.add('open');
     }
   });
 
+  // 點選單外關閉；子選單在 <body> 層、不在 #settings-menu 裡，點它（例如兩個語言之間的空隙）不算外面
   document.addEventListener('click', (e) => {
-    if (!settingsMenu.contains(e.target) && !settingsMenuBtn.contains(e.target)) {
-      settingsMenu.classList.remove('open');
-      settingsMenuBtn.classList.remove('open');
-      const menuLanguageLabel = document.getElementById('menu-language-label');
-      if (menuLanguageLabel) menuLanguageLabel.classList.remove('submenu-open');
-    }
+    const submenu = document.getElementById('menu-language-submenu');
+    if (settingsMenu.contains(e.target) || settingsMenuBtn.contains(e.target)) return;
+    if (submenu && submenu.contains(e.target)) return;
+    if (settingsMenu.classList.contains('open') || isLanguageSubmenuOpen()) closeSettingsMenu();
+  });
+
+  // 鍵盤在母選單裡按 Esc → 收起整個選單、焦點回 ⚙（子選單裡的 Esc 只收子選單，見 bindLanguageMenuActions）
+  settingsMenu.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    e.preventDefault();
+    closeSettingsMenu();
   });
 }
 
@@ -3358,20 +3628,16 @@ if (menuClaudeUsageToggle) {
     _showClaudeUsage = !_showClaudeUsage;
     chrome.storage.local.set({ showClaudeUsageInPopup: _showClaudeUsage });
     updateClaudeUsageMenuLabel();
-    if (settingsMenu) settingsMenu.classList.remove('open');
-    if (settingsMenuBtn) settingsMenuBtn.classList.remove('open');
-    const menuLanguageLabel = document.getElementById('menu-language-label');
-    if (menuLanguageLabel) menuLanguageLabel.classList.remove('submenu-open');
+    closeSettingsMenu();
   });
 }
 
 if (menuOpenTutorial) {
   menuOpenTutorial.addEventListener('click', () => {
+    // 先收選單（焦點還給 ⚙）再開教學：教學的 focus trap 會把當下的焦點記成觸發元素、關閉時還給它——
+    // 記到的要是 ⚙，而不是馬上變 display:none 的「使用教學」
+    closeSettingsMenu();
     openWelcomeModal();
-    if (settingsMenu) settingsMenu.classList.remove('open');
-    if (settingsMenuBtn) settingsMenuBtn.classList.remove('open');
-    const menuLanguageLabel = document.getElementById('menu-language-label');
-    if (menuLanguageLabel) menuLanguageLabel.classList.remove('submenu-open');
   });
 }
 
@@ -3384,43 +3650,65 @@ function _welcomeUpdateDots(n) {
   });
 }
 
+// 按鈕列固定兩個節點（上一步／主按鈕），換頁只就地改文字、data-wgo 與 class（#8）：
+// 舊版每步 btnRow.innerHTML 重建，按「開始設定」後持有焦點的按鈕被拆掉、焦點掉到 <body>，Tab 還能離開 modal。
+// 第 1 頁沒有「上一步」（hidden）；第 5 頁主按鈕變成「開始使用」（#welcome-done-btn，overlay 委派關閉）
 function _welcomeUpdateButtons(n) {
   const btnRow = document.getElementById('welcome-btn-row');
   if (!btnRow) return;
 
-  let html = '';
-  if (n === 1) {
-    html = `<button class="welcome-btn" data-wgo="2">${tr('wBtnStart')}</button>`;
-  } else if (n === 5) {
-    html = `
-      <button class="welcome-btn sec" data-wgo="4">${tr('wBtnPrev')}</button>
-      <button class="welcome-btn ora" id="welcome-done-btn">${tr('wBtnDone')}</button>
-    `;
-  } else {
-    html = `
-      <button class="welcome-btn sec" data-wgo="${n - 1}">${tr('wBtnPrev')}</button>
-      <button class="welcome-btn" data-wgo="${n + 1}">${tr('wBtnNext')}</button>
-    `;
+  let prev = btnRow.querySelector('.welcome-btn-prev');
+  let main = btnRow.querySelector('.welcome-btn-main');
+  if (!prev || !main) {
+    btnRow.innerHTML = `
+      <button type="button" class="welcome-btn sec welcome-btn-prev"></button>
+      <button type="button" class="welcome-btn welcome-btn-main"></button>`;
+    prev = btnRow.querySelector('.welcome-btn-prev');
+    main = btnRow.querySelector('.welcome-btn-main');
   }
-  btnRow.innerHTML = html;
 
-  // Re-bind the done button since it's dynamic
-  document.getElementById('welcome-done-btn')?.addEventListener('click', closeWelcomeModal);
+  // 上一步要消失時若正拿著焦點（第 2 頁按「上一步」回第 1 頁）→ 先交給主按鈕
+  if (n === 1 && document.activeElement === prev) main.focus();
+  prev.hidden = n === 1;
+  prev.dataset.wgo = String(Math.max(1, n - 1));
+  prev.textContent = tr('wBtnPrev');
+
+  const isLast = n === 5;
+  main.classList.toggle('ora', isLast);
+  if (isLast) {
+    main.id = 'welcome-done-btn';
+    delete main.dataset.wgo;
+    main.textContent = tr('wBtnDone');
+  } else {
+    main.removeAttribute('id');
+    main.dataset.wgo = String(n + 1);
+    main.textContent = tr(n === 1 ? 'wBtnStart' : 'wBtnNext');
+  }
+}
+
+// 畫面外的 step 設 inert（#9）：5 頁都留在 500% 寬的 track 裡，不設的話 Tab 會落到看不見的頁
+// （例如第 5 頁的 mailto），還會把 .welcome-main-area 捲歪；螢幕閱讀器也只念目前這一頁
+function _welcomeInert(n) {
+  document.querySelectorAll('#welcome-track .welcome-step').forEach((s, i) => {
+    s.inert = i + 1 !== n;
+  });
 }
 
 function openWelcomeModal() {
   _welcomeStep = 1;
   const track = document.getElementById('welcome-track');
-  if (track) track.style.transition = 'none';
-  if (track) track.style.transform = 'translateX(0)';
+  _welcomeInert(1);
+  if (track) {
+    // 直接歸位到第 1 頁（不滑）：先關 transition、forced reflow 提交位置，再還原（不靠 rAF，背景分頁也成立）
+    track.style.transition = 'none';
+    track.style.transform = 'translateX(0)';
+    track.getBoundingClientRect();
+    track.style.transition = '';
+  }
   _welcomeUpdateDots(1);
   _welcomeUpdateButtons(1);
   const overlay = document.getElementById('welcome-overlay');
   if (overlay) overlay.classList.add('open');
-  // re-enable transition after reset
-  requestAnimationFrame(() => {
-    if (track) track.style.transition = '';
-  });
 }
 
 function closeWelcomeModal() {
@@ -3431,6 +3719,7 @@ function closeWelcomeModal() {
 function welcomeGoStep(n) {
   if (n === _welcomeStep) return;
   _welcomeStep = n;
+  _welcomeInert(n);   // 在設定 transform 之前：離場頁從第一幀就是 inert
   const track = document.getElementById('welcome-track');
   if (track) track.style.transform = `translateX(-${(n - 1) * 20}%)`;
   _welcomeUpdateDots(n);
@@ -3438,7 +3727,6 @@ function welcomeGoStep(n) {
 }
 
 document.getElementById('welcome-close')?.addEventListener('click', closeWelcomeModal);
-document.getElementById('welcome-done-btn')?.addEventListener('click', closeWelcomeModal);
 
 // ── 登入 Canvas 自動跳回 ──
 // 點連結開 Canvas 分頁後「武裝」監聽：同步成功（lastSync 落地）→ 關閉開出的分頁、聚焦回 dashboard。
@@ -3521,6 +3809,7 @@ document.getElementById('welcome-overlay')?.addEventListener('click', (e) => {
     }
     return;
   }
+  if (e.target.closest('#welcome-done-btn')) { closeWelcomeModal(); return; }
   const btn = e.target.closest('[data-wgo]');
   if (btn) { welcomeGoStep(+btn.dataset.wgo); return; }
   const dot = e.target.closest('.welcome-dot[data-wstep]');
@@ -3604,11 +3893,7 @@ function renderWeightEditList(items) {
     </div>`).join('');
 
   list.querySelectorAll('.weight-edit-del').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      btn.closest('.weight-edit-row').remove();
-      updateWeightTotal();
-      refreshWeightColors();
-    });
+    btn.addEventListener('click', () => removeWeightRow(btn.closest('.weight-edit-row')));
   });
 
   list.querySelectorAll('.weight-edit-pct').forEach((input) => {
@@ -3616,6 +3901,18 @@ function renderWeightEditList(items) {
   });
 
   updateWeightTotal();
+}
+
+// 刪除一列權重（清單渲染與「+ 新增項目」共用）：被刪的 ✕ 正拿著焦點，直接 remove 會讓焦點掉出 modal 的 trap →
+// 交給下一列（沒有就上一列）的 ✕，刪光了就交給「+ 新增項目」（#8）
+function removeWeightRow(row) {
+  if (!row) return;
+  const neighbour = row.nextElementSibling || row.previousElementSibling;
+  row.remove();
+  updateWeightTotal();
+  refreshWeightColors();
+  const to = (neighbour && neighbour.querySelector('.weight-edit-del')) || document.getElementById('weight-edit-add');
+  if (to) to.focus();
 }
 
 function refreshWeightColors() {
@@ -3644,11 +3941,7 @@ document.getElementById('weight-edit-add').addEventListener('click', () => {
     <input class="weight-edit-name" type="text" value="" placeholder="${tr('weightItemName')}">
     <input class="weight-edit-pct" type="number" value="0" min="0" max="100" step="0.1">
     <button class="weight-edit-del"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>`;
-  row.querySelector('.weight-edit-del').addEventListener('click', () => {
-    row.remove();
-    updateWeightTotal();
-    refreshWeightColors();
-  });
+  row.querySelector('.weight-edit-del').addEventListener('click', () => removeWeightRow(row));
   row.querySelector('.weight-edit-pct').addEventListener('input', updateWeightTotal);
   document.getElementById('weight-edit-list').appendChild(row);
   row.querySelector('.weight-edit-name').focus();
@@ -3722,9 +4015,11 @@ document.addEventListener('keydown', (e) => {
 });
 
 // ── Modal 無障礙：focus trap ＋ 開啟聚焦第一元素 ＋ 關閉還原焦點到觸發元素（四個 overlay 共用）──
+// inert 子樹（教學畫面外的 step，#9）不算：它們有 client rect、卻永遠拿不到焦點，算進來 trap 的頭尾會錯
 function _focusablesIn(container) {
   const sel = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
-  return Array.from(container.querySelectorAll(sel)).filter((el) => el.getClientRects().length > 0);
+  return Array.from(container.querySelectorAll(sel))
+    .filter((el) => el.getClientRects().length > 0 && !el.closest('[inert]'));
 }
 
 function setupModalA11y(overlay) {

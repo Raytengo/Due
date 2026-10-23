@@ -519,10 +519,19 @@
       transition: opacity var(--t-menu), visibility var(--t-menu);
     }
 
+    /* 打開那一邊 visibility 立刻切換（0s）：visibility 跟著 0.22s 過渡的話，打開的那一刻按鈕仍是 hidden、
+       鍵盤打開後 focus 第一個語言會失敗（#10）；收合仍等淡出結束才 hidden */
     .settings-submenu.submenu-visible {
       opacity: 1;
       visibility: visible;
       pointer-events: auto;
+      transition: opacity var(--t-menu), visibility 0s;
+    }
+
+    /* 「語言」改成點擊開關（N1）：子選單開著時這一列維持 hover 的樣子，滑鼠移開也看得出它是哪一列打開的 */
+    .settings-menu-item[aria-expanded="true"] {
+      background: var(--surface);
+      color: var(--orange);
     }
 
     .settings-submenu button {
@@ -638,6 +647,8 @@
       display: flex;
       flex-direction: column;
       position: relative;
+      /* 課程 grid 在矮視窗會超出這一區、由 Tab 的焦點捲動帶進畫面：留 6px，貼齊下緣的卡片焦點框不被裁（#4） */
+      scroll-padding-block: 6px;
     }
 
     /* ── Week Page ── */
@@ -1162,6 +1173,20 @@
       gap: 3px;
       flex: 1;
       min-width: 0;
+      position: relative;   /* 描述開關（.assignment-desc-toggle）蓋滿左欄的定位基準 */
+    }
+
+    /* 描述開關（#7）：鍵盤用的真按鈕，透明地蓋滿左欄；pointer-events:none → 滑鼠照樣點在下面的標題、握把、左欄上，
+       整列點擊展開描述不變。Enter／Space 的 click 冒泡到列，走同一個開關；焦點框就是左欄的外框 */
+    .assignment-desc-toggle {
+      position: absolute;
+      inset: 0;
+      margin: 0;
+      padding: 0;
+      border: 0;
+      border-radius: 4px;
+      background: none;
+      pointer-events: none;
     }
 
     /* 標題列：名稱 + （可拖列）緊跟其後的拖曳握把；名稱過長由內層 span 做 ellipsis */
@@ -1542,7 +1567,9 @@
       flex: 1;
       width: 100%;
       height: 100%;
-      overflow: hidden;
+      /* clip 而不是 hidden（#9）：hidden 仍是捲動容器，焦點落到畫面外的 step 會把它捲歪、之後每次換頁都錯位；
+         clip 不是捲動容器，捲不動 */
+      overflow: clip;
       position: relative;
     }
 
@@ -2757,10 +2784,14 @@
       display: flex;
       gap: 32px;
       overflow: hidden;
+      /* 矮視窗時左欄（圓餅＋圖例＋編輯）比這一區高，Tab 到「編輯」會把這層捲動：捲動定位留 6px，焦點框不貼底被裁（#4） */
+      scroll-padding-block: 6px;
     }
 
     .detail-left-panel {
       flex-shrink: 0;
+      /* 高度＝內容（不撐滿這一列）：內容超出時捲動範圍才含 .detail-card-bottom 的下 padding，「編輯」的焦點框捲得進來（#4） */
+      align-self: flex-start;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -2862,6 +2893,11 @@
          虛線 outline（offset 3px＋2px 寬）需要兩側留白才不會被切掉左緣 */
       padding-left: 8px;
       padding-right: 8px;
+      /* 下緣留 6px：最後一個停點（「已隱藏 N 項」開關或最後一列）捲到底時，外擴的焦點框還有地方畫（#4） */
+      padding-bottom: 6px;
+      /* Tab 把清單捲到剛好看得見時，焦點元素會貼齊捲動區上下緣、外擴的焦點框被裁掉（#4）→
+         捲動定位留 6px（2px ring＋2px offset＋餘裕）；settleClone 的 scrollIntoView 也一併留白 */
+      scroll-padding-block: 6px;
     }
 
     .detail-right-panel::-webkit-scrollbar {
@@ -2974,6 +3010,11 @@
       align-items: center;
       padding: 3px;
       margin: -3px 0;
+      /* 是 <button>（#6，鍵盤可移動）：拿掉按鈕預設外框與底色，外觀維持原本的握把 */
+      border: 0;
+      border-radius: 4px;
+      background: none;
+      font: inherit;
       color: var(--mid);
       opacity: 0.45;
       cursor: grab;
@@ -3003,6 +3044,11 @@
     :is(.hidden-item-row, .assignment-item) .drag-grip:focus-visible {
       opacity: 1;
       transition: none;
+    }
+
+    /* 已隱藏列平常淡到 0.55：握把拿到鍵盤焦點時整列回到不透明，焦點框才不會跟著被淡掉（#6） */
+    .hidden-item-row:has(.drag-grip:focus-visible) {
+      opacity: 1;
     }
 
     @media not all and (hover: hover) and (pointer: fine) {
@@ -3421,10 +3467,15 @@
       outline: 2px solid var(--orange);
       outline-offset: 2px;
     }
-    .course-card-grid:focus-visible,
-    .week-task-card:focus-visible {
+    .course-card-grid:focus-visible {
       outline: 2px solid var(--orange);
       outline-offset: 2px;
+    }
+    /* 週卡用 inset ring（#4）：.week-right 是捲動容器，外擴的 ring 在卡片貼著捲動區底緣
+       （Tab 捲到看得見的那一刻、或最後一列）時會被裁掉下緣；畫在卡片內側就不會被任何容器裁到 */
+    .week-task-card:focus-visible {
+      outline: 2px solid var(--orange);
+      outline-offset: -2px;
     }
 
     /* 視覺隱藏、仍在 accessibility tree（螢幕閱讀器播報區 #a11y-status 等用，見 dashboard.js announce） */
@@ -3575,7 +3626,10 @@
       .detail-card-bottom {
         flex-direction: column;
         gap: 18px;
-        overflow-y: auto;
+        overflow-y: auto;   /* 窄版面捲動容器換成這層（scroll-padding 見上方 .detail-card-bottom，#4） */
+      }
+      .detail-left-panel {
+        align-self: stretch;   /* 上下堆疊時交叉軸是水平：維持撐滿寬度（上方 flex-start 只為並排時的高度） */
       }
       .detail-weight-pie-container {
         max-width: none;
@@ -3583,6 +3637,10 @@
       }
       .detail-right-panel {
         overflow-y: visible;
+        /* 高度＝內容：flex:1＋min-height:0 會把它壓扁、內容溢出盒外，捲動範圍就不含 .detail-card-bottom 的下 padding，
+           捲到底時最後一個停點的焦點框被裁（#4） */
+        flex: none;
+        padding-bottom: 0;
       }
     }
 
@@ -3631,6 +3689,16 @@
         transition: none;
       }
 
+      /* 教學換頁不滑（上面 .welcome-track transition:none）→ 改成淡入：畫面外的 step 是 inert（#9），
+         離場頁立刻透明、進場頁淡入 */
+      .welcome-step {
+        transition: opacity var(--t-fade);
+      }
+
+      .welcome-step[inert] {
+        opacity: 0;
+      }
+
       /* 尺寸動畫拿掉，只留換色 */
       .welcome-dot {
         transition: background-color var(--t-color);
@@ -3656,6 +3724,13 @@
 <body>
   <!-- 螢幕閱讀器播報區：頁面一開始就掛好（live region 要先存在，之後寫入的文字才會被念出）；寫入一律走 dashboard.js 的 announce() -->
   <div id="a11y-status" class="sr-only" role="status" aria-live="polite"></div>
+  <!-- 語言子選單：放在 <body> 層，position:fixed 不受任何祖先的 transform／opacity 影響；
+       只建這一份、換語言時就地改文字（舊版每換一次語言重建一份、舊的變孤兒，#10）。開合見 dashboard.js bindLanguageMenuActions -->
+  <div class="settings-submenu" id="menu-language-submenu" role="menu" aria-labelledby="menu-language-label">
+    <button type="button" role="menuitemradio" aria-checked="true" id="menu-language-zh-tw" data-lang="zh-TW">繁體中文</button>
+    <button type="button" role="menuitemradio" aria-checked="false" id="menu-language-zh-cn" data-lang="zh-CN">简体中文</button>
+    <button type="button" role="menuitemradio" aria-checked="false" id="menu-language-en" data-lang="en">English</button>
+  </div>
   <!-- 出場層：完成時的碎點與離場殘影（純裝飾，見 dashboard.js burstLayer） -->
   <div id="burst-layer" aria-hidden="true"></div>
   <div class="layout">
@@ -3699,13 +3774,8 @@
                 <div class="settings-menu-title">Quick Actions</div>
                 <div class="settings-menu-divider"></div>
                 <button class="settings-menu-item" id="menu-claude-usage-toggle">Claude 用量</button>
-                <div class="settings-menu-item has-submenu" id="menu-language-label">語言
-                  <div class="settings-submenu">
-                    <button id="menu-language-zh-tw">繁體中文</button>
-                    <button id="menu-language-zh-cn">简体中文</button>
-                    <button id="menu-language-en">English</button>
-                  </div>
-                </div>
+                <!-- 語言（#10／N1）：真的 <button>，點擊／Enter／Space／→ 開關子選單；子選單直接放在 <body> 層（見下方 #menu-language-submenu） -->
+                <button type="button" class="settings-menu-item has-submenu" id="menu-language-label" aria-haspopup="menu" aria-expanded="false" aria-controls="menu-language-submenu"><span id="menu-language-text">語言</span></button>
                 <button class="settings-menu-item" id="menu-open-tutorial">使用教學 <span>↗</span></button>
               </div>
             </div>
