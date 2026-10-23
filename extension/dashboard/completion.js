@@ -61,6 +61,23 @@
     return next;
   }
 
+  // ── 勾選/撤銷的單一寫入入口：把作業設成「目標完成狀態」，回傳新的兩張 map（immutable）──
+  //    依「當下」外部事實（isExternallyDone 現算，不讀 render 時的屬性）決定該用哪張 map 表達，
+  //    並把另一張的同 id 一律清掉 → 結果恆為最小覆蓋，兩 map 並存的髒資料在下一次勾選時自癒：
+  //      done=true ：外部完成 → 兩張都不留（回歸外部事實）；否則 → 只留 manualDone
+  //      done=false：外部完成 → 只留 manualUndone；否則 → 兩張都不留（日後 Canvas 繳交才不會被舊覆蓋藏起來）
+  //    目標狀態冪等：同一目標重套結果不變（供「本頁樂觀更新＋storage 最新值重套」，見 dashboard updateShared）
+  function setDone(maps, assignment, done) {
+    const id = assignment && assignment.id;
+    const ext = isExternallyDone(assignment);
+    const src = maps || {};
+    let manualDone = toggleManualDone(src.manualDone, id, false);
+    let manualUndone = toggleManualDone(src.manualUndone, id, false);
+    if (done && !ext) manualDone = toggleManualDone(manualDone, id, true);
+    if (!done && ext) manualUndone = toggleManualDone(manualUndone, id, true);
+    return { manualDone, manualUndone };
+  }
+
   // ── 清理手動完成 map，只留 truthy 值 → { [String(id)]: true }──
   function normalizeManualDone(map) {
     const cleaned = {};
@@ -77,6 +94,7 @@
     isManualUndone,
     isDone,
     toggleManualDone,
+    setDone,
     normalizeManualDone,
   };
 });

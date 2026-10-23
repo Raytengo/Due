@@ -11,6 +11,7 @@ const I18N = {
     claudeResetAt: '\u91CD\u7F6E\u6642\u9593',
     claudeRefresh: '\u91CD\u65B0\u6293\u53D6 Claude usage',
     claudeRefreshMissing: '\u8ACB\u5148\u6253\u958B\u4E00\u500B Claude \u5206\u9801\u518D\u91CD\u65B0\u6293\u53D6',
+    claudeRefreshFailed: 'Claude usage 抓取失敗',
     claudeRefreshing: '\u6293\u53D6\u4E2D...',
     today: '\u4ECA\u5929',
     tomorrow: '\u660E\u5929',
@@ -31,7 +32,8 @@ const I18N = {
     claudeLastSync: '\u4E0A\u6B21\u540C\u6B65',
     claudeResetAt: '\u91CD\u7F6E\u65F6\u95F4',
     claudeRefresh: '\u91CD\u65B0\u6293\u53D6 Claude usage',
-    claudeRefreshMissing: '\u8BF7\u5148\u6253\u5F00\u4E00\u4E2A Claude \u5206\u9875\u518D\u91CD\u65B0\u6293\u53D6',
+    claudeRefreshMissing: '请先打开一个 Claude 标签页再重新抓取',
+    claudeRefreshFailed: 'Claude usage 抓取失败',
     claudeRefreshing: '\u6293\u53D6\u4E2D...',
     today: '\u4ECA\u5929',
     tomorrow: '\u660E\u5929',
@@ -53,6 +55,7 @@ const I18N = {
     claudeResetAt: 'Reset',
     claudeRefresh: 'Refresh Claude usage',
     claudeRefreshMissing: 'Open a Claude tab first, then refresh usage',
+    claudeRefreshFailed: 'Could not refresh Claude usage',
     claudeRefreshing: 'Refreshing...',
     today: 'Today',
     tomorrow: 'Tomorrow',
@@ -68,14 +71,34 @@ const I18N = {
 
 let _claudeRefreshBusy = false;
 let _currentClaudeUsage = null;
-let _manualDone = {};             // 最新手動完成 map（loadData 更新；勾選/撤銷即時寫回）
 const COMPLETE_DELAY_MS = 1500;   // 勾選後撤銷窗口（毫秒，對齊 dashboard）
+
+// ── 完成標記寫入（read-modify-write，QA P1-2／P1-4）──
+// 讀 storage 最新的 manualDone/manualUndone → DueCompletion.setDone 套用目標狀態（依當下外部事實決定寫哪張、
+// 順手清掉兩張並存的髒資料，與 dashboard 同一入口）→ 寫回。不拿 popup 開啟當下的快照整包覆寫，
+// 否則會吃掉 dashboard／其他視窗在 popup 開著期間的變更。佇列：前一筆寫完才讀下一筆（連點勾/撤銷不互蓋）
+let _writeQueue = Promise.resolve();
+function writeDone(assignment, done) {
+  _writeQueue = _writeQueue.then(() => new Promise((resolve) => {
+    chrome.storage.local.get(['manualDone', 'manualUndone'], (cur) => {
+      const next = DueCompletion.setDone(cur || {}, assignment, done);
+      chrome.storage.local.set(next, () => {
+        const err = chrome.runtime && chrome.runtime.lastError;
+        if (err) console.error('[Due] 完成標記寫入失敗:', err.message);
+        resolve();
+      });
+    });
+  })).catch((err) => console.error('[Due] 完成標記寫入失敗:', err));
+}
 
 function tr(key) {
   return (I18N[_uiLanguage] && I18N[_uiLanguage][key]) || I18N['zh-TW'][key];
 }
 
 function applyUILanguage() {
+  // <html lang> 跟 UI 語言（螢幕閱讀器選語音、CJK 字形 fallback 依此判斷）；未知值退回 zh-TW（同 tr 的 fallback）
+  document.documentElement.lang = I18N[_uiLanguage] ? _uiLanguage : 'zh-TW';
+
   const taskLabel = document.getElementById('task-label');
   if (taskLabel) taskLabel.textContent = tr('taskHeading');
 
@@ -193,6 +216,7 @@ function setClaudeRefreshBusy(busy) {
 }
 
 // 回傳兩組：overdue（30 天內逾期未完成，最近錯過在最上）＋ upcoming（7 天內，最快到期在最上）
+// assignments 為 Canvas ∪ 自訂作業（loadData 以 DueCustomAssignments.mergeAssignmentMaps 合併，同 dashboard render）
 function getTasks(assignments, courseMap, manualDone, manualUndone, manualShown, manualHidden) {
   const now = new Date();
   const nowMs = now.getTime();
@@ -205,18 +229,23 @@ function getTasks(assignments, courseMap, manualDone, manualUndone, manualShown,
   for (const courseId in assignments) {
     for (const a of assignments[courseId]) {
       if (!a.due_at) continue;
+      // 自訂作業掛在已不在課程清單的課（退選/換學期）→ 不列（dashboard 只走 courses，同樣看不到）
+      if (a._isCustom && !courseMap[courseId]) continue;
       // 被收進稽核區者排除：考試/簽到看 manualShown（未升級即隱藏）、一般作業看 manualHidden
-      const hideable = DueTaskRules.isAttendance(a) || DueTaskRules.isExam(a);
+      // 自訂作業一律不自動隱藏（名稱含 Quiz/Midterm/簽到也照樣列；taskRules.isHideable 與 dashboard 共用，QA P1-6）
+      const hideable = DueTaskRules.isHideable(a);
       if (hideable ? !shown[String(a.id)] : !!hidden[String(a.id)]) continue;
       // 完成判斷共用 completion.js（Canvas 已繳或手動完成排除；已繳但標回未完成則顯示）
       if (DueCompletion.isDone(a, manualDone, manualUndone)) continue;
 
       const task = {
         id: a.id,
+        assignment: a,                // 完成寫入用（setDone 需看外部事實：已繳／考試已結束）
         name: a.name,
         due_at: a.due_at,
         course: courseMap[courseId],
         html_url: a.html_url || null,
+        isCustom: !!a._isCustom,      // 自訂作業沒有 Canvas 頁 → 點擊改開 dashboard
       };
 
       if (DueTaskRules.urgency(a.due_at, nowMs) === 'overdue') {
@@ -281,8 +310,11 @@ function makeTaskItem(task, courseNames, group) {
   const cls = isOverdue ? 'overdue' : upcomingClass(task.due_at);
   const displayName = getDisplayName(task.course, courseNames);
   const dueStr = isOverdue ? overdueDaysLabel(task.due_at) : formatDueShort(task.due_at);
-  const canOpen = task.html_url
+  const hasCanvasUrl = !!task.html_url
     && /^https?:\/\/.+\/courses\/\d+\/(assignments|quizzes|discussion_topics)\/\d+/.test(task.html_url);
+  // 可點開：有效的 Canvas 作業頁；自訂作業沒有 Canvas 頁 → 改開 dashboard
+  const canOpen = hasCanvasUrl || task.isCustom;
+  const openItem = () => (hasCanvasUrl ? chrome.tabs.create({ url: task.html_url }) : openDashboard());
 
   const li = document.createElement('li');
   li.className = 'task-item' + (canOpen ? ' openable' : '');
@@ -302,12 +334,12 @@ function makeTaskItem(task, courseNames, group) {
   let undoTimer = null;
   let inUndo = false;
 
-  // 作業名稱點擊 → 開 Canvas 分頁；撤銷窗口內則不開，讓事件冒泡到整列 → 取消
+  // 作業名稱點擊 → 開 Canvas 分頁（自訂作業開 dashboard）；撤銷窗口內則不開，讓事件冒泡到整列 → 取消
   if (canOpen) {
     const openCanvas = (e) => {
       if (inUndo) return;
       e.stopPropagation();
-      chrome.tabs.create({ url: task.html_url });
+      openItem();
     };
     nameEl.addEventListener('click', openCanvas);
     // 鍵盤可觸發（role=button + tabindex=0）：Enter/Space 等同 click；Space 需 preventDefault 擋捲動
@@ -326,9 +358,8 @@ function makeTaskItem(task, courseNames, group) {
     check.setAttribute('aria-label', tr('undoComplete'));
     badge.className = 'task-due undo';
     badge.textContent = '↩ ' + tr('undoComplete');  // ↩ 撤銷
-    // 立即持久化（與 dashboard 即時同步；popup 皆未繳項 → 只走 manualDone）
-    _manualDone = DueCompletion.toggleManualDone(_manualDone, task.id, true);
-    chrome.storage.local.set({ manualDone: _manualDone });
+    // 立即持久化（與 dashboard 同一入口；已繳但被標回未完成者會清 manualUndone 而非寫 manualDone）
+    writeDone(task.assignment, true);
     undoTimer = setTimeout(finalize, COMPLETE_DELAY_MS);
   }
 
@@ -340,8 +371,7 @@ function makeTaskItem(task, courseNames, group) {
     check.setAttribute('aria-label', tr('markDone'));
     badge.className = 'task-due ' + cls;
     badge.textContent = dueStr;
-    _manualDone = DueCompletion.toggleManualDone(_manualDone, task.id, false);
-    chrome.storage.local.set({ manualDone: _manualDone });
+    writeDone(task.assignment, false);
   }
 
   function finalize() {
@@ -365,10 +395,10 @@ function makeTaskItem(task, courseNames, group) {
   });
 
   // 整列點擊（勾選圈已 stopPropagation 排除）：
-  //   撤銷窗口內 → 取消；否則若有有效連結 → 開該作業的 Canvas 頁（名稱點擊會先 stopPropagation，不重複開）
+  //   撤銷窗口內 → 取消；否則若有有效連結 → 開該作業的 Canvas 頁、自訂作業開 dashboard（名稱點擊會先 stopPropagation，不重複開）
   li.addEventListener('click', () => {
     if (inUndo) { cancelUndo(); return; }
-    if (canOpen) chrome.tabs.create({ url: task.html_url });
+    if (canOpen) openItem();
   });
 
   return li;
@@ -451,33 +481,52 @@ function applyClaudeRefreshCopy() {
 }
 
 function loadData() {
-  chrome.storage.local.get(['courses', 'assignments', 'courseNames', 'claudeUsage', 'manualDone', 'manualUndone', 'manualShown', 'manualHidden'], (data) => {
-    _manualDone = data.manualDone || {};   // 記住最新值供勾選/撤銷即時寫回
+  chrome.storage.local.get(['courses', 'assignments', 'customAssignments', 'courseNames', 'claudeUsage', 'manualDone', 'manualUndone', 'manualShown', 'manualHidden'], (data) => {
     const courseMap = buildCourseMap(data.courses);
-    const groups = getTasks(data.assignments || {}, courseMap, _manualDone, data.manualUndone || {}, data.manualShown || {}, data.manualHidden || {});
+    // Canvas ∪ 自訂作業（與 dashboard render 同一合併；自訂作業同套隱藏／完成／7 天與逾期窗規則）
+    const assignments = DueCustomAssignments.mergeAssignmentMaps(data.assignments || {}, data.customAssignments || {});
+    const groups = getTasks(assignments, courseMap, data.manualDone || {}, data.manualUndone || {}, data.manualShown || {}, data.manualHidden || {});
     renderTasks(groups, data.courseNames || {});
     renderClaudeUsage(data.claudeUsage || null);
   });
 }
 
-document.getElementById('dashboard-btn').addEventListener('click', () => {
-  const url = chrome.runtime.getURL('dashboard/index.html');
-  chrome.tabs.create({ url });
-});
+function openDashboard() {
+  chrome.tabs.create({ url: chrome.runtime.getURL('dashboard/index.html') });
+}
+
+document.getElementById('dashboard-btn').addEventListener('click', openDashboard);
 
 document.getElementById('claude-usage-chip').addEventListener('click', () => {
   chrome.tabs.create({ url: 'https://claude.ai/settings/usage' });
 });
 
+// ↻ 抓不到用量時的短暫提示：沒有 claude.ai 分頁 → 請先開分頁；其他失敗 → 通用失敗。數秒後清空（key 為 null → 立即清空）
+const CLAUDE_NOTE_MS = 4000;
+let _claudeNoteTimer = null;
+function showClaudeRefreshNote(key) {
+  const note = document.getElementById('claude-usage-note');
+  if (!note) return;
+  clearTimeout(_claudeNoteTimer);
+  _claudeNoteTimer = null;
+  note.textContent = key ? tr(key) : '';
+  if (key) _claudeNoteTimer = setTimeout(() => { note.textContent = ''; }, CLAUDE_NOTE_MS);
+}
+
 async function triggerClaudeRefreshSilently() {
   if (_claudeRefreshBusy) return;
   setClaudeRefreshBusy(true);
   applyClaudeRefreshCopy();
+  showClaudeRefreshNote(null);   // 重按 ↻ 先清掉上一次的提示
   try {
     const response = await chrome.runtime.sendMessage({ type: 'SYNC_CLAUDE_USAGE', force: true });
-    // If it fails (no tab), we just keep the old data silently
+    // 抓不到（background 回 success:false＋reason）→ 保留舊用量，短暫提示原因
+    if (!response || !response.success) {
+      showClaudeRefreshNote(response && response.reason === 'no-tab' ? 'claudeRefreshMissing' : 'claudeRefreshFailed');
+    }
   } catch (err) {
-    console.warn('[Due] Auto-refresh failed:', err.message);
+    console.warn('[Due] Claude usage refresh failed:', err.message);
+    showClaudeRefreshNote('claudeRefreshFailed');
   } finally {
     setClaudeRefreshBusy(false);
     applyClaudeRefreshCopy();
