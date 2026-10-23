@@ -75,6 +75,7 @@
       --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);     /* ease.inOut：兩頁一起移動（push） */
       --ease-ring: cubic-bezier(0.16, 1, 0.3, 1);         /* 進度環弧與分子 tick（使用者拍板，只命名、數值不動） */
       --ease-draw: cubic-bezier(0, 0, 0.58, 1);           /* ease.draw：勾號畫出 */
+      --ease-away: cubic-bezier(0.33, 0.17, 0.67, 0.5);   /* ease.away：dialog 關閉、加速離開 */
       --t-color: 200ms var(--ease-color);                 /* transition.color */
       --t-fade: 200ms var(--ease-out);                    /* transition.fade */
       --t-swap: 150ms var(--ease-out);                    /* transition.swap */
@@ -82,11 +83,15 @@
       --t-menu: 220ms var(--ease-soft);                   /* transition.menu */
       --t-disclosure: 350ms var(--ease-soft);             /* transition.disclosure */
       --t-check: 300ms var(--ease-draw);                  /* transition.check：勾號在填色後畫出（delay 200ms 另寫，同 popup） */
+      --t-overlay: 400ms var(--ease-soft);                /* transition.overlay：modal 背景變暗／模糊，進出同一條 */
+      --t-dialog-fade: 400ms var(--ease-soft);            /* transition.dialogFade：modal 卡片淡入 */
+      --t-dismiss: 200ms var(--ease-away);                /* transition.dismiss：modal 卡片關閉 */
       /* spring（stiffness/damping → CSS linear()；由 skill 的 css-timing 轉出） */
       --spring-press: 400ms linear(0, 0.0261, 0.0935, 0.188, 0.2977, 0.4132, 0.5271, 0.6343, 0.7313, 0.8159, 0.8872, 0.9452, 0.9906, 1.0244, 1.048, 1.063, 1.0709, 1.0732, 1.0713, 1.0663, 1.0594, 1.0514, 1.0429, 1.0346, 1.0267, 1.0196, 1.0134, 1.0082, 1.004, 1.0007, 0.9982, 0.9965, 1, 0.9948, 0.9946, 0.9948, 1, 1, 1, 1);   /* spring.press 550/30 */
       --spring-highlight: 300ms linear(0, 0.0233, 0.0813, 0.1598, 0.2483, 0.3396, 0.4288, 0.5126, 0.5894, 0.658, 0.7183, 0.7704, 0.8149, 0.8524, 0.8837, 0.9094, 0.9303, 0.9472, 0.9607, 0.9713, 0.9796, 0.986, 0.9908, 0.9944, 0.997, 0.9988, 1.0001, 1.001, 1.0015, 1);   /* spring.highlight 500/40 */
       --reflow: var(--spring-highlight);                  /* spring.reflow（同為 500/40）：補位、落點 */
       --spring-selection: 500ms linear(0, 0.0141, 0.0509, 0.1035, 0.1663, 0.2349, 0.306, 0.3769, 0.4459, 0.5115, 0.573, 0.6297, 0.6814, 0.728, 0.7696, 0.8064, 0.8387, 0.8668, 0.8911, 0.9119, 0.9296, 0.9445, 0.957, 0.9673, 0.9758, 0.9827, 0.9882, 0.9926, 0.9961, 0.9987, 1.0007, 1.0021, 1.0031, 1.0038, 1.0041, 1, 1, 1, 1.004, 1.0038, 1.0035, 1.0032, 1.0029, 1.0026, 1.0023, 1.002, 1.0017, 1.0015, 1, 1);   /* spring.selection 300/30 */
+      --spring-dialog: 750ms linear(0, 0.0071, 0.0261, 0.0541, 0.0886, 0.1279, 0.1702, 0.2143, 0.2592, 0.3041, 0.3485, 0.3918, 0.4336, 0.4738, 0.5121, 0.5485, 0.5829, 0.6153, 0.6456, 0.674, 0.7004, 0.725, 0.7479, 0.769, 0.7886, 0.8066, 0.8233, 0.8386, 0.8527, 0.8656, 0.8775, 0.8884, 0.8983, 0.9074, 0.9158, 0.9234, 0.9303, 0.9367, 0.9424, 0.9477, 0.9525, 0.9569, 0.9609, 0.9645, 0.9678, 0.9708, 0.9735, 0.976, 0.9782, 0.9803, 0.9821, 0.9838, 0.9853, 0.9867, 0.9879, 0.9891, 0.9901, 0.9911, 0.9919, 0.9927, 0.9934, 0.994, 0.9946, 0.9951, 0.9955, 0.996, 0.9964, 0.9967, 0.997, 0.9973, 0.9976, 0.9978, 1, 1, 1);   /* spring.dialog：modal 卡片放大到位 */
       --ring: 800ms var(--ease-ring);                     /* 進度環弧 */
       --ring-tick: 400ms var(--ease-ring);                /* 進度環分子變動的微上滑 tick */
       /* 位移／縮放量（減少動態時歸零或 1） */
@@ -94,6 +99,9 @@
       --scale-press: 0.97;                                /* scale.press：按鈕按下 */
       --scale-choice: 0.985;                              /* scale.choice：整張卡片／整列按下 */
       --modal-from: scale(0.96);                          /* modal 進出場的起點縮放 */
+      --scale-menu: 0.9;                                  /* scale.menu：設定選單／子選單從觸發點長出的起點 */
+      --blur-swap: blur(2px);                             /* blur.icon／blur.disclosure：標籤淡換、展開面板的內容 */
+      --blur-surface: blur(4px);                          /* blur.surface：首次同步後內容從模糊清晰 */
     }
 
     * {
@@ -216,17 +224,6 @@
 
     .side-nav-item.active .side-nav-count {
       color: var(--orange);
-    }
-
-    /* 拖曳升級落點在另一個視圖時，clone 飛入側欄導航 → 計數閃示標記落點（見 settleCloneToNav） */
-    .side-nav-count.count-flash {
-      animation: nav-count-flash 0.9s ease-out;
-    }
-
-    @keyframes nav-count-flash {
-      0%  { color: var(--orange); transform: scale(1.35); }
-      55% { color: var(--orange); }
-      100% { transform: scale(1); }
     }
 
     /* Sidebar section */
@@ -376,6 +373,34 @@
       color: var(--orange);
     }
 
+    /* 同步按鈕的四個狀態疊在同一格（#30）：閒置／三點／「✓ 已同步」／「同步失敗」，依 data-status 只亮一個，
+       opacity＋blur(2px) 原地淡換（transition.swap＋blur.icon）。格子寬＝最寬的標籤，換狀態按鈕不變寬。
+       沒亮的那幾個 visibility:hidden → 按鈕的可及名稱只有目前那一個；visibility 跟著 swap 時長走，
+       離場的標籤淡完才藏起，進場的第一幀就 visible（離散屬性往 visible 的方向立即生效） */
+    .sync-swap {
+      display: inline-grid;
+      place-items: center;
+      vertical-align: middle;
+    }
+
+    .sync-swap > * {
+      grid-area: 1 / 1;
+      opacity: 0;
+      filter: var(--blur-swap);
+      visibility: hidden;
+      white-space: nowrap;
+      transition: opacity var(--t-swap), filter var(--t-swap), visibility var(--t-swap);
+    }
+
+    [data-status="idle"] > .sync-swap > .s-idle,
+    [data-status="loading"] > .sync-swap > .s-loading,
+    [data-status="done"] > .sync-swap > .s-done,
+    [data-status="error"] > .sync-swap > .s-error {
+      opacity: 1;
+      filter: none;
+      visibility: visible;
+    }
+
     @keyframes dot-bounce {
       0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
       40% { transform: translateY(-4px); opacity: 1; }
@@ -448,6 +473,17 @@
       display: none;
       z-index: 10;
       overflow: visible;
+      /* 從齒輪長出來、關閉時縮回去（#50，menu recipe）：origin 對準底部小箭頭（right 10px＋6px 邊）；
+         開關同一條 transition.menu，display 延後到淡出結束才 none（allow-discrete），起點見 @starting-style */
+      opacity: 0;
+      scale: var(--scale-menu);
+      transform-origin: calc(100% - 16px) 100%;
+      transition: opacity var(--t-menu), scale var(--t-menu), display var(--t-menu) allow-discrete;
+    }
+
+    /* 收合淡出中的那 220ms 還畫著：不接指標，避免點到正在消失的項目 */
+    .settings-menu:not(.open) {
+      pointer-events: none;
     }
 
     .settings-menu::after {
@@ -478,6 +514,15 @@
 
     .settings-menu.open {
       display: block;
+      opacity: 1;
+      scale: 1;
+    }
+
+    @starting-style {
+      .settings-menu.open {
+        opacity: 0;
+        scale: var(--scale-menu);
+      }
     }
 
     .settings-menu-item {
@@ -516,16 +561,20 @@
       visibility: hidden;
       pointer-events: none;
       z-index: 9999;
-      transition: opacity var(--t-menu), visibility var(--t-menu);
+      /* 與母選單同一組參數（#50）：從「語言」那一列長出來——子選單在該列右側 8px，origin 取左緣往左 8px、垂直置中 */
+      scale: var(--scale-menu);
+      transform-origin: -8px 50%;
+      transition: opacity var(--t-menu), scale var(--t-menu), visibility var(--t-menu);
     }
 
     /* 打開那一邊 visibility 立刻切換（0s）：visibility 跟著 0.22s 過渡的話，打開的那一刻按鈕仍是 hidden、
        鍵盤打開後 focus 第一個語言會失敗（#10）；收合仍等淡出結束才 hidden */
     .settings-submenu.submenu-visible {
       opacity: 1;
+      scale: 1;
       visibility: visible;
       pointer-events: auto;
-      transition: opacity var(--t-menu), visibility 0s;
+      transition: opacity var(--t-menu), scale var(--t-menu), visibility 0s;
     }
 
     /* 「語言」改成點擊開關（N1）：子選單開著時這一列維持 hover 的樣子，滑鼠移開也看得出它是哪一列打開的 */
@@ -1258,22 +1307,18 @@
       letter-spacing: 0.02em;
     }
 
-    /* Assignment Description (accordion) */
+    /* Assignment Description (accordion)：開合動效見下方「展開面板」共用規則（#28） */
     .assignment-desc {
-      display: none;
-      padding: 12px 0 8px;
       font-size: 13px;
       color: var(--muted);
       line-height: 1.7;
-      border-bottom: 1px solid var(--border);
     }
 
-    .assignment-desc.open {
-      display: block;
-    }
-
+    /* padding 與底線放在內層：外層 height:0 才收得乾淨（外層有 padding 的話收合後仍有 20px＋1px） */
     .assignment-desc-inner {
-      max-height: 240px;
+      padding: 12px 0 8px;
+      border-bottom: 1px solid var(--border);
+      max-height: 260px;   /* 240px 內容＋20px padding（border-box） */
       overflow-y: auto;
     }
 
@@ -1404,13 +1449,55 @@
       color: var(--orange);
     }
 
-    .grade-calc-body {
-      display: none;
+    /* 標頭的開合指示（#28）：與「已隱藏 N 項」同一顆 chevron、同一個 timing，開著轉 90° */
+    .grade-calc-head {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .grade-calc-arrow {
+      display: inline-flex;
+      align-items: center;
+      color: var(--mid);
+      transition: transform var(--t-disclosure);
+    }
+
+    .grade-calc.open .grade-calc-arrow {
+      transform: rotate(90deg);
+    }
+
+    /* padding 在內層（外層 height:0 才收得乾淨）；開合見下方「展開面板」共用規則（#28） */
+    .grade-calc-body-inner {
       padding: 14px 16px;
     }
 
-    .grade-calc.open .grade-calc-body {
+    /* ── 展開面板（disclosure recipe，#28）：作業描述、成績計算器、已隱藏清單 ──
+       面板高度 0 ↔ auto（interpolate-size，Chrome 129+；更舊的版本高度照舊直接跳，淡入仍有效）、
+       內容從 2px 模糊清晰（blur.disclosure），三者與 chevron 同一個 transition.disclosure，讀起來是同一個動作。
+       收合時 visibility:hidden（面板裡的連結、輸入框不在 Tab 順序裡，A17）：
+       打開那一邊 visibility 立刻生效（0s，鍵盤移動後焦點要能馬上落進去，#6）；收合等淡出跑完才藏。
+       拖曳降級時（.drop-active）稽核清單也走同一個開合，不再硬切 */
+    .detail-right-panel {
+      interpolate-size: allow-keywords;
+    }
+
+    :is(.assignment-desc, .grade-calc-body, .hidden-items-list) {
       display: block;
+      height: 0;
+      overflow: clip;
+      opacity: 0;
+      filter: var(--blur-swap);
+      visibility: hidden;
+      transition: height var(--t-disclosure), opacity var(--t-disclosure), filter var(--t-disclosure), visibility var(--t-disclosure);
+    }
+
+    :is(.assignment-desc.open, .grade-calc.open .grade-calc-body, .hidden-items.open .hidden-items-list, .hidden-items.drop-active .hidden-items-list) {
+      height: auto;
+      opacity: 1;
+      filter: none;
+      visibility: visible;
+      transition: height var(--t-disclosure), opacity var(--t-disclosure), filter var(--t-disclosure), visibility 0s;
     }
 
     .grade-calc-group {
@@ -1535,16 +1622,27 @@
       display: none;
       position: fixed;
       inset: 0;
-      background: rgba(20, 20, 19, 0.55);
+      background-color: transparent;
       z-index: 200;
       align-items: center;
       justify-content: center;
       padding: 24px;
-      backdrop-filter: blur(2px);
+      backdrop-filter: blur(0px);
+      /* 背景暗度與模糊從 0 淡入、同一條淡出（#29，transition.overlay）；只有教學這層有模糊 */
+      transition: background-color var(--t-overlay), backdrop-filter var(--t-overlay), display var(--t-overlay) allow-discrete;
     }
 
     .welcome-overlay.open {
       display: flex;
+      background-color: rgba(20, 20, 19, 0.55);
+      backdrop-filter: blur(2px);
+    }
+
+    @starting-style {
+      .welcome-overlay.open {
+        background-color: transparent;
+        backdrop-filter: blur(0px);
+      }
     }
 
     .welcome-card {
@@ -1557,10 +1655,33 @@
       max-height: calc(100vh - 64px);
       position: relative;
       box-shadow: 0 24px 64px rgba(20, 20, 19, 0.18);
-      animation: welcomeIn 0.28s var(--ease-out);
       display: flex;
       flex-direction: column;
       overflow: hidden;
+    }
+
+    /* ── 四個 modal 的卡片進出場（#29，modal recipe）──
+       進場：淡入 transition.dialogFade＋從 0.96 放大到位 spring.dialog（起點見 @starting-style）；
+       出場：倒著走、比進場快——transition.dismiss（200ms ease.away）淡出並縮回 0.96，背景再用 transition.overlay 淡回透明。
+       overlay 的 display 延後到背景淡完才 none（allow-discrete），出場中的 overlay 由 setupModalA11y 設 inert，接不到焦點與點擊。
+       減少動態：--modal-from 為 none（檔尾 media 區塊），只淡入淡出、不縮放（連 @starting-style 一起生效） */
+    :is(.welcome-card, .custom-assignment-modal, .weight-edit-modal, .confirm-modal) {
+      opacity: 0;
+      transform: var(--modal-from);
+      transition: opacity var(--t-dismiss), transform var(--t-dismiss);
+    }
+
+    .open > :is(.welcome-card, .custom-assignment-modal, .weight-edit-modal, .confirm-modal) {
+      opacity: 1;
+      transform: none;
+      transition: opacity var(--t-dialog-fade), transform var(--spring-dialog);
+    }
+
+    @starting-style {
+      .open > :is(.welcome-card, .custom-assignment-modal, .weight-edit-modal, .confirm-modal) {
+        opacity: 0;
+        transform: var(--modal-from);
+      }
     }
 
     .welcome-main-area {
@@ -1571,18 +1692,6 @@
          clip 不是捲動容器，捲不動 */
       overflow: clip;
       position: relative;
-    }
-
-    @keyframes welcomeIn {
-      from {
-        opacity: 0;
-        transform: scale(0.96) translateY(8px);
-      }
-
-      to {
-        opacity: 1;
-        transform: scale(1) translateY(0);
-      }
     }
 
     .welcome-close {
@@ -2259,16 +2368,24 @@
     .custom-assignment-overlay {
       position: fixed;
       inset: 0;
-      background: rgba(20, 20, 19, 0.28);
+      background-color: transparent;
       display: none;
       align-items: center;
       justify-content: center;
       padding: 24px;
       z-index: 2500;
+      transition: background-color var(--t-overlay), display var(--t-overlay) allow-discrete;   /* 背景淡入淡出（#29） */
     }
 
     .custom-assignment-overlay.open {
       display: flex;
+      background-color: rgba(20, 20, 19, 0.28);
+    }
+
+    @starting-style {
+      .custom-assignment-overlay.open {
+        background-color: transparent;
+      }
     }
 
     .custom-assignment-modal {
@@ -2296,7 +2413,10 @@
       line-height: 1.2;
     }
 
-    .custom-assignment-close {
+    /* ✕：關閉但保留草稿（N2；權重視窗也補一顆，滑鼠使用者才有「不丟掉已輸入內容」的關法） */
+    .custom-assignment-close,
+    .weight-edit-close {
+      flex-shrink: 0;
       width: 30px;
       height: 30px;
       border: 1px solid var(--border);
@@ -2363,6 +2483,12 @@
       min-height: 18px;
       color: var(--orange);
       font-size: 12px;
+    }
+
+    /* 送出失敗（#38）：欄位轉紅（id 特異度蓋過上面的焦點橘框，焦點還在欄位上也看得出是錯的）；開始打字就清掉 */
+    #custom-assignment-name[aria-invalid="true"] {
+      border-color: var(--overdue);
+      transition: border-color var(--t-color);
     }
 
     .custom-assignment-actions {
@@ -2506,7 +2632,7 @@
         transparent 80%);
       background-size: 200% 100%;
       background-repeat: no-repeat;
-      animation: skel-shimmer 1.4s ease-in-out infinite;
+      animation: skel-shimmer 1.4s linear infinite;   /* 持續的 loader 用 linear（B2，#43） */
     }
 
 
@@ -2519,19 +2645,73 @@
     .skel-nav-row { padding: 9px 14px; }
     .skel-nav-row .skel { height: 12px; }
 
-    /* skeleton → 真資料到位的一次性淡入上浮 */
-    @keyframes content-arrive {
-      from { opacity: 0; transform: translateY(4px); }
-      to   { opacity: 1; transform: translateY(0); }
+    /* 主區 skeleton 疊層（#43）：掛在 #main-section 的 parent（.main-content），對齊 #main-section 的位置與大小——
+       renderWeekSection／renderCardGrid 會覆寫 #main-section 的 innerHTML，疊層放在裡面會被一幀刪掉。
+       真內容在它底下畫好後，疊層用 transition.fade 淡出、內容同時從 blur.surface 清晰（兩者交疊，不留空白幀） */
+    .main-content {
+      position: relative;
     }
 
-    #main-section.arrive > * {
-      animation: content-arrive .3s ease-out both;
+    .sync-skeleton {
+      position: absolute;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg);
+      pointer-events: none;
+      transition: opacity var(--t-fade);
     }
+
+    /* 週頁形狀：與真的週頁同一組版面 class（.week-panel／.week-left／.week-right…），換上來時圓環、摘要列、卡片條都在原位 */
+    .skel-ring {
+      width: 158px;
+      height: 158px;
+      border-radius: 50%;
+      -webkit-mask: radial-gradient(circle, transparent 58.5px, #000 59px);
+      mask: radial-gradient(circle, transparent 58.5px, #000 59px);
+    }
+
+    .skel-sum {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 12px;
+      height: 39px;
+    }
+
+    .skel-sum .skel-sum-n { width: 22px; height: 20px; }
+    .skel-sum .skel-sum-l { height: 12px; }
+
+    .skel-group-title {
+      width: 84px;
+      height: 11px;
+      margin-bottom: 12px;
+    }
+
+    .skel-wcard {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px 14px;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .skel-wcard .skel-wcard-a { width: 58%; height: 11px; }
+    .skel-wcard .skel-wcard-b { width: 86%; height: 14px; }
+    .skel-wcard .skel-wcard-c { width: 42%; height: 12px; }
 
     .card-rows-container {
       flex: 1;
       min-height: 0;
+    }
+
+    /* 有分頁的卡保留「3 列、兩行標題」的高度（#31）：每頁標題行數不同，換頁時卡片不變高變矮、同一排下面的卡不被推動
+       （每列 2 × 14px × 1.3 ＋ 20px padding，列間 2 條 1px 底線，最後一列無底線＝171.2px）。
+       用 calc 寫出完整算式、不取整數：寫成 171px 會比三列兩行的自然高度（171.125px）矮，換到列較矮的頁時卡片仍縮 0.1px、下面的卡跟著動 */
+    .card-bottom:has(.card-pager) .card-rows-container {
+      min-height: calc(3 * (2 * 14px * 1.3 + 20px) + 2px);
     }
 
     .card-row {
@@ -2744,7 +2924,8 @@
       color: var(--dark);
       background: transparent;
       border: none;
-      border-bottom: 2px solid var(--orange);
+      /* 底線用不佔高度的 box-shadow（#34）：2px border-bottom 會讓標題長高 2px、下面的 meta 被推下去 */
+      box-shadow: 0 2px 0 var(--orange);
       outline: none;
       line-height: 1.25;
       field-sizing: content;
@@ -2968,20 +3149,16 @@
       line-height: 1;
       display: inline-flex;
       align-items: center;
-      transition: transform 0.15s;
+      transition: transform var(--t-disclosure);   /* 與清單的開合同一個 timing（#28） */
     }
 
     .hidden-items.open .hidden-items-arrow {
       transform: rotate(90deg);
     }
 
-    .hidden-items-list {
-      display: none;
-      margin-top: 4px;
-    }
-
-    .hidden-items.open .hidden-items-list {
-      display: block;
+    /* 清單開合見「展開面板」共用規則（#28）；上方 4px 間距放內層，外層 height:0 才收得乾淨 */
+    .hidden-items-list-inner {
+      padding-top: 4px;
     }
 
     .hidden-item-row {
@@ -3063,17 +3240,19 @@
 
     /* 拖曳中的浮動 clone：抬起（陰影＋微放大＋0.4° 微傾）跟隨游標 */
     /* 雙 class 提高特異度：蓋過 .assignment-item:last-child 的 border-bottom:none、.submitted/.hidden-item-row 的降透明 */
+    /* 拿起時 clone 裡的字與原列完全重合（#41）：block 方向沿用列本身的 padding（作業列 12px、稽核列 8px），
+       只在左右各多 14px（makeDragClone 把 clone 往左挪 14px、加寬 28px 抵銷）；外框改成不佔位的 box-shadow 細線 */
     .drag-clone.drag-clone {
       position: fixed;
       z-index: 400;
       margin: 0;
-      padding: 6px 14px;
+      padding-inline: 14px;
       pointer-events: none;
       overflow: hidden;
       background: var(--bg);
-      border: 1px solid var(--border);
+      border: 0;
       border-radius: 8px;
-      box-shadow: 0 4px 10px rgba(20, 20, 19, 0.08), 0 14px 32px rgba(20, 20, 19, 0.16);
+      box-shadow: 0 0 0 1px var(--border), 0 4px 10px rgba(20, 20, 19, 0.08), 0 14px 32px rgba(20, 20, 19, 0.16);
       opacity: 1;
       will-change: transform;
     }
@@ -3085,13 +3264,23 @@
     }
 
     /* 放置目標：虛線框 + 淡橘底 + 提示文字（data-drophint）*/
+    /* 底色過渡寫在 base（#41）：只寫在 .drop-active 上的話淡入有、淡出卻是硬切 */
+    .detail-assignments-list,
+    .hidden-items {
+      transition: background-color var(--t-color);
+    }
+
+    /* 升級提示（::before）要絕對定位的基準 */
+    .detail-assignments-list {
+      position: relative;
+    }
+
     .detail-assignments-list.drop-active,
     .hidden-items.drop-active {
       outline: 2px dashed var(--orange);
       outline-offset: 3px;
       border-radius: 8px;
       background: rgba(217, 119, 87, 0.04);
-      transition: background 0.15s, padding-bottom 0.18s cubic-bezier(0.2, 0, 0, 1);
     }
 
     /* 游標真正在目標上方：實線＋加深，表示「放開即生效」 */
@@ -3113,19 +3302,22 @@
       letter-spacing: 0.04em;
       color: var(--orange);
     }
-    .detail-assignments-list.drop-active::before { padding: 2px 0 8px; }
+    /* 升級提示移出文件流（#41）：壓在清單頂端的虛線上（底色同詳情卡、把那段虛線遮掉），清單與殘影不被往下推 */
+    .detail-assignments-list.drop-active::before {
+      position: absolute;
+      left: 50%;
+      top: -3px;
+      translate: -50% -50%;
+      padding: 0 8px;
+      background: var(--surface);
+      line-height: 1.6;
+      white-space: nowrap;
+    }
     .hidden-items.drop-active::after { padding: 8px 0 2px; }
 
-    /* 降級拖曳中：即使稽核區收合，也強制顯示列表作為放置目標 */
-    .hidden-items.drop-active .hidden-items-list {
-      display: block;
-    }
+    /* 降級拖曳中：即使稽核區收合，也展開列表作為放置目標——走「展開面板」共用規則的開合（#28），不硬切 */
 
-    /* 落點動畫：clone 飛入期間目標列隱形，落地後淡橘閃一下 */
-    .drag-arriving {
-      opacity: 0 !important;
-    }
-
+    /* 落點：clone 飛入、快到時與落地列交叉淡換（settleClone 以 inline opacity 處理，#41），落地後淡橘閃一下 */
     .drag-arrived {
       animation: drag-arrived-flash 0.9s ease-out;
     }
@@ -3246,15 +3438,23 @@
     .weight-edit-overlay {
       position: fixed;
       inset: 0;
-      background: rgba(0,0,0,0.35);
+      background-color: transparent;
       display: none;
       align-items: center;
       justify-content: center;
       z-index: 1000;
+      transition: background-color var(--t-overlay), display var(--t-overlay) allow-discrete;   /* 背景淡入淡出（#29） */
     }
 
     .weight-edit-overlay.open {
       display: flex;
+      background-color: rgba(0, 0, 0, 0.35);
+    }
+
+    @starting-style {
+      .weight-edit-overlay.open {
+        background-color: transparent;
+      }
     }
 
     .weight-edit-modal {
@@ -3387,6 +3587,7 @@
       font-family: 'DM Mono', monospace;
       font-size: 13px;
       color: var(--muted);
+      transition: color var(--t-color);   /* 超過 100% 變色淡入（#38；數字同時由 aria-live 念出） */
     }
 
     .weight-edit-total.over { color: var(--orange); }
@@ -3524,16 +3725,24 @@
     .confirm-overlay {
       position: fixed;
       inset: 0;
-      background: rgba(20, 20, 19, 0.35);
+      background-color: transparent;
       display: none;
       align-items: center;
       justify-content: center;
       padding: 24px;
       z-index: 3000;
+      transition: background-color var(--t-overlay), display var(--t-overlay) allow-discrete;   /* 背景淡入淡出（#29） */
     }
 
     .confirm-overlay.open {
       display: flex;
+      background-color: rgba(20, 20, 19, 0.35);
+    }
+
+    @starting-style {
+      .confirm-overlay.open {
+        background-color: transparent;
+      }
     }
 
     .confirm-modal {
@@ -3667,12 +3876,11 @@
         --scale-press: 1;
         --scale-choice: 1;
         --modal-from: none;
+        --scale-menu: 1;   /* 設定選單／子選單只淡入淡出、不縮放（#50） */
       }
 
-      /* 進場位移 → 只淡入 */
-      #main-section.arrive > *,
-      .wk-ring-frac b.tick,
-      .welcome-card {
+      /* 進場位移 → 只淡入（modal 卡片的縮放由上面 --modal-from: none 拿掉，#29） */
+      .wk-ring-frac b.tick {
         animation-name: rm-fade;
       }
 
@@ -3685,8 +3893,18 @@
       /* 弧直接到位（JS 不等 transitionend）、chevron 不轉、教學頁直接換 */
       .wk-ring-bar,
       .hidden-items-arrow,
+      .grade-calc-arrow,
       .welcome-track {
         transition: none;
+      }
+
+      /* 展開面板（#28）：高度直接到位，只留淡入淡出、模糊清晰與 visibility */
+      :is(.assignment-desc, .grade-calc-body, .hidden-items-list) {
+        transition: opacity var(--t-disclosure), filter var(--t-disclosure), visibility var(--t-disclosure);
+      }
+
+      :is(.assignment-desc.open, .grade-calc.open .grade-calc-body, .hidden-items.open .hidden-items-list, .hidden-items.drop-active .hidden-items-list) {
+        transition: opacity var(--t-disclosure), filter var(--t-disclosure), visibility 0s;
       }
 
       /* 教學換頁不滑（上面 .welcome-track transition:none）→ 改成淡入：畫面外的 step 是 inert（#9），
@@ -3701,11 +3919,6 @@
 
       /* 尺寸動畫拿掉，只留換色 */
       .welcome-dot {
-        transition: background-color var(--t-color);
-      }
-
-      .detail-assignments-list.drop-active,
-      .hidden-items.drop-active {
         transition: background-color var(--t-color);
       }
 
@@ -3767,7 +3980,8 @@
 
         <div class="sidebar-footer">
           <div class="footer-row">
-            <button class="btn-sync" id="sync-btn">同步</button>
+            <!-- 四個狀態先放好、疊在同一格，換狀態只改 data-status（#30，見 .sync-swap） -->
+            <button class="btn-sync" id="sync-btn" data-status="idle"><span class="sync-swap"><span class="s-idle" id="sync-label-idle">同步</span><span class="s-loading" id="sync-label-loading"><span class="sync-dots" aria-hidden="true"><span></span><span></span><span></span></span><span class="sr-only" id="sync-label-loading-text">同步中...</span></span><span class="s-done" id="sync-label-done">✓ 已同步</span><span class="s-error" id="sync-label-error">同步失敗</span></span></button>
             <div class="settings-menu-wrap">
               <button class="btn-theme-toggle" id="settings-menu-btn" title="設定"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
               <div class="settings-menu" id="settings-menu">
@@ -4067,7 +4281,7 @@
     <div class="custom-assignment-modal">
       <div class="custom-assignment-header">
         <div class="custom-assignment-title" id="custom-assignment-modal-title">新增作業</div>
-        <button class="custom-assignment-close" id="custom-assignment-close"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+        <button type="button" class="custom-assignment-close" id="custom-assignment-close" aria-label="關閉"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
       </div>
       <form class="custom-assignment-form" id="custom-assignment-form">
         <div class="custom-assignment-field">
@@ -4076,7 +4290,7 @@
         </div>
         <div class="custom-assignment-field">
           <label for="custom-assignment-name" id="custom-assignment-name-label">作業名稱</label>
-          <input id="custom-assignment-name" type="text" required />
+          <input id="custom-assignment-name" type="text" required aria-describedby="custom-assignment-error" />
         </div>
         <div class="custom-assignment-field">
           <label for="custom-assignment-description" id="custom-assignment-description-label">作業描述</label>
@@ -4086,7 +4300,8 @@
           <label for="custom-assignment-due" id="custom-assignment-due-label">截止日期</label>
           <input id="custom-assignment-due" type="datetime-local" />
         </div>
-        <div class="custom-assignment-error" id="custom-assignment-error"></div>
+        <!-- 錯誤訊息（#38）：role=alert 一寫入就念出；名稱欄以 aria-describedby 綁到這裡，回到欄位時一起念 -->
+        <div class="custom-assignment-error" id="custom-assignment-error" role="alert"></div>
         <div class="custom-assignment-actions">
           <button type="button" class="btn-custom-cancel" id="custom-assignment-cancel">取消</button>
           <button type="submit" class="btn-custom-save" id="custom-assignment-save">儲存</button>
@@ -4100,13 +4315,14 @@
     <div class="weight-edit-modal">
       <div class="weight-edit-header">
         <span class="weight-edit-title" id="weight-edit-title">編輯評分權重</span>
+        <button type="button" class="weight-edit-close" id="weight-edit-close" aria-label="關閉"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
       </div>
       <div class="weight-edit-list" id="weight-edit-list"></div>
       <button class="weight-edit-add" id="weight-edit-add">+ 新增項目</button>
       <div class="weight-edit-footer">
         <div class="weight-edit-footer-left">
           <button class="weight-edit-reset" id="weight-edit-reset" style="display:none">還原 Canvas 權重</button>
-          <span class="weight-edit-total" id="weight-edit-total">總計：0%</span>
+          <span class="weight-edit-total" id="weight-edit-total" aria-live="polite">總計：0%</span>
         </div>
         <div class="weight-edit-actions">
           <button class="weight-edit-cancel" id="weight-edit-cancel">取消</button>

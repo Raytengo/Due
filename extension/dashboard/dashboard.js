@@ -37,6 +37,8 @@ const MOTION = Object.freeze({
   reflow: _SPRING_HIGHLIGHT,                                         // --reflow：補位、落點
   // spring.selection 300/30
   selection: Object.freeze({ duration: 500, easing: 'linear(0, 0.0141, 0.0509, 0.1035, 0.1663, 0.2349, 0.306, 0.3769, 0.4459, 0.5115, 0.573, 0.6297, 0.6814, 0.728, 0.7696, 0.8064, 0.8387, 0.8668, 0.8911, 0.9119, 0.9296, 0.9445, 0.957, 0.9673, 0.9758, 0.9827, 0.9882, 0.9926, 0.9961, 0.9987, 1.0007, 1.0021, 1.0031, 1.0038, 1.0041, 1, 1, 1, 1.004, 1.0038, 1.0035, 1.0032, 1.0029, 1.0026, 1.0023, 1.002, 1.0017, 1.0015, 1, 1)' }),
+  // transition.shake（--ease-in-out）：送出失敗時欄位搖一次「不」（#38）
+  shake: Object.freeze({ duration: 400, easing: 'cubic-bezier(0.77, 0, 0.175, 1)' }),
   ring: Object.freeze({ duration: 800, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' }),      // --ring：進度環弧（使用者拍板）
   ringTick: Object.freeze({ duration: 400, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' }),  // --ring-tick：分子 tick
 });
@@ -80,6 +82,10 @@ const I18N = {
     sync: '同步',
     syncing: '同步中...',
     syncFailed: '同步失敗',
+    // 同步按鈕的完成狀態（#30）：按鈕上停 1.5 秒；短字，最寬的狀態決定按鈕寬度
+    syncDone: '✓ 已同步',
+    a11ySynced: '同步完成',
+    closeDialog: '關閉',
     tabWeek: '學期待辦',
     tabCourses: '課程',
     addAssignment: '+ 新增作業',
@@ -222,6 +228,9 @@ const I18N = {
     sync: '同步',
     syncing: '同步中...',
     syncFailed: '同步失败',
+    syncDone: '✓ 已同步',
+    a11ySynced: '同步完成',
+    closeDialog: '关闭',
     tabWeek: '学期待办',
     tabCourses: '课程',
     addAssignment: '+ 新增作业',
@@ -347,6 +356,9 @@ const I18N = {
     sync: 'Sync',
     syncing: 'Syncing...',
     syncFailed: 'Sync failed',
+    syncDone: '✓ Synced',
+    a11ySynced: 'Sync complete',
+    closeDialog: 'Close',
     tabWeek: 'Upcoming',
     tabCourses: 'Courses',
     addAssignment: '+ Add Assignment',
@@ -515,7 +527,15 @@ function applyUILanguage() {
     if (el) el.textContent = tr(key);
   };
   setText('label-courses', 'courses');
-  setText('sync-btn', 'sync');
+  // 同步按鈕四個狀態各自一格（#30）：只改文字，data-status 不動（換語言不打斷進行中的狀態）
+  setText('sync-label-idle', 'sync');
+  setText('sync-label-loading-text', 'syncing');
+  setText('sync-label-done', 'syncDone');
+  setText('sync-label-error', 'syncFailed');
+  ['custom-assignment-close', 'weight-edit-close'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.setAttribute('aria-label', tr('closeDialog'));
+  });
   setText('nav-week-label', 'tabWeek');
   setText('nav-courses-label', 'tabCourses');
   setText('btn-add-assignment', 'addAssignment');
@@ -567,11 +587,28 @@ function isLanguageSubmenuOpen() {
   return !!(submenu && submenu.classList.contains('submenu-visible'));
 }
 
+// 「語言」列在母選單長到原尺寸時的位置（#50）：母選單還在從齒輪長出來（scale 0.9 → 1）時，getBoundingClientRect 量到的是
+// 縮放中的 rect，子選單會開歪。不等 transitionend（等的那 ~200ms 內鍵盤的 Tab／方向鍵會落在母選單上，焦點也進不了子選單），
+// 直接把縮放反算回去：origin 在縮放中不動，P_最終 = O + (P_目前 − O) / s
+function menuRowFinalRect(row, menu) {
+  const r = row.getBoundingClientRect();
+  const cs = menu ? getComputedStyle(menu) : null;
+  const s = cs ? parseFloat(cs.scale) : NaN;   // 'none' → NaN（沒有縮放）
+  if (!Number.isFinite(s) || s <= 0 || Math.abs(s - 1) < 1e-4) return r;
+  const m = menu.getBoundingClientRect();
+  const [ox, oy] = cs.transformOrigin.split(' ').map(parseFloat);   // 相對母選單自身（未縮放）的 px
+  const Ox = m.left + s * ox;
+  const Oy = m.top + s * oy;
+  const top = Oy + (r.top - Oy) / s;
+  const bottom = Oy + (r.bottom - Oy) / s;
+  return { top, bottom, left: Ox + (r.left - Ox) / s, right: Ox + (r.right - Ox) / s, height: bottom - top };
+}
+
 function openLanguageSubmenu({ focusItem = false } = {}) {
   const { label, submenu } = languageSubmenuEls();
   if (!label || !submenu) return;
-  // 依「語言」那一列定位（fixed，相對 viewport）：右側 8px、垂直置中
-  const rect = label.getBoundingClientRect();
+  // 依「語言」那一列定位（fixed，相對 viewport）：右側 8px、垂直置中；母選單縮放中也量最終位置（menuRowFinalRect）
+  const rect = menuRowFinalRect(label, document.getElementById('settings-menu'));
   const midY = rect.top + rect.height / 2;
   submenu.style.top = `${midY - submenu.offsetHeight / 2}px`;
   submenu.style.left = `${rect.right + 8}px`;
@@ -959,19 +996,35 @@ function getCourseName(course) {
 
 // 模組級狀態：null = 新增模式；非 null = 正在編輯的既有自訂作業（帶原 id / created_at / course_id）
 let _editingCustom = null;
+// 表單草稿（N2）：{ key, values } 或 null。✕／Esc 關掉時存起來，重開同一個視窗（同一 key，見 DueCustomAssignments.formDraftKey）
+// 就還原；送出成功或按「取消」才丟掉。只放在記憶體（重新整理頁面就沒了）
+let _customDraft = null;
+
+function customFormEls() {
+  return {
+    overlay: document.getElementById('custom-assignment-overlay'),
+    form: document.getElementById('custom-assignment-form'),
+    courseSelect: document.getElementById('custom-assignment-course'),
+    nameInput: document.getElementById('custom-assignment-name'),
+    descInput: document.getElementById('custom-assignment-description'),
+    dueInput: document.getElementById('custom-assignment-due'),
+    errorEl: document.getElementById('custom-assignment-error'),
+    titleEl: document.getElementById('custom-assignment-modal-title'),
+  };
+}
+
+// 錯誤狀態（#38）：清掉欄位的 aria-invalid 與錯誤文字（開視窗、開始打字時）
+function clearCustomFormError() {
+  const { nameInput, errorEl } = customFormEls();
+  if (nameInput) nameInput.removeAttribute('aria-invalid');
+  if (errorEl) errorEl.textContent = '';
+}
 
 function openCustomAssignmentModal(defaultCourseId = currentCourseId, editing = null) {
   const courses = _currentData.courses || [];
   if (!courses.length) return;
 
-  const overlay = document.getElementById('custom-assignment-overlay');
-  const form = document.getElementById('custom-assignment-form');
-  const courseSelect = document.getElementById('custom-assignment-course');
-  const nameInput = document.getElementById('custom-assignment-name');
-  const descInput = document.getElementById('custom-assignment-description');
-  const dueInput = document.getElementById('custom-assignment-due');
-  const errorEl = document.getElementById('custom-assignment-error');
-  const titleEl = document.getElementById('custom-assignment-modal-title');
+  const { overlay, form, courseSelect, nameInput, descInput, dueInput, titleEl } = customFormEls();
   if (!overlay || !form || !courseSelect || !nameInput || !descInput || !dueInput) return;
 
   _editingCustom = editing;
@@ -1001,24 +1054,69 @@ function openCustomAssignmentModal(defaultCourseId = currentCourseId, editing = 
     }
     dueInput.value = DueCustomAssignments.getDefaultDueLocalValue();
   }
-  if (errorEl) errorEl.textContent = '';
+
+  // 草稿（N2）：重開同一個視窗 → 蓋回上次關掉時的內容；開的是別的（新增↔編輯、編輯別筆）→ 重新開始、舊草稿丟掉
+  const key = DueCustomAssignments.formDraftKey(editing);
+  const draft = DueCustomAssignments.draftValuesFor(_customDraft, key);
+  if (draft) {
+    if (courses.some((c) => String(c.id) === String(draft.courseId))) courseSelect.value = String(draft.courseId);
+    nameInput.value = draft.name;
+    descInput.value = draft.description;
+    dueInput.value = draft.dueLocalValue;
+  } else {
+    _customDraft = null;
+  }
+
+  clearCustomFormError();
   overlay.classList.add('open');
   requestAnimationFrame(() => nameInput.focus());
 }
 
-function closeCustomAssignmentModal() {
-  const overlay = document.getElementById('custom-assignment-overlay');
+// 關閉新增／編輯作業視窗。keepDraft（✕、Esc）：把已輸入的內容存成草稿，重開同一個視窗會還原（N2）；
+// 取消、送出成功：丟掉草稿。背景點擊不再關閉（N2：誤觸背景就得重填）
+function closeCustomAssignmentModal({ keepDraft = false } = {}) {
+  const { overlay, courseSelect, nameInput, descInput, dueInput } = customFormEls();
+  if (keepDraft && overlay && overlay.classList.contains('open') && nameInput) {
+    _customDraft = {
+      key: DueCustomAssignments.formDraftKey(_editingCustom),
+      values: {
+        courseId: courseSelect ? courseSelect.value : '',
+        name: nameInput.value,
+        description: descInput ? descInput.value : '',
+        dueLocalValue: dueInput ? dueInput.value : '',
+      },
+    };
+  } else if (!keepDraft) {
+    _customDraft = null;
+  }
   if (overlay) overlay.classList.remove('open');
-  _editingCustom = null;   // 關閉/取消一律清掉編輯狀態
+  _editingCustom = null;   // 關閉/取消一律清掉編輯狀態（草稿自帶 key，重開時比對）
+}
+
+// 送出失敗（#38，field-error recipe）：錯誤文字寫進 role=alert（念出）、欄位 aria-invalid（轉紅框）、焦點回到欄位、
+// 欄位搖一次「不」（shift.shake 3px，transition.shake；每次送出失敗搖一次，打字時不搖；減少動態不搖）
+const SHAKE_KEYFRAMES = [0, -3, 3, -2, 2, -1, 1, 0].map((x) => ({ transform: `translateX(${x}px)` }));
+function showCustomNameError() {
+  const { nameInput, errorEl } = customFormEls();
+  const msg = tr('customNameRequired');
+  if (errorEl) {
+    if (errorEl.textContent === msg) {
+      // 同一句再寫一次 alert 不會重念：先清空、稍後再寫（與 announce() 同一招）
+      errorEl.textContent = '';
+      setTimeout(() => { if (nameInput && nameInput.getAttribute('aria-invalid') === 'true') errorEl.textContent = msg; }, 50);
+    } else {
+      errorEl.textContent = msg;
+    }
+  }
+  if (!nameInput) return;
+  nameInput.setAttribute('aria-invalid', 'true');
+  nameInput.focus();
+  if (!reduceMotion()) nameInput.animate(SHAKE_KEYFRAMES, MOTION.shake);
 }
 
 function saveCustomAssignmentFromForm(e) {
   e.preventDefault();
-  const courseSelect = document.getElementById('custom-assignment-course');
-  const nameInput = document.getElementById('custom-assignment-name');
-  const descInput = document.getElementById('custom-assignment-description');
-  const dueInput = document.getElementById('custom-assignment-due');
-  const errorEl = document.getElementById('custom-assignment-error');
+  const { courseSelect, nameInput, descInput, dueInput } = customFormEls();
 
   const input = {
     courseId: courseSelect.value,
@@ -1026,6 +1124,9 @@ function saveCustomAssignmentFromForm(e) {
     description: descInput.value,
     dueLocalValue: dueInput.value,
   };
+
+  // 重建前記下右欄捲動位置（重建會歸零），落地提示之前還原（#48）
+  const savedScroll = captureListScroll();
 
   try {
     if (_editingCustom) {
@@ -1053,7 +1154,11 @@ function saveCustomAssignmentFromForm(e) {
           closeCustomAssignmentModal();
           // 重建會拆掉 modal 剛把焦點還回去的那顆「編輯」→ 用 id 找回同一列的新按鈕（換了課程就不在這頁，退到清單標題）
           const cssId = CSS.escape(String(updated.id));
-          loadData(() => refocusInDetail([`.btn-edit-custom-assignment[data-assignment-id="${cssId}"]`]));
+          loadData(() => {
+            restoreListScroll(savedScroll);
+            refocusInDetail([`.btn-edit-custom-assignment[data-assignment-id="${cssId}"]`]);
+            landCustomAssignment(updated.id);
+          });
         });
       });
     } else {
@@ -1065,13 +1170,63 @@ function saveCustomAssignmentFromForm(e) {
         customAssignments[key] = [assignment, ...(customAssignments[key] || [])];
         chrome.storage.local.set({ customAssignments }, () => {
           closeCustomAssignmentModal();
-          loadData();
+          loadData(() => {
+            restoreListScroll(savedScroll);
+            landCustomAssignment(assignment.id);
+          });
         });
       });
     }
   } catch (err) {
-    if (errorEl) errorEl.textContent = tr('customNameRequired');
+    showCustomNameError();
   }
+}
+
+// ── 自訂作業的落地提示（#48，list recipe）──
+// 重建後用 id 找到那一列（詳情：作業列；學期待辦：週卡），先捲進可視區（nearest），再在落點淡入＋上浮 8px
+// （opacity transition.fade、transform --reflow）並閃一下底色；課程 grid 沒有逐列的落點，不提示。
+// forced reflow 提交起點再清回 CSS 值（不用 rAF）；減少動態只淡入
+function landCustomAssignment(id) {
+  const cssId = CSS.escape(String(id));
+  let row = null;
+  if (currentView === 'course') {
+    row = document.querySelector(`#course-detail-container .detail-assignments-list .assignment-item[data-hideable-id="${cssId}"]`);
+  } else if (currentPage === 'week' && !showSubmitted) {
+    row = document.querySelector(`#main-section .week-task-card[data-assignment-id="${cssId}"]`);
+  }
+  if (!row) return;
+  row.scrollIntoView({ block: 'nearest' });
+  row.style.transition = 'none';
+  row.style.opacity = '0';
+  if (!reduceMotion()) row.style.transform = 'translateY(8px)';
+  row.getBoundingClientRect();
+  row.style.transition = `${cssTransition('opacity', MOTION.fade)}, ${cssTransition('transform', MOTION.reflow)}`;
+  row.style.opacity = '';
+  row.style.transform = '';
+  // 底色閃示只給詳情列（底色透明）：週卡有自己的 var(--bg) 底，閃示動畫跑完會一幀跳回原底色
+  if (row.classList.contains('assignment-item')) row.classList.add('drag-arrived');
+  setTimeout(() => {
+    if (!row.isConnected) return;
+    row.style.transition = '';
+    row.classList.remove('drag-arrived');
+  }, 900);
+}
+
+// 重建（loadData → innerHTML）會把清單的捲動位置歸零：重建前記下、重建後還原（#48）。
+// 詳情：右欄（窄版面時是外層 .detail-card-bottom）；學期待辦：.week-right
+const LIST_SCROLLERS = ['#course-detail-container .detail-right-panel', '#course-detail-container .detail-card-bottom', '#main-section .week-right'];
+function captureListScroll() {
+  return LIST_SCROLLERS.map((sel) => {
+    const el = document.querySelector(sel);
+    return el ? el.scrollTop : 0;
+  });
+}
+
+function restoreListScroll(saved) {
+  LIST_SCROLLERS.forEach((sel, i) => {
+    const el = document.querySelector(sel);
+    if (el && saved[i]) el.scrollTop = saved[i];
+  });
 }
 
 function deleteCustomAssignment(courseId, assignmentId) {
@@ -1098,10 +1253,48 @@ function deleteCustomAssignment(courseId, assignmentId) {
         customAssignments[key] = (customAssignments[key] || [])
           .filter((assignment) => String(assignment.id) !== String(assignmentId));
         if (!customAssignments[key].length) delete customAssignments[key];
-        chrome.storage.local.set({ customAssignments }, () => loadData(() => refocusInDetail([neighbourSel])));
+        // 刪除後空隙收合（#48）：重建前用 key 記下其他列的位置與捲動 → 重建 → 還原捲動 → 下面的列從舊位置沿 --reflow 滑上來
+        const savedScroll = captureListScroll();
+        const first = detailFlipSnapshot();
+        // 焦點交給鄰居在 FLIP 之前：focus 可能把清單捲動一段，FLIP 要量捲完之後的位置，列才會從舊位置一路滑到最終位置
+        chrome.storage.local.set({ customAssignments }, () => loadData(() => {
+          restoreListScroll(savedScroll);
+          refocusInDetail([neighbourSel]);
+          detailFlipPlay(first);
+        }));
       });
     },
   });
+}
+
+// 課程詳情整段重建前後的 FLIP（#48）：節點全換新，用 key 對應新舊（作業列＝id；標題、成績計算器、已隱藏區各一個）。
+// 量的是含進行中 transform 的視覺位置，連刪兩筆時從目前位置接續（flipPlay 會先 cancel 進行中的 reflow，A12）
+function detailFlipKeyed(root) {
+  const out = new Map();
+  if (!root) return out;
+  root.querySelectorAll('.detail-right-panel > .grade-calc, .detail-assignments-label, .detail-assignments-list .assignment-item, .hidden-items')
+    .forEach((el) => {
+      const key = el.classList.contains('assignment-item') ? `row:${el.dataset.hideableId}` : el.className.split(' ')[0];
+      out.set(key, el);
+    });
+  return out;
+}
+
+function detailFlipSnapshot() {
+  const first = new Map();
+  if (reduceMotion() || currentView !== 'course') return first;
+  detailFlipKeyed(document.getElementById('course-detail-container'))
+    .forEach((el, key) => first.set(key, el.getBoundingClientRect()));
+  return first;
+}
+
+function detailFlipPlay(firstByKey) {
+  if (!firstByKey.size || currentView !== 'course') return;
+  const first = new Map();
+  detailFlipKeyed(document.getElementById('course-detail-container')).forEach((el, key) => {
+    if (firstByKey.has(key)) first.set(el, firstByKey.get(key));
+  });
+  flipPlay(first);
 }
 
 // ── 自製確認對話框（取代 window.confirm；焦點 trap 與 Esc/背景關閉見 setupModalA11y / Esc handler）──
@@ -1152,8 +1345,9 @@ function fitLegendText(root) {
   });
 }
 
-// ── 同步 skeleton（首次同步的載入佔位，見 spec 2026-07-23-sync-skeleton）──
-// 只在「無資料＋點同步」時渲染；成功後 loadData 原位替換成真卡片、失敗由 loadData 還原空狀態
+// ── 同步 skeleton（首次同步的載入佔位，見 spec 2026-07-23-sync-skeleton；#43）──
+// 只在「無資料＋點同步」時渲染；成功後 render 在疊層底下畫好真內容再交叉淡換、失敗由 loadData 還原空狀態並淡掉疊層。
+// 形狀跟著真的會換上來的那一頁走：學期待辦（currentPage 預設）＝進度環＋摘要列＋2 欄卡片條，其餘＝課程卡 grid
 function renderSyncSkeleton() {
   document.getElementById('header-meta').textContent = tr('syncing');
   fitMetaText();
@@ -1163,32 +1357,102 @@ function renderSyncSkeleton() {
     .map((w) => `<div class="skel-nav-row" aria-hidden="true"><span class="skel" style="width:${w}%"></span></div>`)
     .join('');
 
-  // 主區：6 張課程卡佔位（對齊 .course-card-grid 結構：code 短條、name 長條、2–3 列作業條）
-  const card = (nameW, rows) => `
-    <div class="course-card-grid skel-card" aria-hidden="true">
-      <div class="card-top">
-        <span class="skel skel-code"></span>
-        <span class="skel skel-name" style="width:${nameW}%"></span>
-      </div>
-      <div class="card-bottom">
-        ${Array.from({ length: rows }, (_, i) => `<span class="skel skel-row" style="width:${88 - i * 14}%"></span>`).join('')}
-      </div>
-    </div>`;
+  let html;
+  if (currentPage === 'week' && !showSubmitted) {
+    // 週頁形狀：用真的週頁版面 class，圓環（158px）、4 條摘要、組標題與 2 欄卡片條都落在真內容的位置
+    const sums = [46, 54, 50, 62].map((w) => `
+      <div class="skel-sum"><span class="skel skel-sum-n"></span><span class="skel skel-sum-l" style="width:${w}px"></span></div>`).join('');
+    const wcard = () => `
+      <div class="skel-wcard"><span class="skel skel-wcard-a"></span><span class="skel skel-wcard-b"></span><span class="skel skel-wcard-c"></span></div>`;
+    html = `
+      <div class="week-panel"><div class="week-content">
+        <div class="week-left">
+          <div class="wk-ring-wrap"><span class="skel skel-ring"></span></div>
+          <div class="wk-breakdown">${sums}</div>
+        </div>
+        <div class="week-right">
+          <div class="week-group"><span class="skel skel-group-title"></span>
+            <div class="week-task-grid">${Array.from({ length: 4 }, wcard).join('')}</div>
+          </div>
+          <div class="week-divider"></div>
+          <div class="week-group"><span class="skel skel-group-title"></span>
+            <div class="week-task-grid">${Array.from({ length: 4 }, wcard).join('')}</div>
+          </div>
+        </div>
+      </div></div>`;
+  } else {
+    // 課程卡 grid：6 張課程卡佔位（對齊 .course-card-grid 結構：code 短條、name 長條、2–3 列作業條）
+    const card = (nameW, rows) => `
+      <div class="course-card-grid skel-card">
+        <div class="card-top">
+          <span class="skel skel-code"></span>
+          <span class="skel skel-name" style="width:${nameW}%"></span>
+        </div>
+        <div class="card-bottom">
+          ${Array.from({ length: rows }, (_, i) => `<span class="skel skel-row" style="width:${88 - i * 14}%"></span>`).join('')}
+        </div>
+      </div>`;
+    html = `<div class="courses-grid">${[[76, 3], [58, 2], [84, 3], [66, 2], [72, 3], [60, 2]]
+      .map(([w, r]) => card(w, r)).join('')}</div>`;
+  }
+
+  // 疊層掛在 #main-section 的 parent（它的 innerHTML 會被真內容覆寫），對齊 #main-section 的 offset box；
+  // 不用 inset:0——.main-content 還有 padding 與頁首（.page-tabs），inset:0 會蓋住頁首、skeleton 也會比內容高一截
   const main = document.getElementById('main-section');
-  main.innerHTML = `<div class="courses-grid">${[[76, 3], [58, 2], [84, 3], [66, 2], [72, 3], [60, 2]]
-    .map(([w, r]) => card(w, r)).join('')}</div>`;
-  main.dataset.skeleton = '1';   // render() 據此在真資料到位時做一次性淡入
+  dismissSyncSkeleton({ instant: true });
+  const overlay = document.createElement('div');
+  overlay.className = 'sync-skeleton';
+  overlay.id = 'sync-skeleton';
+  overlay.setAttribute('aria-hidden', 'true');
+  Object.assign(overlay.style, {
+    top: `${main.offsetTop}px`, left: `${main.offsetLeft}px`,
+    width: `${main.offsetWidth}px`, height: `${main.offsetHeight}px`,
+  });
+  overlay.innerHTML = html;
+  main.parentElement.appendChild(overlay);
 }
+
+// skeleton 疊層離場：forced reflow 提交目前的不透明度，再淡出（transition.fade），transitionend 移除（保底 timeout：背景分頁）
+function dismissSyncSkeleton({ instant = false } = {}) {
+  const overlay = document.getElementById('sync-skeleton');
+  if (!overlay) return false;
+  overlay.removeAttribute('id');   // 進行中的淡出不再被當成「目前的 skeleton」
+  if (instant) { overlay.remove(); return true; }
+  overlay.getBoundingClientRect();
+  overlay.style.opacity = '0';
+  const done = () => overlay.remove();
+  overlay.addEventListener('transitionend', (e) => { if (e.target === overlay) done(); });
+  setTimeout(done, MOTION.fade.duration + 100);
+  return true;
+}
+
+// 新內容從 blur.surface 清晰（transition.reveal，不位移）：先 inline 釘在起點、forced reflow、再清回 CSS 值（不靠 rAF）
+function revealFromBlur(els) {
+  els.forEach((el) => {
+    el.style.transition = 'none';
+    el.style.opacity = '0';
+    el.style.filter = 'var(--blur-surface)';
+  });
+  if (!els.length) return;
+  els[0].getBoundingClientRect();
+  const t = `${cssTransition('opacity', MOTION.reveal)}, ${cssTransition('filter', MOTION.reveal)}`;
+  els.forEach((el) => {
+    el.style.transition = t;
+    el.style.opacity = '';
+    el.style.filter = '';
+  });
+  setTimeout(() => els.forEach((el) => { if (!el.style.opacity) el.style.transition = ''; }), MOTION.reveal.duration + 50);
+}
+
+// 由「已繳交」切換觸發的下一次 render：新畫面淡入（#32）
+let _fadeNextRender = false;
 
 // ── 主要渲染 ──
 function render(data) {
-  // skeleton → 真資料的一次性淡入（同步完成、真課程原位出現的瞬間）
-  const _mainEl = document.getElementById('main-section');
-  if (_mainEl.dataset.skeleton) {
-    delete _mainEl.dataset.skeleton;
-    _mainEl.classList.add('arrive');
-    setTimeout(() => _mainEl.classList.remove('arrive'), 400);
-  }
+  // skeleton → 真資料（#43）：疊層還蓋著時在底下畫好真內容，接著疊層淡出、內容同時清晰，中間沒有空白幀
+  const arriving = !!document.getElementById('sync-skeleton');
+  const fadeIn = _fadeNextRender;
+  _fadeNextRender = false;
 
   const canvasAssignments = data.assignments || {};
   const customAssignments = data.customAssignments || {};
@@ -1230,6 +1494,23 @@ function render(data) {
     } else {
       renderCardGrid(courses, assignments, assignmentGroups);
     }
+  }
+
+  const shown = currentView === 'course'
+    ? document.getElementById('course-detail-container')
+    : document.getElementById('main-section');
+  if (arriving) {
+    // 首次同步：skeleton 淡出（transition.fade）與真內容從模糊清晰（transition.reveal）交疊；側欄課程列同一個進場
+    dismissSyncSkeleton();
+    revealFromBlur([...shown.children, ...document.getElementById('course-nav').children]);
+  } else if (fadeIn) {
+    // 「已繳交」切換（#32）：待辦與已完成兩組沒有交集、沒有東西能滑到新位置 → 新畫面只做一個短淡入（transition.fade），
+    // 不位移、不 stagger；WAAPI 不靠 rAF 觸發，不設 fill，跑完就是最終狀態。
+    // 在課程詳情裡切換時，換掉的是作業清單（課名、圓餅、成績計算器不變，標頭只換一行件數字）→ 只淡入清單，整頁不閃一下
+    const targets = currentView === 'course'
+      ? [...shown.querySelectorAll('.detail-assignments-list')]
+      : [...shown.children];
+    targets.forEach((el) => el.animate([{ opacity: 0 }, { opacity: 1 }], MOTION.fade));
   }
 }
 
@@ -1810,6 +2091,15 @@ function updateCardPage(courseId, dir) {
     return;
   }
   rowsEl.innerHTML = renderCardRows(filtered.slice(next * pageSize, (next + 1) * pageSize));
+  // 換內容不換位置（#31，swap recipe）：高度由 CSS 的 min-height 保住；新的列從透明＋2px 模糊原地清晰
+  // （transition.swap＋blur.icon），沒有位移。forced reflow 提交起點再清回 CSS 值，不用 rAF
+  rowsEl.style.transition = 'none';
+  rowsEl.style.opacity = '0';
+  rowsEl.style.filter = 'var(--blur-swap)';
+  rowsEl.getBoundingClientRect();
+  rowsEl.style.transition = `${cssTransition('opacity', MOTION.swap)}, ${cssTransition('filter', MOTION.swap)}`;
+  rowsEl.style.opacity = '';
+  rowsEl.style.filter = '';
   if (info) info.textContent = `${next + 1} / ${totalPages}`;
   const prevOff = next === 0;
   const nextOff = next >= totalPages - 1;
@@ -2039,6 +2329,16 @@ function showGridView() {
   startMorph(update);
 }
 
+// 鉛筆緊跟在課名文字後面（CSS 做不到：按鈕是 absolute、.detail-name 的寬度不等於文字寬度）。
+// 渲染詳情、改名收尾（restore）、側欄改名同步詳情標題時都要重算——只算一次的話改短會空一大段、改長會蓋到字（#34）
+function positionRenameBtn(root) {
+  const textSpan = root.querySelector('.detail-name .detail-name-text');
+  const renameBtn = root.querySelector('.btn-rename-course');
+  if (textSpan && renameBtn) {
+    renameBtn.style.left = `${textSpan.offsetLeft + textSpan.offsetWidth + 8}px`;
+  }
+}
+
 // ── 課程重命名（inline edit）──
 function startCourseRename(courseId) {
   const textSpan = document.querySelector('.detail-name .detail-name-text');
@@ -2063,6 +2363,8 @@ function startCourseRename(courseId) {
     span.textContent = displayName;
     input.replaceWith(span);
     if (renameBtn) renameBtn.style.visibility = '';
+    const view = span.closest('.detail-card-top');
+    if (view) positionRenameBtn(view);   // 鉛筆跟著新名字（#34）
   };
 
   // 焦點（#8）：輸入框被換回 span 時焦點會掉到 <body> → 只有 Enter／Escape 收尾時還給鉛筆；
@@ -2167,7 +2469,10 @@ function startSidebarRename(courseId) {
     // 若右側正顯示同一課，順手同步詳情標題（只改文字、不整段重繪，避免打斷成績計算器/捲動）
     if (currentView === 'course' && currentCourseId === courseId) {
       const dName = document.querySelector('#course-detail-container .detail-name-text');
-      if (dName) dName.textContent = displayName;
+      if (dName) {
+        dName.textContent = displayName;
+        positionRenameBtn(document.getElementById('course-detail-container'));   // 鉛筆跟著新名字（#34）
+      }
     }
   };
 
@@ -2660,13 +2965,7 @@ function renderCourseDetailSection(course, asgns, groups, scores) {
       </div>
     </div>`;
 
-  // Position rename button right after the text (can't do this in CSS alone since
-  // the button is position:absolute but the block width != text width)
-  const textSpan = el.querySelector('.detail-name-text');
-  const renameBtn = el.querySelector('.btn-rename-course');
-  if (textSpan && renameBtn) {
-    renameBtn.style.left = `${textSpan.offsetLeft + textSpan.offsetWidth + 8}px`;
-  }
+  positionRenameBtn(el);
 
   // 固定寬左欄下，評分圖例字體自動縮放（過長再 ellipsis）
   fitLegendText(el);
@@ -2889,7 +3188,10 @@ function dragMove(ctx, ev) {
 }
 
 // 浮動 clone（拖曳與鍵盤移動共用）：疊在原列的位置；複本裡的勾選圈／握把是假的，
-// inert＋aria-hidden 讓 Tab 與螢幕閱讀器碰不到（#6）
+// inert＋aria-hidden 讓 Tab 與螢幕閱讀器碰不到（#6）。
+// 拿起時字不動（#41）：clone 左右各多 14px 的 padding（.drag-clone），所以往左挪 14px、加寬 28px，
+// 內容區與原列完全重合（同寬、截斷點不變）；上下沿用列本身的 padding，top／height 照原列
+const DRAG_CLONE_PAD_X = 14;
 function makeDragClone(ctx) {
   const rect = ctx.row.getBoundingClientRect();
   ctx.base = rect;
@@ -2897,9 +3199,12 @@ function makeDragClone(ctx) {
   clone.classList.add('drag-clone');
   clone.inert = true;
   clone.setAttribute('aria-hidden', 'true');
-  clone.style.width = rect.width + 'px';
+  clone.style.width = rect.width + DRAG_CLONE_PAD_X * 2 + 'px';
   clone.style.height = rect.height + 'px';
-  clone.style.left = rect.left + 'px';
+  // 原列的底線（作業列／稽核列 1px，最後一列 0）換成等寬的透明邊：內容區高度與原列一樣，置中的字不會差半個 px
+  // （外框細線改由 .drag-clone 的 box-shadow 畫；背景鋪到 border 底下，看不出來）
+  clone.style.borderBottom = `${getComputedStyle(ctx.row).borderBottomWidth} solid transparent`;
+  clone.style.left = rect.left - DRAG_CLONE_PAD_X + 'px';
   clone.style.top = rect.top + 'px';
   document.body.appendChild(clone);
   ctx.clone = clone;
@@ -2997,10 +3302,14 @@ function commitDrag(ctx, { viaKeyboard = false } = {}) {
 
   const container = document.getElementById('course-detail-container');
   const scroller = container.querySelector('.detail-right-panel');
-  if (scroller) scroller.scrollTop = savedScroll;  // 重繪會重置捲動位置 → 還原
-  // 稽核區開合：降級後強制展開（讓使用者看到落點）；升級則維持拖曳前狀態
+  // 稽核區開合：降級後強制展開（讓使用者看到落點）；升級則維持拖曳前狀態。
+  // 新節點直接到位、不重播展開（instant）：重繪前畫面上它本來就開著（拖曳前開著，或降級拖曳中 .drop-active 已把它展開）；
+  // 鍵盤降級、原本收著的情況也直接打開——落點列要在這一幀就有最終位置，scrollIntoView 與 clone 的飛行才量得對
+  // （高度還在 0 時，清單裡的列被 overflow:clip 裁掉、不算進捲動範圍，捲不到落點）
   const hidden = container.querySelector('.hidden-items');
-  if (hidden && (hiddenWasOpen || ctx.dir === 'demote')) setHiddenItemsOpen(hidden, true);
+  if (hidden && (hiddenWasOpen || ctx.dir === 'demote')) setHiddenItemsOpen(hidden, true, { instant: true });
+  // 重繪會重置捲動位置 → 還原；在展開之後：先還原的話，收著的新清單會把 scrollTop 夾小
+  if (scroller) scroller.scrollTop = savedScroll;
 
   const cssId = (window.CSS && CSS.escape) ? CSS.escape(String(ctx.id)) : String(ctx.id);
   let landed = null;
@@ -3038,13 +3347,25 @@ function focusAfterMove(container, landed, dir) {
   if (to) to.focus({ preventScroll: true });   // 捲動交給 settleClone 的 scrollIntoView（與飛行落點同一次）
 }
 
-// clone 飛入 targetRow 的位置後移除；targetRow 期間隱形、落地後亮一下（flash）
+// clone 飛入 targetRow 的位置後移除；落地後亮一下（flash）。
+// 只飛位置（#41，A8）：transform 走 --reflow，clone 的寬高不動；快到時 clone 淡出、落地列同時淡入（各 200ms ease.out，
+// 從 150ms 起交疊），兩種形狀（稽核列 ↔ 作業列）用 crossfade 銜接，不在最後一幀硬切成另一個形狀的列。
+// 取消（targetRow＝原列）時原列從殘影的 0.3 淡回，而不是從 0。減少動態：不飛行，原地交叉淡換（#0）
+const DRAG_CROSSFADE_DELAY_MS = 150;
 function settleClone(ctx, targetRow, { flash = true, after = null } = {}) {
   const clone = ctx.clone;
+  let to = null;
+  if (targetRow && targetRow.isConnected) {
+    targetRow.scrollIntoView({ block: 'nearest' });
+    to = targetRow.getBoundingClientRect();
+  }
+  const visible = !!to && !!(to.width || to.height);
+  const fly = visible && !reduceMotion();
+  const delay = fly ? DRAG_CROSSFADE_DELAY_MS : 0;
   const finish = () => {
     clone.remove();
     if (targetRow && targetRow.isConnected) {
-      targetRow.classList.remove('drag-arriving');
+      targetRow.style.transition = '';
       if (flash) {
         targetRow.classList.add('drag-arrived');
         setTimeout(() => targetRow.classList.remove('drag-arrived'), 900);
@@ -3052,25 +3373,25 @@ function settleClone(ctx, targetRow, { flash = true, after = null } = {}) {
     }
     if (after) after();
   };
-  let to = null;
-  if (targetRow && targetRow.isConnected) {
-    targetRow.scrollIntoView({ block: 'nearest' });
-    to = targetRow.getBoundingClientRect();
+
+  // 落地列：inline opacity 釘在起點（原列殘影 0.3／新列 0）→ forced reflow → 清回 CSS 值，同一條 ease.out 淡入
+  if (visible) {
+    const from = targetRow.classList.contains('drag-source') ? '0.3' : '0';
+    targetRow.classList.remove('drag-source');
+    targetRow.style.transition = 'none';
+    targetRow.style.opacity = from;
+    targetRow.getBoundingClientRect();
+    targetRow.style.transition = `opacity ${MOTION.fade.duration}ms ${MOTION.fade.easing} ${delay}ms`;
+    targetRow.style.opacity = '';
   }
-  // 落點不存在/不可見（如已繳交過濾）→ 原地淡出；減少動態時一律不飛行、原地淡出（落點閃色保留，#0）
-  if (reduceMotion() || !to || (!to.width && !to.height)) {
-    clone.style.transition = cssTransition('opacity', MOTION.fade);
-    clone.style.opacity = '0';
-    setTimeout(finish, MOTION.fade.duration + 30);
-    return;
+  if (fly) {
+    clone.style.transition = cssTransition('transform', MOTION.reflow);
+    clone.style.transform = `translate(${to.left - ctx.base.left}px, ${to.top - ctx.base.top}px)`;
   }
-  targetRow.classList.add('drag-arriving');
-  // 位置走 --reflow；寬高仍隨飛行改變（#41 會拿掉寬高、改成只飛位置）
-  clone.style.transition = `${cssTransition('transform', MOTION.reflow)}, width ${DRAG_SETTLE_MS}ms ease, height ${DRAG_SETTLE_MS}ms ease`;
-  clone.style.transform = `translate(${to.left - ctx.base.left}px, ${to.top - ctx.base.top}px)`;
-  clone.style.width = to.width + 'px';
-  clone.style.height = to.height + 'px';
-  setTimeout(finish, DRAG_SETTLE_MS + 30);
+  // clone 淡出（落點不存在/不可見，如已繳交過濾 → 原地淡出）；WAAPI 不靠 rAF
+  clone.animate([{ opacity: 1 }, { opacity: 0 }],
+    { duration: MOTION.fade.duration, delay, easing: MOTION.fade.easing, fill: 'forwards' });
+  setTimeout(finish, Math.max(fly ? DRAG_SETTLE_MS : 0, delay + MOTION.fade.duration) + 30);
 }
 
 // 重繪前中止進行中的拖曳（clone 直接移除，不跑動畫），避免 clone/監聽器變孤兒
@@ -3092,12 +3413,26 @@ function abortActiveDrag() {
 }
 
 // 已隱藏區開合（按鈕點擊與拖曳／鍵盤降級後強制展開共用）：切 .open 並同步開關的 aria-expanded——
-// 鍵盤使用者要靠它知道裡面的列現在 Tab 得到（#6）
-function setHiddenItemsOpen(wrap, open) {
+// 鍵盤使用者要靠它知道裡面的列現在 Tab 得到（#6）。
+// instant：重繪後還原「畫面上本來就開著」的清單（拖曳中 .drop-active 已把它展開、或拖曳前就開著）——
+// 新節點從 height 0 起算，不跳過過渡的話整段清單會在落點前重新長一次，落點也會量在展開途中（#28／#41）
+function setHiddenItemsOpen(wrap, open, { instant = false } = {}) {
+  const list = instant ? wrap.querySelector('.hidden-items-list') : null;
+  const arrow = instant ? wrap.querySelector('.hidden-items-arrow') : null;
+  if (list) list.style.transition = 'none';
+  if (arrow) arrow.style.transition = 'none';
   wrap.classList.toggle('open', open);
+  if (list || arrow) {
+    wrap.getBoundingClientRect();   // forced reflow：在 transition:none 下提交終點，再還原 CSS 的過渡
+    if (list) list.style.transition = '';
+    if (arrow) arrow.style.transition = '';
+  }
   const btn = wrap.querySelector('.hidden-items-toggle');
   if (btn) btn.setAttribute('aria-expanded', String(open));
 }
+
+// 展開面板的 chevron（已隱藏清單、成績計算器共用，#28）
+const DISCLOSURE_CHEVRON = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>';
 
 // ── 已自動隱藏稽核清單（唯讀精簡列；考試/簽到；不顯示任何分數，見決策 3）──
 function renderHiddenItemsSection(items, groups, courseId) {
@@ -3141,10 +3476,10 @@ function renderHiddenItemsSection(items, groups, courseId) {
   return `
     <div class="hidden-items" data-course-id="${courseId}" data-drophint="${esc(tr('dropToHide'))}">
       <button class="hidden-items-toggle" data-course-id="${courseId}" aria-expanded="false" aria-controls="hidden-items-list-${courseId}">
-        <span class="hidden-items-arrow"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
+        <span class="hidden-items-arrow">${DISCLOSURE_CHEVRON}</span>
         <span>${esc(tr('hiddenItemsToggle').replace('{n}', items.length))}</span>
       </button>
-      <div class="hidden-items-list" id="hidden-items-list-${courseId}">${listInner}</div>
+      <div class="hidden-items-list" id="hidden-items-list-${courseId}"><div class="hidden-items-list-inner">${listInner}</div></div>
     </div>`;
 }
 
@@ -3276,14 +3611,21 @@ function renderGradeCalculator(course, asgns, groups, scores) {
 
   if (!groupRows.trim()) return '';
 
+  // 標頭補上與「已隱藏 N 項」同一顆 chevron（#28）：開著轉 90°，一看就知道是開是關；
+  // padding 放在 .grade-calc-body-inner，外層 height:0 才收得乾淨（開合見 index.html「展開面板」）
   return `
     <div class="grade-calc">
       <div class="grade-calc-header">
-        <span class="grade-calc-title">${tr('gradeCalcTitle')}</span>
+        <span class="grade-calc-head">
+          <span class="grade-calc-arrow" aria-hidden="true">${DISCLOSURE_CHEVRON}</span>
+          <span class="grade-calc-title">${tr('gradeCalcTitle')}</span>
+        </span>
         <span class="grade-calc-final-display" id="final-grade-${course.id}">—</span>
       </div>
       <div class="grade-calc-body">
-        ${groupRows}
+        <div class="grade-calc-body-inner">
+          ${groupRows}
+        </div>
       </div>
     </div>`;
 }
@@ -3437,12 +3779,14 @@ function renderAssignmentRow(a, groups, courseId) {
 document.getElementById('btn-add-assignment')?.addEventListener('click', () => {
   openCustomAssignmentModal();
 });
-document.getElementById('custom-assignment-close')?.addEventListener('click', closeCustomAssignmentModal);
-document.getElementById('custom-assignment-cancel')?.addEventListener('click', closeCustomAssignmentModal);
-document.getElementById('custom-assignment-overlay')?.addEventListener('click', (e) => {
-  if (e.target === document.getElementById('custom-assignment-overlay')) closeCustomAssignmentModal();
-});
+// 關閉路徑（N2）：✕ 與 Esc 保留草稿、「取消」丟掉草稿；點背景不關閉（誤觸背景不該讓已輸入的內容消失）
+document.getElementById('custom-assignment-close')?.addEventListener('click', () => closeCustomAssignmentModal({ keepDraft: true }));
+document.getElementById('custom-assignment-cancel')?.addEventListener('click', () => closeCustomAssignmentModal());
 document.getElementById('custom-assignment-form')?.addEventListener('submit', saveCustomAssignmentFromForm);
+// 開始打字就清掉送出失敗的狀態（#38）：紅框退回一般焦點框、錯誤文字消失；只在送出時搖，打字不搖
+document.getElementById('custom-assignment-name')?.addEventListener('input', (e) => {
+  if (e.target.getAttribute('aria-invalid') === 'true') clearCustomFormError();
+});
 
 // 確認對話框：確定 → 跑 callback 後關閉；取消／點背景 → 關閉不執行
 document.getElementById('confirm-ok')?.addEventListener('click', () => {
@@ -3472,11 +3816,13 @@ function goToPage(page) {
     loadData();
     return;
   }
-  // 若正在看「已繳交」，關閉後回到目標頁
+  // 若正在看「已繳交」，關閉後回到目標頁：與「已繳交」切換同一套（側欄當幀亮起、新畫面淡入，#32）
   if (showSubmitted) {
     showSubmitted = false;
     currentPage = page;
+    updateSideNav();
     syncHistory();
+    _fadeNextRender = true;
     loadData();
     return;
   }
@@ -3493,32 +3839,45 @@ document.getElementById('detail-back-btn').addEventListener('click', () => histo
 // ── 查看已繳交（切換過濾） ──
 document.getElementById('nav-submitted').addEventListener('click', () => {
   showSubmitted = !showSubmitted;
+  // 按下的那一幀就亮起（#32，A5）：updateSideNav 只讀 _currentData，不必等 storage 讀完；新畫面到了再淡入
+  updateSideNav();
   syncHistory();   // 「已繳交」為過濾切換：更新目前 entry，不疊返回步
+  _fadeNextRender = true;
   loadData();
 });
 
-// ── 同步按鈕 ──
+// ── 同步按鈕（#30）──
+// 狀態顯示在觸發它的地方：閒置 →（三點）→「✓ 已同步」停 1.5 秒／「同步失敗」停 2.5 秒 → 閒置。
+// 四個標籤一開始就疊在同一格（index.html .sync-swap），換狀態只改 data-status，CSS 原地模糊淡換；結果同時念出（#3）
+const SYNC_DONE_MS = 1500;
+const SYNC_ERROR_MS = 2500;
+let _syncStatusTimer = 0;
+function setSyncStatus(btn, status) {
+  clearTimeout(_syncStatusTimer);
+  btn.dataset.status = status;
+  btn.classList.toggle('sync-error', status === 'error');
+  btn.disabled = status === 'loading' || status === 'error';
+  if (status === 'done' || status === 'error') {
+    _syncStatusTimer = setTimeout(() => setSyncStatus(btn, 'idle'), status === 'done' ? SYNC_DONE_MS : SYNC_ERROR_MS);
+  }
+}
+
 document.getElementById('sync-btn').addEventListener('click', () => {
   const btn = document.getElementById('sync-btn');
-  btn.innerHTML = '<span class="sync-dots"><span></span><span></span><span></span></span>';
-  btn.disabled = true;
+  if (btn.dataset.status === 'loading') return;
+  setSyncStatus(btn, 'loading');
   // 首次同步（無資料）→ 渲染 skeleton 佔位；已有資料則維持靜默背景刷新（不用佔位蓋真資料）
   const firstSync = !(_currentData.courses || []).length;
   if (firstSync) renderSyncSkeleton();
   chrome.runtime.sendMessage({ type: 'SYNC' }, (resp) => {
     if (chrome.runtime.lastError || !resp || !resp.success) {
-      // 同步失敗：先還原畫面（清掉 skeleton、回空狀態），再顯示錯誤態 2.5 秒
+      // 同步失敗：先還原畫面（淡出 skeleton、回空狀態），再顯示錯誤態 2.5 秒
       if (firstSync) loadData();
-      btn.textContent = tr('syncFailed');
-      btn.classList.add('sync-error');
-      setTimeout(() => {
-        btn.textContent = tr('sync');
-        btn.classList.remove('sync-error');
-        btn.disabled = false;
-      }, 2500);
+      setSyncStatus(btn, 'error');
+      announce(tr('syncFailed'));
     } else {
-      btn.textContent = tr('sync');
-      btn.disabled = false;
+      setSyncStatus(btn, 'done');
+      announce(tr('a11ySynced'));
       loadData();
     }
   });
@@ -3540,12 +3899,13 @@ function loadData(onRendered) {
         document.getElementById('page-tabs').style.display = '';
         document.getElementById('main-section').style.display = '';
         document.getElementById('course-detail-container').style.display = 'none';
-        delete document.getElementById('main-section').dataset.skeleton;   // 失敗還原：清掉 skeleton 標記
         document.getElementById('main-section').innerHTML = `
           <div class="state-msg">
             <div class="big">${tr('noData')}</div>
             <div class="small">${tr('noDataHintSync')}</div>
           </div>`;
+        dismissSyncSkeleton();   // 失敗還原：skeleton 疊層淡出、露出底下的空狀態
+        _fadeNextRender = false;
         return;
       }
       render({
@@ -3861,6 +4221,9 @@ loadData();
 
 // ── Weight Edit Modal ──
 let _weightEditCourseId = null;
+// 權重草稿（N2）：{ key: weightDraftKey(courseId), values: [{ name, weight }] }。✕／Esc 關掉時存起來，
+// 重開同一門課的權重視窗就還原；開別門課、按「取消」、儲存、還原 Canvas 權重都會丟掉
+let _weightDraft = null;
 
 function openWeightEditModal(courseId) {
   _weightEditCourseId = courseId;
@@ -3874,12 +4237,19 @@ function openWeightEditModal(courseId) {
   } else if (groups.some((g) => g.group_weight)) {
     items = groups.filter((g) => g.group_weight).map((g) => ({ name: g.name, weight: g.group_weight }));
   }
+  const draft = DueCustomAssignments.draftValuesFor(_weightDraft, DueCustomAssignments.weightDraftKey(courseId));
+  if (draft) items = draft;
+  else _weightDraft = null;
 
   renderWeightEditList(items);
   // 逃生口：僅當該課已有自訂權重時，才顯示「還原 Canvas 權重」
   const resetBtn = document.getElementById('weight-edit-reset');
   if (resetBtn) resetBtn.style.display = (custom && custom.length > 0) ? '' : 'none';
   document.getElementById('weight-edit-overlay').classList.add('open');
+  // 開啟後焦點落在第一個項目名稱（沒有項目就「+ 新增項目」），與補上 ✕ 之前一樣——不讓標頭的 ✕ 成為第一個停點
+  // （與新增作業視窗同一個做法：等 overlay 解除 inert 後的下一幀）
+  const firstField = document.querySelector('#weight-edit-list .weight-edit-name') || document.getElementById('weight-edit-add');
+  requestAnimationFrame(() => { if (firstField && firstField.isConnected) firstField.focus(); });
 }
 
 function renderWeightEditList(items) {
@@ -3948,6 +4318,33 @@ document.getElementById('weight-edit-add').addEventListener('click', () => {
   updateWeightTotal();
 });
 
+// 關閉權重視窗。keepDraft（✕、Esc）：目前每一列的名稱與百分比存成草稿（N2）；取消／儲存／還原：丟掉草稿
+function closeWeightEditModal({ keepDraft = false } = {}) {
+  const overlay = document.getElementById('weight-edit-overlay');
+  if (keepDraft && overlay.classList.contains('open') && _weightEditCourseId != null) {
+    _weightDraft = {
+      key: DueCustomAssignments.weightDraftKey(_weightEditCourseId),
+      values: [...document.querySelectorAll('#weight-edit-list .weight-edit-row')].map((row) => ({
+        name: row.querySelector('.weight-edit-name').value,
+        weight: row.querySelector('.weight-edit-pct').value,
+      })),
+    };
+  } else if (!keepDraft) {
+    _weightDraft = null;
+  }
+  overlay.classList.remove('open');
+}
+
+// 儲存／還原後整段重建詳情：保住右欄捲動位置；modal 歸還焦點時要還的「編輯」鈕已被重建拆掉 →
+// 等 setupModalA11y 的歸還（MutationObserver，microtask）跑完，焦點真的掉了才交給重建後的同一顆
+function rerenderDetailAfterWeights(course) {
+  const savedScroll = captureListScroll();
+  const { assignments = {}, assignmentGroups = {}, scores = {} } = _currentData;
+  renderCourseDetailSection(course, assignments[course.id] || [], assignmentGroups[course.id] || [], scores);
+  restoreListScroll(savedScroll);
+  setTimeout(() => refocusInDetail(['.btn-edit-weights']), 0);
+}
+
 document.getElementById('weight-edit-save').addEventListener('click', () => {
   const rows = document.querySelectorAll('.weight-edit-row');
   const items = Array.from(rows).map((row) => ({
@@ -3964,16 +4361,15 @@ document.getElementById('weight-edit-save').addEventListener('click', () => {
     chrome.storage.local.set({ customWeights: all });
   });
 
-  document.getElementById('weight-edit-overlay').classList.remove('open');
+  closeWeightEditModal();
 
-  const { courses = [], assignments = {}, assignmentGroups = {}, scores = {} } = _currentData;
-  const course = courses.find((c) => c.id === _weightEditCourseId);
-  if (course) renderCourseDetailSection(course, assignments[course.id] || [], assignmentGroups[course.id] || [], scores);
+  const course = (_currentData.courses || []).find((c) => c.id === _weightEditCourseId);
+  if (course) rerenderDetailAfterWeights(course);
 });
 
-document.getElementById('weight-edit-cancel').addEventListener('click', () => {
-  document.getElementById('weight-edit-overlay').classList.remove('open');
-});
+// 取消＝丟掉這次的修改（含草稿）；✕／Esc 才保留（N2）。點背景不關閉
+document.getElementById('weight-edit-cancel').addEventListener('click', () => closeWeightEditModal());
+document.getElementById('weight-edit-close').addEventListener('click', () => closeWeightEditModal({ keepDraft: true }));
 
 document.getElementById('weight-edit-reset').addEventListener('click', () => {
   const courseId = _weightEditCourseId;
@@ -3984,14 +4380,9 @@ document.getElementById('weight-edit-reset').addEventListener('click', () => {
     delete all[courseId];
     chrome.storage.local.set({ customWeights: all });
   });
-  document.getElementById('weight-edit-overlay').classList.remove('open');
-  const { courses = [], assignments = {}, assignmentGroups = {}, scores = {} } = _currentData;
-  const course = courses.find((c) => c.id === courseId);
-  if (course) renderCourseDetailSection(course, assignments[course.id] || [], assignmentGroups[course.id] || [], scores);
-});
-
-document.getElementById('weight-edit-overlay').addEventListener('click', (e) => {
-  if (e.target === e.currentTarget) e.currentTarget.classList.remove('open');
+  closeWeightEditModal();
+  const course = (_currentData.courses || []).find((c) => c.id === courseId);
+  if (course) rerenderDetailAfterWeights(course);
 });
 
 // ── Esc 關閉最上層 overlay（一次只關一個；優先序：新增作業 → 權重 → 教學）──
@@ -3999,10 +4390,11 @@ document.getElementById('weight-edit-overlay').addEventListener('click', (e) => 
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
   // 優先序：確認框 → 新增/編輯作業 → 權重 → 教學（一次只關最上層；經 close 函式一併清狀態）
+  // 新增作業與權重視窗用 Esc 關掉時保留草稿（N2），重開同一個視窗會還原
   const closers = [
     ['confirm-overlay', closeConfirmDialog],
-    ['custom-assignment-overlay', closeCustomAssignmentModal],
-    ['weight-edit-overlay', () => document.getElementById('weight-edit-overlay').classList.remove('open')],
+    ['custom-assignment-overlay', () => closeCustomAssignmentModal({ keepDraft: true })],
+    ['weight-edit-overlay', () => closeWeightEditModal({ keepDraft: true })],
     ['welcome-overlay', closeWelcomeModal],
   ];
   for (const [id, close] of closers) {
@@ -4061,13 +4453,21 @@ function setupModalA11y(overlay) {
     }
   });
 
-  // 監看 .open class：開→啟用 trap；關→還原焦點（涵蓋 Esc／背景點擊／儲存等所有關閉路徑）
-  new MutationObserver(() => {
-    if (overlay.classList.contains('open')) activate();
-    else deactivate();
-  }).observe(overlay, { attributes: true, attributeFilter: ['class'] });
+  // 監看 .open class：開→啟用 trap；關→還原焦點（涵蓋 Esc／背景點擊／儲存等所有關閉路徑）。
+  // 關閉後 overlay 還要淡出 400ms 才 display:none（#29）：這段期間設 inert，出場中的 modal 接不到焦點與點擊
+  // （先把焦點還給觸發元素再設 inert）
+  const sync = () => {
+    if (overlay.classList.contains('open')) {
+      overlay.inert = false;
+      activate();
+    } else {
+      deactivate();
+      overlay.inert = true;
+    }
+  };
+  new MutationObserver(sync).observe(overlay, { attributes: true, attributeFilter: ['class'] });
 
-  if (overlay.classList.contains('open')) activate();   // 設定時已開著（如首次載入教學）也啟用
+  sync();   // 設定時已開著（如首次載入教學）也啟用；關著的一開始就 inert
 }
 
 ['custom-assignment-overlay', 'weight-edit-overlay', 'welcome-overlay', 'confirm-overlay']

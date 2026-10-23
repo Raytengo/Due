@@ -118,3 +118,33 @@ test('update rejects a missing existing assignment', () => {
     DueCustomAssignments.updateCustomAssignment(null, { name: 'X' });
   }, /existing assignment is required/);
 });
+
+// ── 表單草稿（N2）──
+test('draft key is "new" for the add form and per-id for editing', () => {
+  assert.equal(DueCustomAssignments.formDraftKey(null), 'new');
+  assert.equal(DueCustomAssignments.formDraftKey(undefined), 'new');
+  assert.equal(DueCustomAssignments.formDraftKey({ id: 'custom-1' }), 'edit:custom-1');
+  assert.notEqual(
+    DueCustomAssignments.formDraftKey({ id: 'custom-1' }),
+    DueCustomAssignments.formDraftKey({ id: 'custom-2' }),
+  );
+});
+
+test('weight draft key is per course', () => {
+  assert.equal(DueCustomAssignments.weightDraftKey(42), 'weight:42');
+  assert.equal(DueCustomAssignments.weightDraftKey('42'), DueCustomAssignments.weightDraftKey(42));
+  assert.notEqual(DueCustomAssignments.weightDraftKey(42), DueCustomAssignments.weightDraftKey(43));
+});
+
+test('a draft is restored only when reopening the same form', () => {
+  const values = { courseId: '42', name: 'Half typed', description: '', dueLocalValue: '2026-03-13T23:59' };
+  const draft = { key: 'new', values };
+  assert.equal(DueCustomAssignments.draftValuesFor(draft, 'new'), values);
+  assert.equal(DueCustomAssignments.draftValuesFor(draft, 'edit:custom-1'), null);
+  assert.equal(DueCustomAssignments.draftValuesFor(null, 'new'), null);
+  const editKey = DueCustomAssignments.formDraftKey({ id: 'custom-1' });
+  const editDraft = { key: editKey, values };
+  assert.equal(DueCustomAssignments.draftValuesFor(editDraft, editKey), values);
+  assert.equal(DueCustomAssignments.draftValuesFor(editDraft, DueCustomAssignments.formDraftKey({ id: 'custom-2' })), null);
+  assert.equal(DueCustomAssignments.draftValuesFor(editDraft, 'new'), null);
+});
