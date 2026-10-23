@@ -221,3 +221,11 @@ if (nowDone && card) {
 | `extension/dashboard/index.html` | `@property --ring-pct`、`.wk-ring` transition；新增 `.wk-spin-arc`/`.wk-spin-1/2/3`/`wk-spin`/`wk-spin-fade`/`.wk-ears`/`.wk-ear`/`wk-ears-pop` CSS |
 
 > 不改 `completion.js`、`taskRules.js`、`background.js`、`popup.js`、課程詳情頁圓餅圖。
+
+---
+
+> **2026-10-23 後記（QA #193／#201／#16）**：§3.2 的「click 當下算 `celebrate` 旗標、沿 `beginCompleteWeek` → `finishCompleteWeek` → `rerenderWeekAndNav` 鏈路傳遞」與 §4 第一點的並行取捨**已作廢**，改為 render 端的**狀態轉移判定**：
+>
+> - `renderWeekSection(courses, assignments, fromCommit)`：`fromCommit` 只表示「這次是週卡完成 commit 的收尾重繪」（`rerenderWeekAndNav(true)`），不再帶任何點擊當下的判斷。模組層 `_ringAllDone` 記住上次渲染時近期作業是否全部完成（`null`＝尚未渲染）；`celebrateNow = fromCommit && allNearDone && _ringAllDone === false`，算完即更新 `_ringAllDone`。勾選 handler 不再呼叫 `computeNearProgress`。
+> - 修掉的兩個問題：近期作業已全部完成後，再勾 8-30 天／30 天以上／無截止的作業不會重播慶祝（#193，上次已是 true，沒有轉移）；最後兩項間隔勾選時，先收尾的那筆會被延到批次重繪（見 [2026-07-21 碎點爆 spec 後記](2026-07-21-completion-burst-animation-design.md)），最後那次重繪仍看得到 false → true 的轉移，所以只播一次、不會漏播（#201）。
+> - §4「並行完成會清掉另一筆計時器」不再成立：連勾多筆時，每筆都會跑完整的撤銷窗口，最後一筆收尾後才統一重繪（`settleCompletion`，#16）。

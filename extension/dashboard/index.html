@@ -126,7 +126,10 @@
       margin-bottom: 6px;
     }
 
+    /* 「校名 · 同步時間」：同步時間永遠完整；校名放不下先微縮字（JS，地板 11px）再省略號（title 看全名，QA #135） */
     .sidebar-brand .meta {
+      display: flex;
+      min-width: 0;
       font-family: 'DM Mono', monospace;
       font-size: 13px;
       letter-spacing: 0.05em;
@@ -134,6 +137,17 @@
       line-height: 1.5;
       white-space: nowrap;
       overflow: hidden;
+    }
+
+    .meta-school {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .meta-sync {
+      flex-shrink: 0;
+      white-space: pre;
     }
 
     /* Sidebar main nav */
@@ -169,6 +183,17 @@
       color: var(--orange);
     }
 
+    /* 沒有課程時停用（課程／已繳交）：淡化、不給 hover（title 說明原因，見 setNoCoursesMode） */
+    .side-nav-item:disabled {
+      cursor: default;
+      color: var(--mid);
+      opacity: 0.6;
+    }
+
+    .side-nav-item:disabled:hover {
+      background: transparent;
+    }
+
     .side-nav-name {
       font-family: 'Source Serif 4', Georgia, serif;
       font-size: 16px;
@@ -185,17 +210,6 @@
 
     .side-nav-item.active .side-nav-count {
       color: var(--orange);
-    }
-
-    /* 拖曳升級落點在另一個視圖時，clone 飛入側欄導航 → 計數閃示標記落點（見 settleCloneToNav） */
-    .side-nav-count.count-flash {
-      animation: nav-count-flash 0.9s ease-out;
-    }
-
-    @keyframes nav-count-flash {
-      0%  { color: var(--orange); transform: scale(1.35); }
-      55% { color: var(--orange); }
-      100% { transform: scale(1); }
     }
 
     /* Sidebar section */
@@ -312,6 +326,53 @@
       display: flex;
       gap: 8px;
       align-items: center;
+    }
+
+    /* 偵測到另一個 Canvas：同步鍵上方一行安靜的提示（文字按鈕比照 .hidden-items-toggle） */
+    .canvas-candidate {
+      margin-bottom: 14px;
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--muted);
+    }
+
+    .canvas-candidate-host {
+      font-family: 'DM Mono', monospace;
+      color: var(--dark);
+      overflow-wrap: anywhere;
+    }
+
+    .canvas-candidate-actions {
+      display: flex;
+      gap: 14px;
+      margin-top: 4px;
+    }
+
+    .canvas-candidate-btn {
+      border: none;
+      background: none;
+      cursor: pointer;
+      padding: 2px 0;
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.03em;
+      color: var(--muted);
+      transition: color 0.12s;
+    }
+
+    .canvas-candidate-btn:hover {
+      color: var(--orange);
+    }
+
+    .canvas-candidate-btn:disabled {
+      cursor: default;
+      opacity: 0.5;
+    }
+
+    /* 切換失敗：提示保留，下方一行說明（依 reason：未登入該 Canvas → 請先登入；同步失敗 → 請稍後再試） */
+    .canvas-candidate-error {
+      margin-top: 4px;
+      color: var(--overdue);
     }
 
     .btn-sync {
@@ -584,6 +645,14 @@
     .btn-add-assignment:hover {
       border-color: var(--dark);
       color: var(--dark);
+    }
+
+    .btn-add-assignment:disabled,
+    .btn-add-assignment:disabled:hover {
+      border-color: var(--border);
+      color: var(--muted);
+      opacity: 0.5;
+      cursor: default;
     }
 
     #main-section {
@@ -942,21 +1011,6 @@
       padding: 4px;
     }
 
-    /* ── Section Label ── */
-    .section-label {
-      font-family: 'DM Mono', monospace;
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: var(--mid);
-      margin-bottom: 14px;
-    }
-
-    /* ── Course Cards ── */
-    .courses-section .section-label {
-      margin-bottom: 16px;
-    }
-
     /* Assignment List */
     .assignment-item {
       display: flex;
@@ -972,8 +1026,27 @@
       border-bottom: none;
     }
 
-    .assignment-item.submitted {
-      opacity: 0.45;
+    /* 已完成列淡化（主清單＋已繳交視圖的已隱藏列）：只套在內容上，不整列 opacity——整列會疊乘到
+       拖曳握把與操作鈕（已繳交視圖握把曾只剩約 1.6:1，QA #79）。用變數讓拖曳 clone／殘影歸零淡化，
+       維持舊外觀（clone 全不透明、殘影只吃 .drag-source 的 0.3）*/
+    .assignment-item.submitted,
+    .hidden-item-row.submitted {
+      --done-fade: 0.45;
+    }
+
+    .drag-clone.drag-clone,
+    .drag-source.drag-source {
+      --done-fade: 1;
+    }
+
+    .assignment-item.submitted > .assignment-check,
+    .assignment-item.submitted .assignment-title > span:first-child,
+    .assignment-item.submitted .assignment-left > :not(.assignment-title),
+    .assignment-item.submitted .assignment-right > :not(.custom-actions-row),
+    .hidden-item-row.submitted .hidden-item-title > span:first-child,
+    .hidden-item-row.submitted .hidden-item-left > :not(.hidden-item-title),
+    .hidden-item-row.submitted .hidden-item-right > :not(.custom-actions-row) {
+      opacity: var(--done-fade);
     }
 
     /* 完成勾選圈：未完成空心 / 完成實心綠勾 / Canvas 已繳 locked */
@@ -1037,7 +1110,13 @@
       to   { transform: scaleX(0); }
     }
     .assignment-item.completing { position: relative; }
-    .assignment-item.bursting {
+    .assignment-item.bursting,
+    .week-task-card.bursting {
+      animation: complete-burst 0.4s ease-out forwards;
+      pointer-events: none;   /* 爆完的列/卡可能留在原位等批次重繪（其他撤銷窗口未結束），不可再互動或拖曳 */
+    }
+    /* 爆開列下方若展開著描述，一起淡出（不然批次重繪前會留下一段孤立的描述） */
+    .assignment-item.bursting + .assignment-desc {
       animation: complete-burst 0.4s ease-out forwards;
     }
     .complete-countdown {
@@ -1067,6 +1146,12 @@
       border-radius: 50%;
       pointer-events: none;
       animation: complete-dot 0.5s ease-out forwards;
+    }
+    /* 週卡的勾選圈在右上角：碎點從圈心噴出（圈 18px、距右/上緣 11px → 圈心 20px，再扣半顆 3.5px） */
+    .week-task-card .complete-burst-dot {
+      left: auto;
+      right: 16.5px;
+      top: 16.5px;
     }
 
     .assignment-left {
@@ -1137,13 +1222,6 @@
       letter-spacing: 0.04em;
     }
 
-    .exam-grade {
-      font-family: 'DM Mono', monospace;
-      font-size: 12px;
-      color: var(--orange);
-      letter-spacing: 0.02em;
-    }
-
     /* Assignment Description (accordion) */
     .assignment-desc {
       display: none;
@@ -1165,6 +1243,12 @@
 
     .assignment-desc-inner * {
       max-width: 100%;
+    }
+
+    /* 自訂作業的描述是純文字：保留使用者打的換行（QA #155） */
+    .assignment-desc-inner.is-plain {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
     }
 
     .assignment-desc-inner ul,
@@ -1251,11 +1335,40 @@
       margin-bottom: 10px;
     }
 
-    .state-msg .small {
+    .state-msg .body {
+      max-width: 440px;
+      margin: 0 auto;
+      font-size: 14px;
+      font-weight: 300;
+      line-height: 1.7;
+      color: var(--muted);
+    }
+
+    /* 空狀態的下一步（前往 Canvas）：沿用 .btn-add-assignment 的外框鈕語彙，橘色＝主要動作 */
+    .state-msg-action {
+      margin-top: 24px;
+      height: 35px;
+      padding: 0 20px;
+      border: 1px solid var(--orange);
+      border-radius: 6px;
+      background: none;
+      color: var(--orange);
       font-family: 'DM Mono', monospace;
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
+      font-size: 13px;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .state-msg-action:hover {
+      background: rgba(217, 119, 87, 0.08);
+    }
+
+    .state-msg-sub {
+      max-width: 440px;
+      margin: 12px auto 0;
+      font-size: 12px;
+      color: var(--mid);
     }
 
     /* ── Grade Calculator ── */
@@ -1369,6 +1482,25 @@
 
     .grade-calc-pts input:focus {
       border-color: var(--orange);
+    }
+
+    /* 負分：標紅、不計入總分（QA #25） */
+    .grade-calc-pts input.invalid {
+      border-color: var(--overdue);
+      color: var(--overdue);
+    }
+
+    /* Canvas 已免除：不給輸入框，不計入（QA #94） */
+    .grade-calc-excused {
+      width: 64px;
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      color: var(--mid);
+      text-align: right;
+    }
+
+    .grade-calc-row.is-excused .grade-calc-asgn-name {
+      color: var(--mid);
     }
 
     .grade-calc-possible {
@@ -1664,39 +1796,11 @@
       font-weight: 400;
     }
 
-    .welcome-feature-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 6px;
-      margin-top: 16px;
-    }
-
-    .welcome-feature-item {
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 10px 14px;
-      background: var(--surface);
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      height: 44px;
-    }
-
-    .welcome-feature-label {
-      font-family: 'DM Mono', monospace;
-      font-size: 10px;
-      text-transform: uppercase;
-      letter-spacing: 0.07em;
-      color: var(--mid);
-      white-space: nowrap;
-    }
-
-    .welcome-feature-desc {
+    .welcome-inst-sub {
+      display: block;
+      margin-top: 2px;
       font-size: 13px;
-      color: var(--dark);
-      line-height: 1;
-      font-weight: 300;
-      white-space: nowrap;
+      color: var(--mid);
     }
 
     .welcome-preview {
@@ -1819,18 +1923,6 @@
     .welcome-btn.ora:hover {
       background: #c4683f;
       border-color: #c4683f;
-    }
-
-    /* ── Welcome feature item: allow text wrap ── */
-    .welcome-feature-item {
-      height: auto;
-      align-items: flex-start;
-      padding: 10px 14px;
-    }
-
-    .welcome-feature-desc {
-      white-space: normal;
-      line-height: 1.4;
     }
 
     /* ── Welcome inline link ── */
@@ -2037,47 +2129,6 @@
     .welcome-dash-mock-card-date {
       font-size: 10px;
       color: var(--orange);
-    }
-
-    /* ── Welcome done checklist ── */
-    .welcome-done-list {
-      display: flex;
-      flex-direction: column;
-      gap: 7px;
-      margin-top: 18px;
-    }
-
-    .welcome-done-item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 9px 12px;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      background: var(--surface);
-      font-size: 13px;
-      color: var(--dark);
-    }
-
-    .welcome-done-check {
-      width: 18px;
-      height: 18px;
-      border-radius: 50%;
-      background: var(--green);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-    }
-
-    .welcome-done-check svg {
-      width: 10px;
-      height: 10px;
-      stroke: #fff;
-      fill: none;
-      stroke-width: 2.5;
-      stroke-linecap: round;
-      stroke-linejoin: round;
     }
 
     /* ── Welcome step 5：功能卡 ── */
@@ -2399,7 +2450,7 @@
     }
 
     .skel {
-      --skel-glint: rgba(255, 255, 255, 0.5);   /* dark mode 降為微白光（見下方覆蓋） */
+      --skel-glint: rgba(255, 255, 255, 0.5);
       display: block;
       height: 12px;
       border-radius: 4px;
@@ -2422,6 +2473,17 @@
 
     .skel-nav-row { padding: 9px 14px; }
     .skel-nav-row .skel { height: 12px; }
+
+    /* 週待辦版 skeleton：沿用 .week-panel／.wk-ring／.wk-sum-row／.week-task-card 的版面，內容換成佔位條 */
+    .skel-week { pointer-events: none; }
+    .skel-week .skel-ring-frac { width: 64px; height: 24px; }
+    .skel-week .wk-sum-row { align-items: center; }
+    .skel-week .skel-sum-num { flex: none; width: 22px; height: 18px; }
+    .skel-week .skel-sum-label { height: 11px; }
+    .skel-week .skel-group-title { width: 84px; height: 10px; margin-bottom: 12px; }
+    .skel-week .week-task-card .skel-code { height: 10px; }
+    .skel-week .week-task-card .skel-name { height: 14px; }
+    .skel-week .week-task-card .skel-row { width: 30%; height: 10px; }
 
     /* skeleton → 真資料到位的一次性淡入上浮 */
     @keyframes content-arrive {
@@ -2596,6 +2658,9 @@
       color: var(--dark);
       line-height: 1.25;
       position: relative;
+      /* 右側留出鉛筆的位置（鉛筆 absolute 貼在最後一行尾端），超長無空白的名稱也照樣換行、不把鉛筆推出卡片（QA #167） */
+      padding-right: 32px;
+      overflow-wrap: anywhere;
     }
 
     .btn-rename-course {
@@ -2634,6 +2699,7 @@
       line-height: 1.25;
       field-sizing: content;
       min-width: 4ch;
+      max-width: 100%;
       padding: 0;
     }
 
@@ -2800,7 +2866,18 @@
       margin: 24px 0 10px;
     }
 
-    /* ── 已自動隱藏稽核清單（考試・簽到）── */
+    /* 「已繳交」過濾開著：標題後附過濾名（深色，在淡灰標題中可辨，QA #5/#119） */
+    .detail-filter-tag {
+      color: var(--dark);
+    }
+
+    .detail-filter-tag::before {
+      content: '·';
+      margin: 0 6px;
+      color: var(--muted);
+    }
+
+    /* ── 已隱藏區（自動隱藏的考試・簽到＋手動拖進來的作業；跟隨完成過濾，見 spec 2026-10-23）── */
     .hidden-items {
       margin-top: 12px;
       padding-top: 10px;
@@ -2819,6 +2896,7 @@
       font-size: 11px;
       letter-spacing: 0.03em;
       color: var(--muted);
+      text-align: left;
       transition: color 0.12s;
     }
 
@@ -2826,12 +2904,34 @@
       color: var(--orange);
     }
 
+    /* 另一個完成桶的隱藏數短註（「另 M 項已完成，在『已繳交』中」）：接在數量後、較淡、以「·」隔開；
+       與數量同一段行內文字，窄欄時自然換行並對齊在箭頭之後 */
+    .hidden-items-note {
+      color: var(--mid);
+    }
+
+    .hidden-items-note::before {
+      content: '·';
+      margin: 0 6px;
+    }
+
+    .hidden-items-toggle:hover .hidden-items-note {
+      color: inherit;
+    }
+
+    /* 箭頭固定對齊第一行（短註換行時不跑到兩行中間） */
     .hidden-items-arrow {
       font-size: 11px;
       line-height: 1;
       display: inline-flex;
       align-items: center;
+      align-self: flex-start;
+      height: 16px;
       transition: transform 0.15s;
+    }
+
+    .hidden-items-label {
+      line-height: 16px;
     }
 
     .hidden-items.open .hidden-items-arrow {
@@ -2847,26 +2947,27 @@
       display: block;
     }
 
+    /* 隱藏列不整列降透明：淡化只靠較小字級＋標題改 --mid＋分組/時間標籤 0.75（見下），不疊乘到握把與操作鈕（QA #79） */
     .hidden-item-row {
       display: flex;
       align-items: center;
       gap: 8px;
       padding: 8px 0;
       border-bottom: 1px solid var(--border);
-      opacity: 0.55;
     }
 
     .hidden-item-row:last-child {
       border-bottom: none;
     }
 
-    /* 與當前視圖完成類別不符者：此視圖不可拖（無握把），再淡一階示意「於另一視圖管理」 */
-    .hidden-item-locked {
-      opacity: 0.4;
+    /* 分組/時間標籤是次要資訊：略降透明；已完成的隱藏列改由 --done-fade 覆寫（同元素覆寫，不疊乘） */
+    .hidden-item-row .assignment-group,
+    .hidden-item-row .due-label {
+      opacity: 0.75;
     }
 
-    /* ── 拖曳升級／降級（考試/簽到隱藏項；pointer 自繪拖曳，見 spec 2026-07-22）── */
-    /* 握把：緊跟作業名稱後，唯一拖曳起點 */
+    /* ── 拖曳隱藏／取消隱藏（作業清單 ↔ 已隱藏區；pointer 自繪拖曳，見 spec 2026-07-22、2026-10-23）── */
+    /* 握把：緊跟作業名稱後，唯一拖曳起點；靜止 0.75 對 --bg 約 3.2:1（UI 元件 ≥3:1，QA #79） */
     .drag-grip {
       flex: 0 0 auto;
       display: inline-flex;
@@ -2874,7 +2975,7 @@
       padding: 3px;
       margin: -3px 0;
       color: var(--mid);
-      opacity: 0.45;
+      opacity: 0.75;
       cursor: grab;
       touch-action: none;
       transition: opacity 0.12s, color 0.12s;
@@ -2882,7 +2983,7 @@
 
     .hidden-item-row:hover .drag-grip,
     .assignment-item:hover .drag-grip {
-      opacity: 0.85;
+      opacity: 1;
     }
 
     .drag-grip:hover {
@@ -2895,7 +2996,7 @@
     }
 
     /* 拖曳中的浮動 clone：抬起（陰影＋微放大＋0.4° 微傾）跟隨游標 */
-    /* 雙 class 提高特異度：蓋過 .assignment-item:last-child 的 border-bottom:none、.submitted/.hidden-item-row 的降透明 */
+    /* 雙 class 提高特異度：蓋過 .assignment-item:last-child 的 border-bottom:none、.submitted 的降透明 */
     .drag-clone.drag-clone {
       position: fixed;
       z-index: 400;
@@ -3001,7 +3102,7 @@
       gap: 7px;
       min-width: 0;
       font-size: 14px;
-      color: var(--dark);
+      color: var(--mid);
     }
 
     .hidden-item-right {
@@ -3560,6 +3661,52 @@
 
     .ai-settings-save:hover { opacity: 0.8; }
 
+    .weight-edit-save:disabled,
+    .weight-edit-save:disabled:hover {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
+    /* 權重無法儲存的原因（超過 100%／總和 0／負數）；沿用新增作業 modal 的錯誤字樣 */
+    .weight-edit-msg {
+      margin: -4px 20px 10px;
+      color: var(--orange);
+      font-size: 12px;
+    }
+
+    .weight-edit-msg:empty {
+      display: none;
+    }
+
+    /* ── 輕量 toast：沿用選單浮層的外觀（米白底、細邊、陰影），底部置中淡入、數秒後淡出 ── */
+    .due-toast {
+      position: fixed;
+      left: 50%;
+      bottom: 24px;
+      transform: translate(-50%, 6px);
+      max-width: min(520px, calc(100vw - 32px));
+      padding: 10px 16px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg);
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.14);
+      color: var(--dark);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+      line-height: 1.5;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      z-index: 3000;
+      transition: opacity 0.16s ease, transform 0.16s ease, visibility 0.16s ease;
+    }
+
+    .due-toast.show {
+      opacity: 1;
+      visibility: visible;
+      transform: translate(-50%, 0);
+    }
+
 
 
     /* ── 無障礙：鍵盤 focus 一致外框（只在鍵盤導航時顯示，不干擾滑鼠點擊）──
@@ -3681,6 +3828,32 @@
       opacity: 0.88;
     }
 
+    /* ── 系統「減少動態效果」（QA #138）：所有過渡／動畫壓成瞬間，hover 不位移、課程 morph 不播 ──
+       JS 端另外略過頁面滑動、View Transition、碎點爆、進度環慶祝（WAAPI 不受 CSS 影響）與拖曳落點飛入（見 prefersReducedMotion）。
+       撤銷倒數條例外：它是撤銷窗口的計時資訊，JS 以 inline !important 保留其動畫 */
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        animation-delay: 0s !important;
+        transition-duration: 0.01ms !important;
+        transition-delay: 0s !important;
+        scroll-behavior: auto !important;
+      }
+
+      ::view-transition-group(*),
+      ::view-transition-old(*),
+      ::view-transition-new(*) {
+        animation: none !important;
+      }
+
+      .course-card-grid:hover {
+        transform: none;
+      }
+    }
+
     /* ── 響應式斷點：窄視窗降欄、縮 sidebar、縮 padding ──
        morph 命名元素（course-shell/code/name/badge/meta）皆在 detail-card-top，不受下列規則影響 */
     @media (max-width: 1199px) {
@@ -3698,8 +3871,57 @@
       .main-content { padding: 16px 16px 12px; }
     }
 
+    /* 課程詳情：視窗 ≤1100px 時左欄（固定 248px 的評分圓餅）會把右欄作業名稱擠到剩 0–1 個字（QA P1-10）→
+       改上下堆疊：圓餅＋圖例在上方排成一列（圓餅縮小），作業清單在下方用滿寬度、仍由 .detail-right-panel 捲動
+       （拖曳邊緣自動捲動、重繪還原捲動位置都依賴它） */
+    @media (max-width: 1100px) {
+      .detail-card-bottom {
+        flex-direction: column;
+        gap: 18px;
+      }
+      .detail-left-panel {
+        padding-top: 0;
+        align-items: stretch;
+      }
+      .detail-weight-pie-container {
+        width: 100%;
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
+        align-items: center;
+        gap: 12px 28px;
+      }
+      .detail-pie {
+        width: 104px;
+        height: 104px;
+      }
+      .detail-weight-pie-container .btn-edit-weights {
+        margin-top: 0;
+      }
+      .detail-right-panel {
+        flex: 1;
+      }
+    }
+
+    /* 課程詳情 ≤767px（側欄仍佔 240px）：作業列右側 nowrap 的截止標籤（英文最寬約 176px）把名稱擠到 4–5em（QA P1-10）→
+       收窄下半部左右留白、列內名稱與標籤的間距，截止標籤降一級字；681px 時被截斷的名稱仍保有約 6em。
+       上半部（morph 命名元素所在）不動 */
+    @media (max-width: 767px) {
+      .detail-card-bottom {
+        padding-left: 16px;
+        padding-right: 16px;
+      }
+      .assignment-right,
+      .hidden-item-right {
+        margin-left: 12px;
+      }
+      .detail-card-bottom .due-label {
+        font-size: 13px;
+      }
+    }
+
     @media (max-width: 680px) {
-      /* 課程詳情左右欄改上下堆疊：餅圖在上、成績計算器＋作業清單在下 */
+      /* 更窄：整個下半部一起捲動（圓餅列換行後太高，右欄單獨捲動會只剩一小截） */
       .detail-card-bottom {
         flex-direction: column;
         gap: 18px;
@@ -3725,7 +3947,7 @@
 
         <div class="sidebar-brand">
           <h1>Due</h1>
-          <div class="meta" id="header-meta">載入中...</div>
+          <div class="meta" id="header-meta" data-loading="1">載入中…</div>
         </div>
 
         <nav class="side-nav" id="side-nav">
@@ -3750,12 +3972,21 @@
         </div>
 
         <div class="sidebar-footer">
+          <!-- 偵測到另一個已登入的 Canvas（background 記的 canvasBaseCandidate）：不自動切換，由使用者決定 -->
+          <div class="canvas-candidate" id="canvas-candidate" role="status" hidden>
+            <div class="canvas-candidate-text"><span id="canvas-candidate-label">偵測到另一個 Canvas：</span><span class="canvas-candidate-host" id="canvas-candidate-host"></span></div>
+            <div class="canvas-candidate-actions">
+              <button class="canvas-candidate-btn" id="canvas-candidate-switch">切換到這裡</button>
+              <button class="canvas-candidate-btn" id="canvas-candidate-ignore">忽略</button>
+            </div>
+            <div class="canvas-candidate-error" id="canvas-candidate-error" hidden></div>
+          </div>
           <div class="footer-row">
             <button class="btn-sync" id="sync-btn">同步</button>
             <div class="settings-menu-wrap">
-              <button class="btn-theme-toggle" id="settings-menu-btn" title="設定"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
+              <button class="btn-theme-toggle" id="settings-menu-btn" title="設定" aria-label="設定"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
               <div class="settings-menu" id="settings-menu">
-                <div class="settings-menu-title">Quick Actions</div>
+                <div class="settings-menu-title" id="settings-menu-title">設定</div>
                 <div class="settings-menu-divider"></div>
                 <button class="settings-menu-item" id="menu-claude-usage-toggle">Claude 用量</button>
                 <button class="settings-menu-item" id="menu-ai-settings">AI 分析設定</button>
@@ -3767,6 +3998,8 @@
                   </div>
                 </div>
                 <button class="settings-menu-item" id="menu-open-tutorial">使用教學 <span>↗</span></button>
+                <div class="settings-menu-divider"></div>
+                <button class="settings-menu-item" id="menu-clear-data">清除本機資料…</button>
               </div>
             </div>
           </div>
@@ -3823,11 +4056,11 @@
 
               <div class="welcome-dash-mock" style="flex:0 0 280px; margin-top:0; align-self: flex-start; position: relative; top: -51px;">
                 <div class="welcome-dash-mock-header">
-                  <span class="welcome-dash-mock-title">Dashboard 概覽</span>
+                  <span class="welcome-dash-mock-title" id="wmock-title">Dashboard 概覽</span>
                 </div>
                 <div class="welcome-dash-mock-body">
                   <div class="welcome-dash-mock-chart">
-                    <div class="welcome-dash-mock-ring" role="img" aria-label="本週完成 3/5">
+                    <div class="welcome-dash-mock-ring" id="wmock-ring" role="img" aria-label="近期完成 3/5">
                       <svg viewBox="0 0 48 48" aria-hidden="true">
                         <circle class="welcome-dash-mock-ring-track" cx="24" cy="24" r="20"></circle>
                         <circle class="welcome-dash-mock-ring-bar" cx="24" cy="24" r="20"
@@ -3837,23 +4070,23 @@
                         <div class="welcome-dash-mock-ring-frac"><b>3</b>/5</div>
                       </div>
                     </div>
-                    <div class="welcome-dash-mock-ring-cap">本週完成</div>
+                    <div class="welcome-dash-mock-ring-cap" id="wmock-ring-cap">近期完成</div>
                     <div class="welcome-dash-mock-sum">
-                      <div class="welcome-dash-mock-sum-row is-overdue"><span class="welcome-dash-mock-sum-num">1</span>已逾期</div>
-                      <div class="welcome-dash-mock-sum-row is-urgent"><span class="welcome-dash-mock-sum-num">3</span>7天內</div>
-                      <div class="welcome-dash-mock-sum-row is-soon"><span class="welcome-dash-mock-sum-num">2</span>8-30天</div>
+                      <div class="welcome-dash-mock-sum-row is-overdue"><span class="welcome-dash-mock-sum-num">1</span><span id="wmock-sum-overdue">已逾期</span></div>
+                      <div class="welcome-dash-mock-sum-row is-urgent"><span class="welcome-dash-mock-sum-num">3</span><span id="wmock-sum-urgent">7天內</span></div>
+                      <div class="welcome-dash-mock-sum-row is-soon"><span class="welcome-dash-mock-sum-num">2</span><span id="wmock-sum-soon">8-30天</span></div>
                     </div>
                   </div>
                   <div class="welcome-dash-mock-cards">
                     <div class="welcome-dash-mock-card">
                       <div class="welcome-dash-mock-card-tag">CHINESE</div>
-                      <div class="welcome-dash-mock-card-title">期中小組報告大綱</div>
-                      <div class="welcome-dash-mock-card-date">3月15日 (3 天後)</div>
+                      <div class="welcome-dash-mock-card-title" id="wmock-card1">期中小組報告大綱</div>
+                      <div class="welcome-dash-mock-card-date" id="wmock-date1">3月15日（3天後）</div>
                     </div>
                     <div class="welcome-dash-mock-card">
                       <div class="welcome-dash-mock-card-tag">MATH</div>
                       <div class="welcome-dash-mock-card-title">Group Project Progress...</div>
-                      <div class="welcome-dash-mock-card-date">3月15日 (3 天後)</div>
+                      <div class="welcome-dash-mock-card-date" id="wmock-date2">3月15日（3天後）</div>
                     </div>
                   </div>
                 </div>
@@ -3884,7 +4117,7 @@
               <span id="wstep-2-body">Due 透過你的 Canvas 登入狀態同步資料，不需要額外設定或 Token。</span>
               <ul class="welcome-inst-list">
                 <div style="margin-bottom: 10px;"></div>
-                <li><span class="welcome-inst-num">1</span><span class="welcome-inst-text" id="wstep-2-li1">登入 <a class="welcome-inline-link" id="welcome-canvas-link">Canvas ↗</a>（點一下，同步完成會自動帶你回來）</span><span class="welcome-canvas-synced" id="welcome-canvas-synced" hidden></span></li>
+                <li><span class="welcome-inst-num">1</span><span class="welcome-inst-text" id="wstep-2-li1">登入 <a class="welcome-inline-link" id="welcome-canvas-link">HKUST(GZ) Canvas ↗</a>（點一下，同步完成會自動帶你回來）<span class="welcome-inst-sub">其他學校：打開你學校的 Canvas（網址結尾是 .instructure.com）並登入，Due 會自動偵測</span></span><span class="welcome-canvas-synced" id="welcome-canvas-synced" hidden></span></li>
                 <li><span class="welcome-inst-num">2</span><span class="welcome-inst-text" id="wstep-2-li2">Due 會<strong>在你每次打開Canvas時自動更新</strong>你的所有課程與作業</span></li>
                 <li><span class="welcome-inst-num">3</span><span class="welcome-inst-text" id="wstep-2-li3">點擊工具列或進入 Dashboard 都可以看到相關資訊</span></li>
               </ul>
@@ -3916,8 +4149,7 @@
                 </ul>
               </div>
               <div class="welcome-preview square" style="align-self: flex-start; background: var(--bg); position: relative; top: -43px;">
-                <img src="../icons/pin_guide.png" alt="釘選 Due 示意圖"
-                  onerror="this.closest('.welcome-preview').style.display='none'" />
+                <img src="../icons/pin_guide.png" id="wstep-3-img" alt="釘選 Due 到工具列的步驟示意圖" />
               </div>
             </div>
           </div>
@@ -3939,7 +4171,7 @@
             <div class="welcome-body split" style="flex:1">
               <div class="welcome-body-text">
                 <span id="wstep-4-body">Due 會自動隱藏考試、簽到<br>你也可以自己決定要藏誰、留誰</span>
-                <p class="welcome-inst-text" id="wstep-4-li1" style="margin-top: 42px;">按住作業的 <strong>⠿</strong> 拖到底部「<strong>已隱藏</strong>」區即可隱藏；反之亦然</p>
+                <p class="welcome-inst-text" id="wstep-4-li1" style="margin-top: 42px;">進入任一<strong>課程頁</strong>，按住作業的 <strong>⠿</strong> 拖到底部「<strong>已隱藏</strong>」區即可隱藏；反之亦然</p>
               </div>
               <div class="welcome-drag-illus" aria-hidden="true">
                 <svg viewBox="0 0 280 232" xmlns="http://www.w3.org/2000/svg">
@@ -3983,18 +4215,17 @@
                   <!-- 清單底部的已隱藏區（放置目標） -->
                   <rect x="22" y="156" width="230" height="52" rx="6" style="fill:var(--surface); stroke:var(--border); stroke-dasharray:4 3" />
                   <path d="M32 167 l4 4 -4 4" style="fill:none; stroke:var(--mid); stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round" />
-                  <text x="44" y="175" style="font-family:'DM Mono',monospace; font-size:9px; fill:var(--mid); letter-spacing:.05em">已隱藏 2 項</text>
+                  <text id="wds-hidden-label" x="44" y="175" style="font-family:'DM Mono',monospace; font-size:9px; fill:var(--mid); letter-spacing:.05em">已隱藏 2 項</text>
                   <rect x="44" y="190" width="74" height="6" rx="3" style="fill:var(--purple); opacity:.8" />
                   <rect x="126" y="186" width="26" height="13" rx="3" style="fill:none; stroke:var(--purple); opacity:.8" />
-                  <text x="130" y="196" style="font-family:'DM Mono',monospace; font-size:8px; fill:var(--purple)">考試</text>
+                  <text id="wds-exam" x="139" y="196" text-anchor="middle" style="font-family:'DM Mono',monospace; font-size:8px; fill:var(--purple)">考試</text>
 
                   <!-- 右側：拖下隱藏（橘）；左側：拖回還原（綠） -->
                   <path d="M 246 90 C 262 112, 262 130, 248 152" marker-end="url(#wds-arrow-o)" style="fill:none; stroke:var(--orange); stroke-width:1.5" />
-                  <text x="247" y="115" style="font-family:'DM Mono',monospace; font-size:9px; fill:var(--orange)">隱</text>
-                  <text x="247" y="127" style="font-family:'DM Mono',monospace; font-size:9px; fill:var(--orange)">藏</text>
+                  <!-- 直排短標：中文逐字一行（tspan）、英文整字轉 90°（dashboard.js setSvgVerticalLabel 依語言重建） -->
+                  <text id="wds-hide" x="247" y="115" style="font-family:'DM Mono',monospace; font-size:9px; fill:var(--orange)"><tspan x="247" dy="0">隱</tspan><tspan x="247" dy="12">藏</tspan></text>
                   <path d="M 34 184 C 18 158, 18 122, 30 96" marker-end="url(#wds-arrow-g)" style="fill:none; stroke:var(--green); stroke-width:1.5" />
-                  <text x="22" y="132" style="font-family:'DM Mono',monospace; font-size:9px; fill:var(--green)">還</text>
-                  <text x="22" y="144" style="font-family:'DM Mono',monospace; font-size:9px; fill:var(--green)">原</text>
+                  <text id="wds-show" x="22" y="132" style="font-family:'DM Mono',monospace; font-size:9px; fill:var(--green)"><tspan x="22" dy="0">還</tspan><tspan x="22" dy="12">原</tspan></text>
                 </svg>
               </div>
             </div>
@@ -4081,7 +4312,7 @@
         </div>
         <div class="custom-assignment-field">
           <label for="custom-assignment-due" id="custom-assignment-due-label">截止日期</label>
-          <input id="custom-assignment-due" type="datetime-local" />
+          <input id="custom-assignment-due" type="datetime-local" min="2000-01-01T00:00" max="9999-12-31T23:59" />
         </div>
         <div class="custom-assignment-error" id="custom-assignment-error"></div>
         <div class="custom-assignment-actions">
@@ -4100,6 +4331,7 @@
       </div>
       <div class="weight-edit-list" id="weight-edit-list"></div>
       <button class="weight-edit-add" id="weight-edit-add">+ 新增項目</button>
+      <div class="weight-edit-msg" id="weight-edit-msg" role="alert"></div>
       <div class="weight-edit-footer">
         <div class="weight-edit-footer-left">
           <button class="weight-edit-reset" id="weight-edit-reset" style="display:none">還原 Canvas 權重</button>
@@ -4178,6 +4410,9 @@
       </div>
     </div>
   </div>
+
+  <!-- 輕量提示（例：自訂作業存到目前畫面看不到的位置時告知去處；文字由 showToast 填入） -->
+  <div class="due-toast" id="due-toast" role="status" aria-live="polite"></div>
 
   <script src="taskRules.js"></script>
   <script src="customAssignments.js"></script>
