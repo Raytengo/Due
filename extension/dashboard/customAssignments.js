@@ -38,12 +38,44 @@
     return `${CUSTOM_PREFIX}${randomPart}`;
   }
 
-  function createCustomAssignment(input) {
+  // 帶 code 的錯誤：UI 依 code 顯示對應文案（name_required → 名稱；invalid_due → 截止日期）
+  function codedError(message, code) {
+    const err = new Error(message);
+    err.code = code;
+    return err;
+  }
+
+  function requireName(input) {
     const name = (input.name || '').trim();
-    if (!name) throw new Error('name is required');
+    if (!name) throw codedError('name is required', 'name_required');
+    return name;
+  }
+
+  // 截止日期合理範圍：Chrome 的 datetime-local 年欄位可打到 6 位數（2 0 2 6 1 1 → 202611 年，new Date 得 Invalid Date），
+  // 只打兩位數則成 0026 年——兩者都是打錯，不是真的截止日（QA #161/#162）
+  const MIN_DUE_YEAR = 2000;
+  const MAX_DUE_YEAR = 9999;
+
+  function isValidDueLocalValue(value) {
+    if (!value) return true;   // 空值＝無截止日期，合法
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return false;
+    const y = d.getFullYear();
+    return y >= MIN_DUE_YEAR && y <= MAX_DUE_YEAR;
+  }
+
+  // datetime-local 值 → ISO（空值 → null）；無效或年份不合理 → throw code 'invalid_due'
+  function parseDueLocalValue(value) {
+    if (!value) return null;
+    if (!isValidDueLocalValue(value)) throw codedError('invalid due date', 'invalid_due');
+    return new Date(value).toISOString();
+  }
+
+  function createCustomAssignment(input) {
+    const name = requireName(input);
 
     const courseId = normalizeCourseId(input.courseId);
-    const dueAt = input.dueLocalValue ? new Date(input.dueLocalValue).toISOString() : null;
+    const dueAt = parseDueLocalValue(input.dueLocalValue);
     const idFactory = input.idFactory || defaultIdFactory;
 
     return {
@@ -64,11 +96,10 @@
   // 沿用 createCustomAssignment 的 normalize 與驗證（空名 throw）。回傳新物件，不 mutate existing。
   function updateCustomAssignment(existing, input) {
     if (!existing || !existing.id) throw new Error('existing assignment is required');
-    const name = (input.name || '').trim();
-    if (!name) throw new Error('name is required');
+    const name = requireName(input);
 
     const courseId = normalizeCourseId(input.courseId);
-    const dueAt = input.dueLocalValue ? new Date(input.dueLocalValue).toISOString() : null;
+    const dueAt = parseDueLocalValue(input.dueLocalValue);
 
     return {
       ...existing,
@@ -145,11 +176,14 @@
 
   return {
     CUSTOM_PREFIX,
+    MIN_DUE_YEAR,
+    MAX_DUE_YEAR,
     createCustomAssignment,
     draftValuesFor,
     formDraftKey,
     weightDraftKey,
     updateCustomAssignment,
+    isValidDueLocalValue,
     getDefaultDueLocalValue,
     mergeAssignmentMaps,
     normalizeCustomAssignmentMap,

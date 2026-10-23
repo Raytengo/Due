@@ -217,6 +217,21 @@
       scale: var(--scale-press);
     }
 
+    /* ↻ 抓不到用量時的短暫提示（數秒後清空）。空字串時高度為 0、不佔版面；
+       live region 常駐不隱藏，螢幕閱讀器才會念出新內容 */
+    .usage-note {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      line-height: 1.4;
+      color: var(--muted);
+      text-align: right;
+      text-wrap: balance;   /* 英文長句折兩行時平均分配，避免單字孤行 */
+    }
+
+    .usage-note:not(:empty) {
+      margin: -4px 0 8px;
+    }
+
     /* 超過約 3 列即內部捲動，避免 popup 過長（≤3 列時自然高度、不出現捲軸）。
        左右各留 4px 給勾選圈的焦點框與 hover halo（否則被捲動容器裁掉左側，#4）；內容寬維持 284px */
     .task-list {
@@ -644,6 +659,7 @@
         title="Refresh Claude usage" aria-label="Refresh Claude usage"><span class="refresh-glyph" aria-hidden="true">&#8635;</span></button>
     </div>
   </div>
+  <p class="usage-note" id="claude-usage-note" role="status" aria-live="polite"></p>
   <ul class="task-list" id="task-list"></ul>
 
   <hr class="divider" />
@@ -651,6 +667,7 @@
 
   <script src="dashboard/taskRules.js"></script>
   <script src="dashboard/completion.js"></script>
+  <script src="dashboard/customAssignments.js"></script>
   <script src="popup.js"></script>
 </body>
 

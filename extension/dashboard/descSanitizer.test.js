@@ -51,7 +51,6 @@ test('isSafeHref: vbscript: rejected', () => {
 test('isSafeHref: relative paths rejected', () => {
   assert.equal(DueDescSanitizer.isSafeHref('/courses/1/assignments/2'), false);
   assert.equal(DueDescSanitizer.isSafeHref('relative/page.html'), false);
-  assert.equal(DueDescSanitizer.isSafeHref('#anchor'), false);
 });
 
 test('isSafeHref: protocol-relative (//host) rejected', () => {
@@ -60,7 +59,51 @@ test('isSafeHref: protocol-relative (//host) rejected', () => {
 
 test('isSafeHref: other schemes rejected', () => {
   assert.equal(DueDescSanitizer.isSafeHref('ftp://host/file'), false);
-  assert.equal(DueDescSanitizer.isSafeHref('mailto:a@b.com'), false);
+  assert.equal(DueDescSanitizer.isSafeHref('tel:+85212345678'), false);
+  assert.equal(DueDescSanitizer.isSafeHref('file:///etc/passwd'), false);
+});
+
+// ── mailto: 與頁內錨點（#…）保留為可點連結（QA #158）──
+test('isSafeHref: mailto: passes (大小寫不敏感、去前後空白)', () => {
+  assert.equal(DueDescSanitizer.isSafeHref('mailto:ta@school.edu'), true);
+  assert.equal(DueDescSanitizer.isSafeHref('MAILTO:ta@school.edu?subject=Lab%201'), true);
+  assert.equal(DueDescSanitizer.isSafeHref('  mailto:ta@school.edu '), true);
+});
+
+test('isSafeHref: empty mailto: rejected', () => {
+  assert.equal(DueDescSanitizer.isSafeHref('mailto:'), false);
+  assert.equal(DueDescSanitizer.isSafeHref('mailto: '), false);
+});
+
+test('isSafeHref: in-page #anchor passes; bare # rejected', () => {
+  assert.equal(DueDescSanitizer.isSafeHref('#rubric'), true);
+  assert.equal(DueDescSanitizer.isSafeHref('#_Toc12345'), true);
+  assert.equal(DueDescSanitizer.isSafeHref('#'), false);
+  assert.equal(DueDescSanitizer.isSafeHref('# rubric'), false);
+});
+
+test('hrefKind: classifies web / mailto / fragment / unsafe', () => {
+  assert.equal(DueDescSanitizer.hrefKind('https://example.com'), 'web');
+  assert.equal(DueDescSanitizer.hrefKind('HTTP://example.com'), 'web');
+  assert.equal(DueDescSanitizer.hrefKind('mailto:ta@school.edu'), 'mailto');
+  assert.equal(DueDescSanitizer.hrefKind('#rubric'), 'fragment');
+  assert.equal(DueDescSanitizer.hrefKind('javascript:alert(1)'), null);
+  assert.equal(DueDescSanitizer.hrefKind('data:text/html,x'), null);
+  assert.equal(DueDescSanitizer.hrefKind('//evil.example/x'), null);
+  assert.equal(DueDescSanitizer.hrefKind(null), null);
+});
+
+// 錨點目標：來源元素的 id（或 <a name>）以 data-desc-anchor 標記保留（不沿用 id：避免與 dashboard 的 id 衝突／DOM clobbering）
+test('anchorTargetOf: id or <a name> becomes the anchor target; others none', () => {
+  const el = (tag, attrs) => ({
+    tagName: tag.toUpperCase(),
+    getAttribute: (k) => (Object.prototype.hasOwnProperty.call(attrs, k) ? attrs[k] : null),
+  });
+  assert.equal(DueDescSanitizer.anchorTargetOf(el('h2', { id: 'rubric' })), 'rubric');
+  assert.equal(DueDescSanitizer.anchorTargetOf(el('a', { name: 'top' })), 'top');
+  assert.equal(DueDescSanitizer.anchorTargetOf(el('span', { id: '  ' })), null);
+  assert.equal(DueDescSanitizer.anchorTargetOf(el('div', { name: 'x' })), null);
+  assert.equal(DueDescSanitizer.anchorTargetOf(el('p', {})), null);
 });
 
 test('isSafeHref: empty / whitespace-only rejected', () => {

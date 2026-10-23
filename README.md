@@ -6,7 +6,7 @@
 
 **A Canvas dashboard that tells you what to do next.**
 
-Due is a Chrome extension that syncs with any Canvas LMS and lays out every
+Due is a Chrome extension that syncs with your school's Canvas and lays out every
 assignment, deadline, and grade weight in one calm, prioritized dashboard —
 no API tokens, no account setup, no server.
 
@@ -33,9 +33,9 @@ there's nothing to configure. Log in to Canvas once and it syncs automatically.
 
 | | |
 |---|---|
-| **7-day popup** | Instant view of what's due this week, with a pinned overdue section |
+| **7-day popup** | Instant view of what's due this week (your custom to-dos included), with a pinned overdue section |
 | **Urgency colors** | Red overdue · Orange ≤7 days · Yellow 8–30 days · Blue 30+ days |
-| **Week progress ring** | How much of this week's work you've cleared, broken down by urgency |
+| **Progress ring** | How much of your near-term work (overdue in the last 30 days + due in the next 7) you've cleared, with a count for each urgency level |
 | **Grade weights** | Per-course breakdown of assignment groups and their weights |
 | **Grade calculator** | Enter scores for a live weighted total — Canvas grades prefill automatically |
 | **Drag to organize** | Exams & attendance auto-hide; drag any hidden item back, or tuck others away |
@@ -48,11 +48,14 @@ there's nothing to configure. Log in to Canvas once and it syncs automatically.
 
 ---
 
-## Works with any Canvas school
+## Which schools work
 
 Due never asks for an API token or a password. It uses the Canvas session
-already in your browser, so any school running Canvas works out of the box —
-just be logged in.
+already in your browser — just be logged in.
+
+It works with schools whose Canvas address ends in `.instructure.com`
+(for example `hkust-gz.instructure.com`). Schools that run Canvas on their
+own domain (like `canvas.yourschool.edu`) aren't supported yet.
 
 ---
 
@@ -70,7 +73,8 @@ Then **log in to Canvas** and Due syncs automatically on your next visit. Click 
 
 Everything stays on your device. Due has **no backend server, no analytics, and
 no telemetry** — all data lives in `chrome.storage.local` and is never sent to
-the developer. Read the full [privacy policy](privacy-policy.md).
+the developer. On a shared computer, **Settings → Clear local data…** wipes
+everything Due has stored in that browser. Read the full [privacy policy](privacy-policy.md).
 
 ---
 
