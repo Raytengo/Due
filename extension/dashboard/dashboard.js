@@ -134,8 +134,8 @@ const I18N = {
     wStep4Li1: '按住作業的 <strong>⠿</strong> 拖到底部「<strong>已隱藏</strong>」區即可隱藏；反之亦然',
     wTitle5: '開始用 Due 吧',
     wBody5: '這幾個功能容易錯過，記得試試：',
-    wFeatCustomName: '自訂作業',
-    wFeatCustomDesc: '加入 Canvas 上沒有的個人任務',
+    wFeatCustomName: '自動課程分析',
+    wFeatCustomDesc: '接上你自己的 AI API，自動抓出每門課的分數權重',
     wFeatRenameName: '課程改名',
     wFeatRenameDesc: '改成你習慣的叫法',
     wSupport5: '有 bug 或建議？跟我說一聲 → <a class="welcome-inline-link" href="mailto:0610raymond@gmail.com">0610raymond@gmail.com</a>',
@@ -253,8 +253,8 @@ const I18N = {
     wStep4Li1: '按住作业的 <strong>⠿</strong> 拖到底部「<strong>已隐藏</strong>」区即可隐藏；反之亦然',
     wTitle5: '开始用 Due 吧',
     wBody5: '这几个功能容易错过，记得试试：',
-    wFeatCustomName: '自定义作业',
-    wFeatCustomDesc: '加入 Canvas 上没有的个人任务',
+    wFeatCustomName: '自动课程分析',
+    wFeatCustomDesc: '接入你自己的 AI API，自动抓取每门课的分数权重',
     wFeatRenameName: '课程改名',
     wFeatRenameDesc: '改成你习惯的叫法',
     wSupport5: '有 bug 或建议？跟我说一声 → <a class="welcome-inline-link" href="mailto:0610raymond@gmail.com">0610raymond@gmail.com</a>',
@@ -372,8 +372,8 @@ const I18N = {
     wStep4Li1: 'Grab an assignment\'s <strong>⠿</strong> and drop it into <strong>Hidden</strong> to hide it, or drag it back to restore — it works both ways',
     wTitle5: 'Start using Due',
     wBody5: 'A couple of features worth trying:',
-    wFeatCustomName: 'Custom assignments',
-    wFeatCustomDesc: 'Add tasks that aren\'t on Canvas',
+    wFeatCustomName: 'Auto course analysis',
+    wFeatCustomDesc: 'Connect your own AI API to auto-fill each course\'s grade weights',
     wFeatRenameName: 'Rename courses',
     wFeatRenameDesc: 'Give courses names you prefer',
     wSupport5: 'Found a bug or have an idea? Let me know → <a class="welcome-inline-link" href="mailto:0610raymond@gmail.com">0610raymond@gmail.com</a>',
@@ -479,6 +479,7 @@ function applyUILanguage() {
       </div>`;
     bindLanguageMenuActions();
   }
+  if (typeof DueAiSettings !== 'undefined') DueAiSettings.applyLanguage(_uiLanguage);
 }
 
 function bindLanguageMenuActions() {
@@ -2994,6 +2995,17 @@ if (menuOpenTutorial) {
   });
 }
 
+const menuAiSettings = document.getElementById('menu-ai-settings');
+if (menuAiSettings) {
+  menuAiSettings.addEventListener('click', () => {
+    if (typeof DueAiSettings !== 'undefined') DueAiSettings.open();
+    if (settingsMenu) settingsMenu.classList.remove('open');
+    if (settingsMenuBtn) settingsMenuBtn.classList.remove('open');
+    const menuLanguageLabel = document.getElementById('menu-language-label');
+    if (menuLanguageLabel) menuLanguageLabel.classList.remove('submenu-open');
+  });
+}
+
 // ── Welcome Modal ──
 let _welcomeStep = 1;
 
@@ -3127,6 +3139,20 @@ if (chrome.storage?.onChanged?.addListener) {
     if (changes.lastSync.newValue && changes.lastSync.newValue !== changes.lastSync.oldValue) {
       _returnToDashboard();
     }
+  });
+}
+
+// AI 評分比重分析寫入 customWeights 後由 background 送來（spec 2026-09-03 §10）：
+// 只更新記憶體快取；正開著該課詳情且沒有拖曳／完成動畫進行中才重繪。不新增 storage.onChanged（見開發注意事項 9）
+if (chrome.runtime?.onMessage?.addListener) {
+  chrome.runtime.onMessage.addListener((msg) => {
+    if (!msg || msg.type !== 'GRADING_WEIGHTS_UPDATED' || !_currentData) return;
+    if (!_currentData.customWeights) _currentData.customWeights = {};
+    _currentData.customWeights[msg.courseId] = msg.weights;
+    const idle = !_dragCtx && Object.keys(_completeTimers).length === 0;
+    if (idle && currentView === 'course' && currentCourseId === msg.courseId) rerenderDetailAndNav(msg.courseId);
+    const overlay = document.getElementById('ai-settings-overlay');
+    if (overlay && overlay.classList.contains('open') && typeof DueAiSettings !== 'undefined') DueAiSettings.refreshStatus();
   });
 }
 
@@ -3330,6 +3356,7 @@ document.addEventListener('keydown', (e) => {
   // 優先序：確認框 → 新增/編輯作業 → 權重 → 教學（一次只關最上層；經 close 函式一併清狀態）
   const closers = [
     ['confirm-overlay', closeConfirmDialog],
+    ['ai-settings-overlay', () => { if (typeof DueAiSettings !== 'undefined') DueAiSettings.close(); }],
     ['custom-assignment-overlay', closeCustomAssignmentModal],
     ['weight-edit-overlay', () => document.getElementById('weight-edit-overlay').classList.remove('open')],
     ['welcome-overlay', closeWelcomeModal],
@@ -3397,6 +3424,6 @@ function setupModalA11y(overlay) {
   if (overlay.classList.contains('open')) activate();   // 設定時已開著（如首次載入教學）也啟用
 }
 
-['custom-assignment-overlay', 'weight-edit-overlay', 'welcome-overlay', 'confirm-overlay']
+['custom-assignment-overlay', 'weight-edit-overlay', 'welcome-overlay', 'confirm-overlay', 'ai-settings-overlay']
   .forEach((id) => setupModalA11y(document.getElementById(id)));
 

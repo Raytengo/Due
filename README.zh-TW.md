@@ -7,8 +7,9 @@
 **一眼看懂：現在該做哪份作業。**
 
 Due 是一個 Chrome 擴充功能，能同步任何 Canvas LMS，把所有作業、截止日期與
-評分比重整理進一個乾淨、依緊急度排序的 Dashboard——不需要 API token、不用
-註冊帳號、沒有伺服器。
+評分比重整理進一個乾淨、依緊急度排序的 Dashboard——不需要 Canvas API token、
+不用註冊帳號、沒有伺服器。另有選用的 AI 功能可從課程大綱抓出評分比重，想用
+的話自備 LLM API key 即可。
 
 🌐 [English](README.md) · **繁體中文**
 
@@ -50,8 +51,9 @@ Due 以「你」的身分登入：它借用瀏覽器裡現成的 Canvas 登入�
 
 ## 適用任何 Canvas 學校
 
-Due 從不要求 API token 或密碼。它使用瀏覽器裡既有的 Canvas 登入狀態，所以任何
-使用 Canvas 的學校都能直接用——只要你已經登入。
+Due 從不要求 Canvas API token 或密碼。它使用瀏覽器裡既有的 Canvas 登入狀態，所以任何
+使用 Canvas 的學校都能直接用——只要你已經登入。Due 唯一會問你要的 key 是選用
+的：開啟 AI 評分比重分析時，你自己的 Gemini／Qwen／DeepSeek／NVIDIA NIM API key（見下方）。
 
 ---
 
@@ -65,11 +67,29 @@ Due 已上架 Chrome Web Store，一鍵安裝、免設定：
 
 ---
 
+## 選用：AI 評分比重分析
+
+有些課程從不在 Canvas 上填權重。開啟這個功能後，Due 會在每次同步後讀課程大綱
+（文字與 PDF），抓出評分比重，寫進該課的**手動權重**——和你自己手動輸入是
+同一個地方，所以隨時可以改、可以還原。
+
+- 設定齒輪 →「**AI 分析設定**」→ 選 Gemini／Qwen／DeepSeek／NVIDIA NIM，貼上你自己的
+  API key，儲存。
+- 每門課只分析**一次**；已有 Canvas 或手動權重的課會跳過。沒填 key 什麼都不會跑。
+- 選 Gemini 儲存時，Chrome 會問是否允許存取 `canvas-user-content.com`，用來下載大綱 PDF；
+  拒絕也能用，只是只讀大綱文字。
+- NVIDIA NIM 不允許瀏覽器直接呼叫，所以選它儲存時會多問一次是否允許存取
+  `integrate.api.nvidia.com`；沒有這個權限該供應商完全無法運作。
+- 大綱內容直接從你的瀏覽器送到你選的供應商，中間沒有 Due 的伺服器。
+
+---
+
 ## 隱私
 
 所有資料都留在你的裝置上。Due **沒有後端伺服器、沒有分析追蹤、也沒有任何
-遙測**——資料全存在 `chrome.storage.local`，絕不會傳送給開發者。完整說明見
-[隱私政策](privacy-policy.md)。
+遙測**——資料全存在 `chrome.storage.local`，絕不會傳送給開發者。若你開啟選用
+的 AI 分析，課程大綱會用你自己的 key 直接送到你選的供應商，開發者不經手。
+完整說明見[隱私政策](privacy-policy.md)。
 
 ---
 
@@ -81,10 +101,12 @@ Due 是純 **vanilla JavaScript** 搭 **Manifest V3**——無框架、無建置
 extension/
 ├── manifest.json      # MV3 設定
 ├── background.js      # service worker：Canvas API 同步 + Claude 用量
+├── ai/*.js            # 選用的 AI 評分比重分析：gradingRules · providers · analysisRunner
 ├── popup.html / .js   # 工具列 popup（7 天待辦）
 └── dashboard/
     ├── index.html     # Dashboard 骨架 + 樣式
     ├── dashboard.js   # 渲染 + 事件
+    ├── aiSettings.js  # AI 分析設定 modal
     └── *.js           # taskRules · completion · customAssignments · descSanitizer
 ```
 
@@ -93,11 +115,12 @@ extension/
   （或 `popup-harness.html`），就能在一般分頁用 mock 資料開發 Dashboard 與 popup。
 - **測試：** 共用邏輯模組都有純 Node 單元測試，例如
   `node extension/dashboard/taskRules.test.js`。
+- **AI 模組測試：** `node extension/ai/gradingRules.test.js`、`node extension/ai/providers.test.js`。
 
 完整架構、資料格式與設計規範，見 [`CLAUDE.md`](CLAUDE.md)。
 
 ---
 
 <div align="center">
-<sub>版本 2.0.0 · <a href="LICENSE">MIT License</a></sub>
+<sub>版本 2.1.0 · <a href="LICENSE">MIT License</a></sub>
 </div>

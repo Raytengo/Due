@@ -1,3 +1,7 @@
+// AI 評分比重分析（spec 2026-09-03）：純規則 + 供應商層 + 編排，全部在 ai/ 目錄，與同步路徑隔離
+// vendor 的 pdf.js 必須先 worker 再 lib（worker 檔設定全域 pdfjsWorker，lib 的 fake-worker 直接抓它用）——見 ai/vendor/README.md
+importScripts('ai/vendor/pdf.worker.min.js', 'ai/vendor/pdf.min.js', 'ai/pdfText.js', 'ai/gradingRules.js', 'ai/providers.js', 'ai/analysisRunner.js');
+
 let BASE_URL = '';
 
 // 自動同步節流狀態（記憶體）：上次成功同步的時間戳（ms）。
@@ -75,6 +79,10 @@ chrome.webNavigation
 
 // ── Message handlers ──
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message && typeof message.type === 'string' && message.type.startsWith('AI_')) {
+    return handleAiMessage(message, sendResponse, BASE_URL);
+  }
+
   if (message.type === 'SYNC') {
     syncAll()
       .then(() => sendResponse({ success: true }))
@@ -114,6 +122,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 });
+
+// API key 存在 storage.local：鎖成只有擴充功能自身頁面可讀（claude.ai 的 content script 讀不到）
+// 必須放在所有 listener 註冊「之後」並包 try：舊版 Chrome 不支援限制 storage.local 時這行會同步丟錯，
+// 擺在最前面會讓整支 script 中斷，onInstalled／onCompleted／onMessage 全都註冊不到。
+try {
+  if (chrome.storage.local.setAccessLevel) {
+    chrome.storage.local.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' }).catch(() => { });
+  }
+} catch (_) { }
 
 async function fetchJSON(url) {
   const res = await fetch(url, { credentials: 'include' });
@@ -332,6 +349,9 @@ async function syncAll() {
     // 成功寫入 storage 後才更新節流時間戳；上面拉課程失敗會 throw、走不到這裡，
     // 時間戳不更新 → 下次造訪 Canvas 仍會重試同步
     _lastAutoSyncAt = Date.now();
+
+    // AI 評分比重分析：排到下一個 tick 跑，不 await、不阻塞 SYNC 回應、不持有 _syncing
+    scheduleGradingAnalysis(BASE_URL);
 
     console.log(`[Due] 同步完成，共 ${courses.length} 門課程`);
   } finally {
