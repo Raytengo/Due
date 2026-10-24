@@ -1902,6 +1902,9 @@
       /* clip 而不是 hidden（#9）：hidden 仍是捲動容器，焦點落到畫面外的 step 會把它捲歪、之後每次換頁都錯位；
          clip 不是捲動容器，捲不動 */
       overflow: clip;
+      /* 但 clip 不是捲動容器，flex 項目的 min-height:auto 就會解析成內容高度（hidden 時是 0）——
+         內容區壓不下去，把底部按鈕列擠出 448px 的卡片外、被裁掉一截。明寫 0 讓它照舊能縮 */
+      min-height: 0;
       position: relative;
     }
 
