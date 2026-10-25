@@ -4836,7 +4836,8 @@ function applyGradesOverviewLanguage() {
   if (ov && ov.classList.contains('open')) renderGradesOverview();
 }
 
-document.getElementById('nav-grades').addEventListener('click', openGradesOverview);
+// 側欄「成績」入口已於 2026-10-25 依 owner 決定拿掉（總覽程式保留、目前沒有入口）
+document.getElementById('nav-grades')?.addEventListener('click', openGradesOverview);
 document.getElementById('grades-close').addEventListener('click', closeGradesOverview);
 
 // 點一門課：關 modal → 進該課詳情（不帶卡片 → 同步渲染）→ 展開成績計算器
@@ -4996,11 +4997,11 @@ function renderEmptyState() {
     </div>`;
 }
 
-// 沒有課程時「+ 新增作業」「課程」「成績」無事可做 → 停用並以 title 說明，不留點了沒反應的死按鈕（QA #13/#171）
+// 沒有課程時「+ 新增作業」「課程」無事可做 → 停用並以 title 說明，不留點了沒反應的死按鈕（QA #13/#171）
 let _noCoursesMode = false;
 function setNoCoursesMode(on) {
   _noCoursesMode = on;
-  ['btn-add-assignment', 'nav-courses', 'nav-grades'].forEach((id) => {
+  ['btn-add-assignment', 'nav-courses'].forEach((id) => {
     const el = document.getElementById(id);
     if (!el) return;
     el.disabled = on;

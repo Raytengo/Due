@@ -268,7 +268,7 @@ sidebar（300px）+ main-content（flex:1）
 │  同步/設定            │
 ```
 
-> 主導航（`.side-nav`）：`學期待辦`／`課程` 為兩個頁面（互斥 active，切換時新頁淡入，見「頁面切換動畫」），右側各顯示數量（待辦數／課程數）。第三顆 `成績`（`#nav-grades`，`aria-haspopup="dialog"`）不是頁面：開「學期成績」modal（見下方），不 active、沒有計數，沒有課程時與課程一起停用（`setNoCoursesMode`）。**沒有「已繳交」**：2026-10-25 起拿掉全域的已完成過濾（`showSubmitted`／`#nav-submitted`，spec 2026-10-25-drop-submitted-filter）——它會讓側欄課程徽章換意思、跟進課程詳情、把已隱藏區切成兩半。已完成的作業只在各課程詳情的「已完成」區看得到。active 狀態、數量與頂部 `#page-title` 由 `updateSideNav()` 統一更新；在課程詳情頁點 `學期待辦`／`課程` 會先退出詳情再切換（見 `goToPage()`）。頂部 `.page-tabs` 只保留頁面標題（詳情模式下由 CSS 隱藏，改顯示返回鍵）與「新增作業」。
+> 主導航（`.side-nav`）：`學期待辦`／`課程` 為兩個頁面（互斥 active，切換時新頁淡入，見「頁面切換動畫」），右側各顯示數量（待辦數／課程數）。沒有課程時「課程」停用（`setNoCoursesMode`）。側欄的 `成績` 按鈕已於 2026-10-25 依 owner 決定拿掉（學期成績總覽的程式保留、目前沒有入口，見下方）。**沒有「已繳交」**：2026-10-25 起拿掉全域的已完成過濾（`showSubmitted`／`#nav-submitted`，spec 2026-10-25-drop-submitted-filter）——它會讓側欄課程徽章換意思、跟進課程詳情、把已隱藏區切成兩半。已完成的作業只在各課程詳情的「已隱藏」區看得到。active 狀態、數量與頂部 `#page-title` 由 `updateSideNav()` 統一更新；在課程詳情頁點 `學期待辦`／`課程` 會先退出詳情再切換（見 `goToPage()`）。頂部 `.page-tabs` 只保留頁面標題（詳情模式下由 CSS 隱藏，改顯示返回鍵）與「新增作業」。
 >
 > **滑動 indicator（#47）**：學期待辦／課程的 active 底色是同一塊 `#side-nav-indicator`（`updateSideNav` → `placeSideNavIndicator`／`placeIndicatorAt` 寫 `--y`／`--h`），換項時沿 `--spring-selection` 滑過去；沒有 active 項（課程詳情）→ `.is-off` 原地淡出、位置不動；恢復時先 `transition:none` 寫到新項位置、forced reflow 後才移除 `.is-off`——在新位置原地淡入，不從舊位置滑來。頁面載入（含 reload 還原課程頁／詳情）直接到位、項目本身的過渡先關掉，不會出現兩塊高亮。按下 active 項時 indicator 跟著縮（`--scale-choice`）。減少動態：直接跳
 >
@@ -326,7 +326,7 @@ sidebar（300px）+ main-content（flex:1）
 - `gradeItemMap` 為共享使用者 key（`SHARED_USER_KEYS`，`updateShared` read-modify-write，`loadData` 預設 `{}`）；不主動清理，殘留名稱被 ① 略過
 
 **學期成績總覽（modal，spec 2026-10-25-semester-grades）：**
-- 入口：側欄主導航「成績」（`openGradesOverview`）；`#grades-overlay` 共用 modal 機制（`MODAL_OVERLAY_IDS`、Esc `closers`、`setupModalA11y`、`trackBackdropPress`／`isBackdropClick`），開著時 `isUiIdle` 為 false
+- **目前沒有入口**：側欄「成績」按鈕已於 2026-10-25 依 owner 決定拿掉，`openGradesOverview` 等程式保留（`#nav-grades` 綁定用 `?.`，按鈕不在也不會出錯），之後決定要不要換入口或整個移除。原入口：側欄主導航「成績」；`#grades-overlay` 共用 modal 機制（`MODAL_OVERLAY_IDS`、Esc `closers`、`setupModalA11y`、`trackBackdropPress`／`isBackdropClick`），開著時 `isUiIdle` 為 false
 - 每門課一列（依課程代碼排序）：代碼＋名稱（含自訂名稱）＋權重來源小字（`Canvas 設定`／`AI 分析`（`isAiCustomWeights`）／`自訂`），有已評分卻未歸類的作業接「· N 項未歸類」（`.grades-warn`）；右側加權分數（`DueGradeCalc.courseGrade`，與該課計算器同數字）＋「已評分 N%」（`gradedWeight/totalWeight`）＋ 2px 綠色細條。沒有權重 →「沒有評分比重」、有權重沒成績 →「尚無成績」
 - 點一列：關 modal → `showCourseDetail(cid)`（不帶卡片，同步渲染）→ 展開計算器 accordion
 - 不算學期平均（Canvas API 拿不到學分）；Canvas 沒開加權也沒有自訂權重的課維持「沒有評分比重」，不用總配分硬算
