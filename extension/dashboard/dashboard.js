@@ -9,7 +9,7 @@ const GROUP_COLORS = [
 // dir：'promote'（已隱藏 → 作業清單）｜'demote'（作業清單 → 已隱藏），與列的 data-drag 相同
 const DRAG_GRIP_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="15" cy="18" r="1.4"/></svg>';
 function dragGripHtml(dir) {
-  const label = tr(dir === 'promote' ? 'a11yShowItem' : 'a11yHideItem');
+  const label = tr(dir === 'promote' ? 'a11yShowItem' : 'a11yArchiveItem');
   return `<button type="button" class="drag-grip" aria-label="${esc(label)}">${DRAG_GRIP_SVG}</button>`;
 }
 
@@ -108,8 +108,7 @@ const I18N = {
     customDueInvalid: '截止日期無效，請檢查年份（4 位數）',
     // 自訂作業存到目前畫面看不到的位置時的提示（QA #162）
     customSavedInCourse: '已存到「{course}」',
-    customSavedInDone: '已存到「{course}」的已完成區',
-    customSavedInHidden: '已存到「{course}」的已隱藏區',
+    customSavedInArchive: '已存到「{course}」的已隱藏區',
     customSavedPastWindow: '已存到「{course}」：逾期超過 30 天，只在課程詳情顯示',
     languageLabel: '語言',
     langZhTw: '繁體中文',
@@ -126,12 +125,9 @@ const I18N = {
     overdueToday: '今天到期',
     overdueDaysLabel: '逾{n}天',
     overdueGroup: '已逾期',
-    hiddenItemsToggle: '已隱藏 {n} 項',
-    doneItemsToggle: '已完成 {n} 項',
-    doneItemsEmpty: '還沒有已完成的作業（把作業拖到這裡可標記完成）',
-    hiddenItemsEmpty: '目前沒有隱藏項目（把作業拖到這裡可隱藏）',
     dropToShow: '放開以加入作業清單',
-    dropToHide: '放開以隱藏',
+    archiveToggle: '已隱藏 {n} 項',
+    archiveEmpty: '目前沒有隱藏項目（把作業拖到這裡可標記完成）',
     dropToDone: '放開以標記完成',
     daysLater: '{n}天後',
     daysLaterOne: '{n}天後',
@@ -193,19 +189,18 @@ const I18N = {
     a11yCompleted: '已完成「{name}」，1.5 秒內再按一次可撤銷',
     a11yUndone: '已撤銷',
     // 隱藏／還原的鍵盤路徑（#6）：握把按鈕名稱與移動後的播報
-    a11yShowItem: '取消隱藏',
-    a11yHideItem: '移到已隱藏',
+    a11yShowItem: '移回作業清單',
+    a11yArchiveItem: '標記完成',
     a11yMovedToList: '「{name}」已移回作業清單',
-    a11yMovedToHidden: '「{name}」已移到已隱藏',
-    a11yMovedToDone: '「{name}」已移到已完成',
+    a11yMovedToDone: '「{name}」已標記完成',
     // week section
     within7Days: '7天內',
     within30Days: '8-30天',
     beyond30Days: '30天以上',
     noTasks: '無待辦事項',
-    weekDoneLabel: '近期完成',
+    weekDoneLabel: '當週待辦',
     weekRingScope: '範圍：30 天內的逾期＋未來 7 天到期',
-    weekAllDoneLabel: '全部完成',
+    weekAllDoneLabel: '當週無待辦',
     // ui widgets
     editWeight: '編輯',
     weightEditTitle: '編輯評分權重',
@@ -242,14 +237,14 @@ const I18N = {
     wStep3Li2: '找到 <strong>Due</strong>，點擊旁邊的<strong>釘選圖示</strong>',
     wStep3Li3: '工具列出現 Due 圖示後即完成',
     wTitle4: '拖曳整理作業清單',
-    wBody4: 'Due 會自動隱藏考試、簽到<br>你也可以自己決定要藏誰、留誰',
-    wStep4Li1: '進入任一<strong>課程頁</strong>，按住作業的 <strong>⠿</strong> 拖到底部「<strong>已隱藏</strong>」區即可隱藏；反之亦然',
+    wBody4: 'Due 會自動把考試、簽到收到下方<br>做完的作業拖下去就算完成',
+    wStep4Li1: '進入任一<strong>課程頁</strong>，按住作業的 <strong>⠿</strong> 拖到底部「<strong>已隱藏</strong>」區即可標記完成；拖回作業清單就變回未完成',
     wPinAlt: '釘選 Due 到工具列的步驟示意圖',
     // 教學第 1 頁迷你 Dashboard／第 4 頁拖曳示意圖的文字（隨語言切換）
     wMockTitle: 'Dashboard 概覽',
     wMockCard1: '期中小組報告大綱',
     wMockExam: '考試',
-    wMockHide: '隱藏',
+    wMockHide: '完成',
     wMockShow: '還原',
     wTitle5: '開始用 Due 吧',
     wBody5: '這幾個功能容易錯過，記得試試：',
@@ -296,8 +291,7 @@ const I18N = {
     confirmDeleteCustomNamed: '确定要删除「{name}」吗？',
     customDueInvalid: '截止日期无效，请检查年份（4 位数）',
     customSavedInCourse: '已保存到「{course}」',
-    customSavedInDone: '已保存到「{course}」的已完成区',
-    customSavedInHidden: '已保存到「{course}」的已隐藏区',
+    customSavedInArchive: '已保存到「{course}」的已隐藏区',
     customSavedPastWindow: '已保存到「{course}」：逾期超过 30 天，只在课程详情显示',
     languageLabel: '语言',
     langZhTw: '繁體中文',
@@ -312,12 +306,9 @@ const I18N = {
     overdueToday: '今天到期',
     overdueDaysLabel: '逾{n}天',
     overdueGroup: '已逾期',
-    hiddenItemsToggle: '已隐藏 {n} 项',
-    doneItemsToggle: '已完成 {n} 项',
-    doneItemsEmpty: '还没有已完成的作业（把作业拖到这里可标记完成）',
-    hiddenItemsEmpty: '目前没有隐藏项目（把作业拖到这里可隐藏）',
     dropToShow: '放开以加入作业清单',
-    dropToHide: '放开以隐藏',
+    archiveToggle: '已隐藏 {n} 项',
+    archiveEmpty: '目前没有隐藏项目（把作业拖到这里可标记完成）',
     dropToDone: '放开以标记完成',
     daysLater: '{n}天后',
     daysLaterOne: '{n}天后',
@@ -366,18 +357,17 @@ const I18N = {
     undoComplete: '撤销',
     a11yCompleted: '已完成「{name}」，1.5 秒内再按一次可撤销',
     a11yUndone: '已撤销',
-    a11yShowItem: '取消隐藏',
-    a11yHideItem: '移到已隐藏',
+    a11yShowItem: '移回作业清单',
+    a11yArchiveItem: '标记完成',
     a11yMovedToList: '「{name}」已移回作业清单',
-    a11yMovedToHidden: '「{name}」已移到已隐藏',
-    a11yMovedToDone: '「{name}」已移到已完成',
+    a11yMovedToDone: '「{name}」已标记完成',
     within7Days: '7天内',
     within30Days: '8-30天',
     beyond30Days: '30天以上',
     noTasks: '无待办事项',
-    weekDoneLabel: '近期完成',
+    weekDoneLabel: '当周待办',
     weekRingScope: '范围：30 天内的逾期＋未来 7 天到期',
-    weekAllDoneLabel: '全部完成',
+    weekAllDoneLabel: '当周无待办',
     editWeight: '编辑',
     weightEditTitle: '编辑评分权重',
     weightReset: '还原 Canvas 权重',
@@ -412,13 +402,13 @@ const I18N = {
     wStep3Li2: '找到 <strong>Due</strong>，点击旁边的<strong>固定图标</strong>',
     wStep3Li3: '工具栏出现 Due 图标后即完成',
     wTitle4: '拖拽整理作业清单',
-    wBody4: 'Due 会自动隐藏考试、签到<br>你也可以自己决定要藏谁、留谁',
-    wStep4Li1: '进入任一<strong>课程页</strong>，按住作业的 <strong>⠿</strong> 拖到底部「<strong>已隐藏</strong>」区即可隐藏；反之亦然',
+    wBody4: 'Due 会自动把考试、签到收到下方<br>做完的作业拖下去就算完成',
+    wStep4Li1: '进入任一<strong>课程页</strong>，按住作业的 <strong>⠿</strong> 拖到底部「<strong>已隐藏</strong>」区即可标记完成；拖回作业清单就变回未完成',
     wPinAlt: '固定 Due 到工具栏的步骤示意图',
     wMockTitle: 'Dashboard 概览',
     wMockCard1: '期中小组报告大纲',
     wMockExam: '考试',
-    wMockHide: '隐藏',
+    wMockHide: '完成',
     wMockShow: '还原',
     wTitle5: '开始用 Due 吧',
     wBody5: '这几个功能容易错过，记得试试：',
@@ -465,8 +455,7 @@ const I18N = {
     confirmDeleteCustomNamed: 'Delete "{name}"?',
     customDueInvalid: 'Invalid due date. Check the year (4 digits)',
     customSavedInCourse: 'Saved to {course}',
-    customSavedInDone: 'Saved to {course}, in its done items',
-    customSavedInHidden: 'Saved to {course}, in its hidden items',
+    customSavedInArchive: 'Saved to {course}, in its hidden items',
     customSavedPastWindow: 'Saved to {course}. Over 30 days overdue, so it only shows on the course page',
     languageLabel: 'Language',
     langZhTw: 'Traditional Chinese',
@@ -481,12 +470,9 @@ const I18N = {
     overdueToday: 'due today',
     overdueDaysLabel: '{n}d late',
     overdueGroup: 'Overdue',
-    hiddenItemsToggle: '{n} hidden',
-    doneItemsToggle: '{n} done',
-    doneItemsEmpty: 'Nothing done yet (drag items here to mark done)',
-    hiddenItemsEmpty: 'Nothing hidden (drag items here to hide)',
     dropToShow: 'Drop to add to list',
-    dropToHide: 'Drop to hide',
+    archiveToggle: '{n} hidden',
+    archiveEmpty: 'Nothing hidden (drag items here to mark done)',
     dropToDone: 'Drop to mark done',
     daysLater: '{n} days left',
     daysLaterOne: '{n} day left',
@@ -535,18 +521,17 @@ const I18N = {
     undoComplete: 'Undo',
     a11yCompleted: 'Completed “{name}”. Press again within 1.5 seconds to undo.',
     a11yUndone: 'Undone',
-    a11yShowItem: 'Unhide',
-    a11yHideItem: 'Move to hidden',
+    a11yShowItem: 'Move back to list',
+    a11yArchiveItem: 'Mark done',
     a11yMovedToList: '“{name}” moved back to the list',
-    a11yMovedToHidden: '“{name}” moved to hidden',
-    a11yMovedToDone: '“{name}” moved to done',
+    a11yMovedToDone: '“{name}” marked done',
     within7Days: 'Due ≤ 7d',
     within30Days: '8-30 days',
     beyond30Days: 'Later (30d+)',
     noTasks: 'No pending tasks',
-    weekDoneLabel: 'Near-term',
+    weekDoneLabel: 'This week',
     weekRingScope: 'Overdue within 30 days + due in the next 7 days',
-    weekAllDoneLabel: 'All done',
+    weekAllDoneLabel: 'Week cleared',
     editWeight: 'Edit',
     weightEditTitle: 'Edit Grade Weights',
     weightReset: 'Reset to Canvas weights',
@@ -581,13 +566,13 @@ const I18N = {
     wStep3Li2: 'Find <strong>Due</strong> and click the <strong>pin icon</strong> next to it',
     wStep3Li3: 'Done when the Due icon appears in your toolbar',
     wTitle4: 'Organize by dragging',
-    wBody4: 'Due auto-hides exams and attendance items<br>but you decide what stays hidden',
-    wStep4Li1: 'Open any <strong>course page</strong>, grab an assignment\'s <strong>⠿</strong> and drop it into <strong>Hidden</strong> to hide it, or drag it back to restore — it works both ways',
+    wBody4: 'Due tucks exams and attendance items away below<br>drag finished work down to mark it done',
+    wStep4Li1: 'Open any <strong>course page</strong>, grab an assignment\'s <strong>⠿</strong> and drop it into <strong>Hidden</strong> at the bottom to mark it done; drag it back to the list to undo',
     wPinAlt: 'How to pin Due to the toolbar',
     wMockTitle: 'Dashboard overview',
     wMockCard1: 'Group report outline',
     wMockExam: 'Exam',
-    wMockHide: 'Hide',
+    wMockHide: 'Done',
     wMockShow: 'Show',
     wTitle5: 'Start using Due',
     wBody5: 'A couple of features worth trying:',
@@ -652,7 +637,7 @@ function applyWelcomeTranslations() {
   setHTML('wstep-4-li1', 'wStep4Li1');
   // 第 4 頁拖曳示意圖（SVG）的文字
   const wdsHidden = document.getElementById('wds-hidden-label');
-  if (wdsHidden) wdsHidden.textContent = tr('hiddenItemsToggle').replace('{n}', 2);
+  if (wdsHidden) wdsHidden.textContent = tr('archiveToggle').replace('{n}', 2);
   setText('wds-exam', 'wMockExam');
   setSvgVerticalLabel(document.getElementById('wds-hide'), tr('wMockHide'));
   setSvgVerticalLabel(document.getElementById('wds-show'), tr('wMockShow'));
@@ -1564,7 +1549,7 @@ function afterCustomSaved(id, { savedScroll = null, refocus = [] } = {}) {
 }
 
 // 自訂作業在「目前畫面」看不到時，回傳說明它在哪的一句話；看得到 → ''（不打擾）
-// 判斷順序：在別門課（詳情頁）→ 被收進已隱藏區 → 已完成（詳情的「已完成」區，清單頁則看不到）→ 週待辦的 30 天逾期窗外
+// 判斷順序：在別門課（詳情頁）→ 被隱藏或已完成（詳情下方的「已隱藏」區，清單頁則看不到）→ 週待辦的 30 天逾期窗外
 function customPlacementNote(a) {
   if (!a) return '';
   const course = (_currentData.courses || []).find((c) => String(c.id) === String(a.course_id));
@@ -1572,8 +1557,7 @@ function customPlacementNote(a) {
   const say = (key) => tr(key).replace('{course}', () => (course ? getCourseName(course) : ''));
   const sameDetail = currentView === 'course' && String(currentCourseId) === String(a.course_id);
   if (currentView === 'course' && !sameDetail) return say('customSavedInCourse');
-  if (isHidden(a)) return sameDetail ? '' : say('customSavedInHidden');   // 同一門課的詳情：已隱藏區在畫面上
-  if (isDone(a)) return say('customSavedInDone');                         // 「已完成」區預設收著
+  if (isHidden(a) || isDone(a)) return say('customSavedInArchive');      // 下方「已隱藏」區預設收著
   if (sameDetail) return '';
   const pastWindow = DueTaskRules.urgency(a.due_at) === 'overdue' && !DueTaskRules.isWithinOverdueWindow(a.due_at);
   if (currentPage === 'week' && pastWindow) return say('customSavedPastWindow');
@@ -1704,7 +1688,7 @@ function deleteCustomAssignment(courseId, assignmentId) {
 function detailFlipKeyed(root) {
   const out = new Map();
   if (!root) return out;
-  root.querySelectorAll('.detail-right-panel > .grade-calc, .detail-assignments-label, .detail-assignments-list .assignment-item, .done-items, .done-items .assignment-item, .hidden-items')
+  root.querySelectorAll('.detail-right-panel > .grade-calc, .detail-assignments-label, .detail-assignments-list .assignment-item, .archive-items, .archive-items .assignment-item')
     .forEach((el) => {
       const key = el.classList.contains('assignment-item') ? `row:${el.dataset.hideableId}` : el.className.split(' ')[0];
       out.set(key, el);
@@ -1932,6 +1916,7 @@ function renderNav(courses, assignments) {
 
   if (!courses.length) {
     navEl.innerHTML = '';
+    _courseNavIndAt = null;
     return;
   }
 
@@ -1951,11 +1936,51 @@ function renderNav(courses, assignments) {
   navEl.innerHTML = sorted.map((c) => navCourseItemHtml(c, assignments)).join('');
   navEl.querySelectorAll('.nav-course-item').forEach(bindNavCourseItem);
   syncNavNameTitles(navEl);
+  placeCourseNavIndicator(navEl);
 
   if (focusedCourse) {
     const again = navEl.querySelector(`.nav-course-item[data-target-course="${focusedCourse}"]`);
     if (again) again.focus({ preventScroll: true });
   }
+}
+
+// 側欄課程列的滑動底色（同主導航 #47 的 indicator recipe）：換課時滑過去；沒有 active 項（回到清單）原地淡出，
+// 回來時在新位置原地淡入；載入後第一次直接到位。renderNav 每次整段重建課程列，indicator 節點跨重建保留、放回最前面——
+// 重新插入的節點沒有「前一個」樣式可過渡，所以先不經過渡寫回上一次的樣子、forced reflow，再寫新的（不用 rAF）
+let _courseNavInd = null;
+let _courseNavIndAt = null;      // 上次畫的位置 { y, h }；null＝沒有 active 項（已淡出）
+let _courseNavIndPlaced = false;
+function placeCourseNavIndicator(navEl) {
+  if (!_courseNavInd) {
+    _courseNavInd = document.createElement('div');
+    _courseNavInd.className = 'course-nav-indicator is-off';
+    _courseNavInd.setAttribute('aria-hidden', 'true');
+  }
+  const ind = _courseNavInd;
+  navEl.prepend(ind);
+  navEl.classList.add('has-indicator');
+  const first = !_courseNavIndPlaced;
+  _courseNavIndPlaced = true;
+  const prev = _courseNavIndAt;
+  const setAt = ({ y, h }) => {
+    ind.style.setProperty('--y', `${y}px`);
+    ind.style.setProperty('--h', `${h}px`);
+  };
+  ind.style.transition = 'none';
+  if (prev) { setAt(prev); ind.classList.remove('is-off'); } else ind.classList.add('is-off');
+  const act = navEl.querySelector('.nav-course-item.active');
+  const next = act ? { y: act.offsetTop, h: act.offsetHeight } : null;
+  if (next && (!prev || first)) setAt(next);         // 從沒有 active 來：在新位置原地淡入（不從舊位置滑來）
+  if (next && first) ind.classList.remove('is-off'); // 載入：直接出現
+  ind.getBoundingClientRect();                        // forced reflow：上一次的樣子（或新位置）先落定
+  ind.style.transition = '';
+  if (!next) {
+    ind.classList.add('is-off');                      // 原地淡出
+  } else {
+    setAt(next);                                      // 換課：從上一次的位置滑過去
+    ind.classList.remove('is-off');
+  }
+  _courseNavIndAt = next;
 }
 
 // 側欄課名被省略號截斷 → 整顆按鈕給 title 看全名（沒截斷不加，免得多一層重複提示，QA #135）
@@ -2164,6 +2189,15 @@ let _prevRingDone = null;
 // 進度環 SVG 幾何：158 外徑、20 線寬 → 半徑 69，全周長 2πr
 const RING_R = 69;
 const RING_C = 2 * Math.PI * RING_R;
+const RING_W = 20;   // 弧的線寬（index.html .wk-ring-bar 的 stroke-width，改一邊要改另一邊）
+
+// 進度 → stroke-dashoffset。圓帽讓弧的兩端各多出半個線寬：弧長若照「進度 × 周長」畫，約 95% 時頭就碰到尾巴，
+// 看起來已經合攏，剩下的動畫（剛好是 0.8s 曲線最慢的尾段）都藏在圓帽底下，像卡在接合處。
+// 改成「進度 ×（周長 − 線寬）」：100% 時兩端剛好在 12 點鐘碰上，之後換成實心圓（.is-full）；0 時不畫
+function ringOffset(done, total) {
+  const p = total > 0 ? done / total : 0;
+  return p > 0 ? RING_C - (RING_C - RING_W) * p : RING_C;
+}
 
 // ── 進度環「落點迸發」慶祝（見 spec 2026-07-23 後記）──
 // 只在最後一項近期作業落地（撤銷窗結束、離開清單）、弧合攏的瞬間觸發（updateWeekRing）；
@@ -2276,13 +2310,12 @@ function renderWeekSection(courses, assignments) {
 
   // 「本週概覽」進度環：範圍＝逾期窗 ∪ 未來 7 天（近期可行動集），現算完成/總數（含已完成項）
   const { nearDone, nearTotal } = computeNearProgress(courses, assignments);
-  const donePct = nearTotal > 0 ? (nearDone / nearTotal) * 100 : 0;
-  const targetOffset = RING_C * (1 - donePct / 100);
+  const targetOffset = ringOffset(nearDone, nearTotal);
   // 讀取畫面上舊弧的目前 offset 當動畫起點（可正確接續被打斷的動畫）；無舊節點（首次掛載）直接用目標值不做動畫
   const _prevBar = document.querySelector('.wk-ring-bar');
   const _prevParsed = _prevBar ? parseFloat(getComputedStyle(_prevBar).strokeDashoffset) : NaN;
   const prevOffset = Number.isFinite(_prevParsed) ? _prevParsed : targetOffset;
-  // 環的範圍不是「本週」：逾期窗（30 天）∪ 未來 7 天 → 標「近期完成」，範圍寫進 aria-label 與 title（QA #14）
+  // 環的範圍＝逾期窗（30 天）∪ 未來 7 天；字樣依 owner 決定（2026-10-26）寫「當週待辦」，完整範圍寫進 aria-label 與 title（QA #14）
   const ringAria = `${tr('weekDoneLabel')} ${nearDone}/${nearTotal} · ${tr('weekRingScope')}`;
   // 分子變動時給數字一個微上滑 tick（與弧的過渡同曲線）；首次渲染不 tick
   const fracTick = _prevRingDone !== null && _prevRingDone !== nearDone;
@@ -2357,6 +2390,8 @@ function renderWeekSection(courses, assignments) {
   if (_barEl) {
     _barEl.getBoundingClientRect();   // forced reflow：提交起點樣式
     _barEl.style.strokeDashoffset = `${targetOffset}`;
+    // 全部完成：弧停在兩端相碰的位置後換成實心圓（沒有 dash 接縫）
+    if (nearTotal > 0 && nearDone === nearTotal) whenRingLands(_barEl, prevOffset, targetOffset, () => _barEl.classList.add('is-full'));
   }
 
   // 「全部完成」慶祝不在整段重繪裡判斷：只在最後一項近期作業落地時由 updateWeekRing 依「上次顯示的分子 → 這次」的
@@ -2620,27 +2655,16 @@ function setMorphName(el, name) {
   if (el && !reduceMotion()) el.style.viewTransitionName = name;
 }
 
-// 卡片端命名（開詳情的 FIRST、回清單的 LAST 共用）。
-// 課程卡：外框＋課號／課名／badge／meta 各自對到詳情的同一個東西。
-// 週卡（#17）：卡片本身＝course-shell，課名 .week-task-course＝course-name（課名對課名）；
-// 作業名不命名，跟著 course-shell 快照一起 crossfade；週卡沒有課號／badge／meta，詳情那幾個只有 new 端，自然淡入
+// 卡片端命名（開詳情的 FIRST、回清單的 LAST 共用）：只命名外框 course-shell。
+// 課名、課號、badge、件數不再各自命名（#16）：文字快照是點陣圖，從卡片的 17px 放大到詳情的 26px 一路都是被放大的圖，
+// 邊縮放邊交叉淡換看起來卡、糊。改成外框長大、裡面舊內容原地淡出、新內容原地淡入，文字全程不縮放
 function nameCardForMorph(cardEl) {
-  const isWeek = cardEl.classList.contains('week-task-card');
   setMorphName(cardEl, 'course-shell');
-  setMorphName(cardEl.querySelector(isWeek ? '.week-task-course' : '.card-name'), 'course-name');
-  if (isWeek) return;
-  setMorphName(cardEl.querySelector('.card-code'), 'course-code');
-  setMorphName(cardEl.querySelector('.card-badge-urgent'), 'course-badge');
-  setMorphName(cardEl.querySelector('.card-meta'), 'course-meta');
 }
 
 // 詳情端命名（開詳情的 LAST、回清單的 FIRST 共用）
 function nameDetailForMorph(container) {
   setMorphName(container.querySelector('.course-detail-view'), 'course-shell');
-  setMorphName(container.querySelector('.detail-code'), 'course-code');
-  setMorphName(container.querySelector('.detail-name'), 'course-name');
-  setMorphName(container.querySelector('.card-badge-urgent'), 'course-badge');
-  setMorphName(container.querySelector('.detail-meta'), 'course-meta');
 }
 
 // ── 卡片 ↔ 詳情 morph 的啟動與清理（#42）──
@@ -2660,10 +2684,32 @@ function clearMorphNames() {
 function clearStaleMorphNames() {
   clearMorphNames();
 }
+// 外框的長相（框線色、陰影、底色）：轉場中由 group 畫，從出發那一端（hover 中的卡片是橘框＋陰影）連續變到抵達那一端，
+// 不會在舊快照淡出時框線消失、到最後真的詳情出現才突然冒出來。時長／曲線與 index.html 的 ::view-transition-group(course-shell) 同步
+const MORPH_SHELL = { duration: 360, easing: 'cubic-bezier(0.32, 0.72, 0, 1)' };
+function morphShellEl() {
+  return [...document.querySelectorAll('[style*="view-transition-name"]')]
+    .find((el) => el.style.viewTransitionName === 'course-shell') || null;
+}
+function morphShellLook(el) {
+  if (!el) return null;
+  const cs = getComputedStyle(el);
+  const shadow = cs.boxShadow && cs.boxShadow !== 'none' ? cs.boxShadow : '0 0 0 0 rgba(0, 0, 0, 0)';
+  return { boxShadow: `0 0 0 1px ${cs.borderTopColor}, ${shadow}`, backgroundColor: cs.backgroundColor };
+}
+
 function startMorph(update) {
+  const from = morphShellLook(morphShellEl());   // 命名（FIRST）已在呼叫前完成
   const t = document.startViewTransition(update);
   _morph = t;
-  t.ready.catch(() => {});   // 被下一段 skip 時 ready 會 reject（AbortError），屬預期，不要變成未處理的 rejection
+  t.ready.then(() => {
+    const to = morphShellLook(morphShellEl());
+    if (!from || !to) return;
+    const look = document.documentElement.animate([from, to], {
+      ...MORPH_SHELL, fill: 'both', pseudoElement: '::view-transition-group(course-shell)',
+    });
+    t.finished.finally(() => look.cancel());   // 偽元素隨轉場消失，fill 住的動畫不留著
+  }).catch(() => {});   // 被下一段 skip 時 ready 會 reject（AbortError），屬預期，不要變成未處理的 rejection
   const cleanup = () => {
     if (_morph !== t) return;   // 已被下一段接手，名字交給它管
     _morph = null;
@@ -3153,14 +3199,14 @@ function finishComplete(item, id, cid) {
   // leaf：捲動容器裡的每一塊（捲到底時移除會讓 scrollTop 被夾小，上方的成績計算器、標題——窄版面連圓餅欄——
   // 也跟著位移，一起滑）
   const first = flipSnapshot(view.querySelectorAll(
-    '.detail-left-panel, .detail-right-panel > .grade-calc, .detail-assignments-label, .assignment-item, .assignment-desc.open, .done-items, .hidden-items'),
+    '.detail-left-panel, .detail-right-panel > .grade-calc, .detail-assignments-label, .assignment-item, .assignment-desc.open, .archive-items'),
   leaving);
   exitInPlace(leaving, scroller);
   if (desc && !leaving.includes(desc)) desc.remove();
 
-  // ④ 就地更新：空清單提示、「已完成」區（計數＋這一項）、header 待辦數／緊急 badge、側欄
+  // ④ 就地更新：空清單提示、下方「已隱藏」區（計數＋這一項）、header 待辦數／緊急 badge、側欄
   if (!list.querySelector('.assignment-item')) list.insertAdjacentHTML('beforeend', detailListEmptyHtml());
-  refreshDoneSection(view, cid);
+  refreshArchiveSection(view, cid);
   if (scroller && scroller.scrollTop !== scrollTop) scroller.scrollTop = scrollTop;
   updateDetailHeader(view, cid);
   updateSideNav();
@@ -3271,8 +3317,10 @@ function updateWeekRing() {
   const bar = ring && ring.querySelector('.wk-ring-bar');
   if (!bar) return;
   const { nearDone, nearTotal } = computeNearProgress(_currentData.courses || [], _currentData.assignments || {});
-  const target = RING_C * (1 - (nearTotal > 0 ? nearDone / nearTotal : 0));
+  const target = ringOffset(nearDone, nearTotal);
   const prevOffset = parseFloat(getComputedStyle(bar).strokeDashoffset);
+  const allDone = nearTotal > 0 && nearDone === nearTotal;
+  if (!allDone) bar.classList.remove('is-full');   // 回到 dash：停在兩端相碰的位置，與實心圓幾乎同形，再往回縮
   bar.style.strokeDashoffset = `${target}`;
   const prevDone = _prevRingDone;
   _prevRingDone = nearDone;
@@ -3286,11 +3334,16 @@ function updateWeekRing() {
     b.getBoundingClientRect();   // forced reflow：重播 tick（不用 rAF）
     b.classList.add('tick');
   }
-  const allDone = nearTotal > 0 && nearDone === nearTotal;
   const cap = ring.querySelector('.wk-ring-cap');
-  if (allDone && prevDone !== null && prevDone < nearTotal) {
-    whenRingLands(bar, prevOffset, target, () => celebrateRingArrival(ring));   // cap 由慶祝換字
-  } else if (cap && !(allDone && prevDone === nearTotal)) {
+  const celebrating = allDone && prevDone !== null && prevDone < nearTotal;
+  if (allDone) {
+    // 弧兩端相碰後換成實心圓（沒有 dash 接縫）；剛全部完成的那一次同時慶祝（cap 由慶祝換字）
+    whenRingLands(bar, prevOffset, target, () => {
+      bar.classList.add('is-full');
+      if (celebrating) celebrateRingArrival(ring);
+    });
+  }
+  if (!celebrating && cap && !(allDone && prevDone === nearTotal)) {
     // 已經全部完成時（之後落地的是非近期卡）不碰 cap：它要嘛已是「全部完成」，要嘛正等弧落地的慶祝換字淡入，
     // 這裡先換會讓「全部完成」在弧合攏前就出現、慶祝時再閃一次
     cap.textContent = tr(allDone ? 'weekAllDoneLabel' : 'weekDoneLabel');
@@ -3545,11 +3598,9 @@ function renderCourseDetailSection(course, asgns, groups, scores) {
   const weightPieHtml = renderWeightPie(groups, course.id);
   const gradeCalcHtml = renderGradeCalculator(course, asgns, groups, scores);
   const assignmentRows = filtered.map((a) => renderAssignmentRow(a, groups, course.id)).join('');
-  // 作業清單下方兩個收合區（spec 2026-10-25-drop-submitted-filter）：每個作業只在一個地方——已隱藏 → 已完成 → 待辦。
-  // 兩區只要該課有作業就恆存在（三區互為拖曳放置目標）
-  const doneHtml = asgns.length ? renderDoneItemsSection(doneItemsOf(asgns), groups, course.id) : '';
-  const hiddenItems = asgns.filter((a) => isHidden(a));
-  const hiddenHtml = asgns.length ? renderHiddenItemsSection(hiddenItems, groups, course.id) : '';
+  // 作業清單下方的「已隱藏」區（spec 2026-10-25-drop-submitted-filter）：每個作業只在一個地方——
+  // 被隱藏或已完成 → 下方區，其餘 → 作業清單。只要該課有作業就恆存在（兩區互為拖曳放置目標）
+  const archiveHtml = asgns.length ? renderArchiveSection(archiveItemsOf(asgns), groups, course.id) : '';
 
   el.innerHTML = `
     <div class="course-detail-view">
@@ -3574,8 +3625,7 @@ function renderCourseDetailSection(course, asgns, groups, scores) {
           <div class="detail-assignments-list" data-course-id="${course.id}" data-drophint="${esc(tr('dropToShow'))}">
             ${assignmentRows || detailListEmptyHtml()}
           </div>
-          ${doneHtml}
-          ${hiddenHtml}
+          ${archiveHtml}
         </div>
       </div>
     </div>`;
@@ -3729,15 +3779,15 @@ let _dragCtx = null;                 // 進行中的拖曳（全域僅允許一�
 
 const DRAG_LIFT_PX = 4;              // 移動超過此距離才視為拖曳（否則當一般點擊）
 const DRAG_SETTLE_MS = MOTION.reflow.duration;   // 落點／返回飛行時長（--reflow，#39）
+const DRAG_ABSORB_SCALE = 0.6;                    // 落進收著的區：clone 飛向標題時縮到的比例
 const DRAG_EDGE_ZONE = 56;           // 距捲動容器上下緣此距離內自動捲動
 const DRAG_EDGE_SPEED = 14;          // 自動捲動每 frame 最大位移
 
-// el：整個詳情（找放置目標與捲動容器）；scope：要綁握把的範圍（「已完成」區就地重畫時只綁新列）
+// el：整個詳情（找放置目標與捲動容器）；scope：要綁握把的範圍（下方收合區就地重畫時只綁新列）
 function setupHideablePromoteDrag(el, scope = el) {
   const zones = {
     list: el.querySelector('.detail-assignments-list'),
-    done: el.querySelector('.done-items'),
-    hidden: el.querySelector('.hidden-items'),
+    archive: el.querySelector('.archive-items'),
     scroller: el.querySelector('.detail-right-panel'),
   };
   scope.querySelectorAll('[data-drag]').forEach((row) => {
@@ -3766,14 +3816,12 @@ function setupHideablePromoteDrag(el, scope = el) {
 // 鍵盤移動（#6）：和 trackDragFrom 同形狀的 ctx（已拿起、已在目標上），clone 從原列原地起飛，飛進重繪後的落點、落地閃一下——
 // 動效與滑鼠拖曳相同（A2）。這個 ctx 不指派給 _dragCtx、也不掛 window 監聽：commitDrag 裡的重繪會跑 abortActiveDrag()，
 // 若掛在 _dragCtx 上，clone 會在 settleClone 之前就被刪掉
-// 鍵盤只做「隱藏 ↔ 取消隱藏」，不改完成狀態：作業清單／已完成的列 → 已隱藏；
-// 已隱藏的列 → 依完成狀態回到作業清單或已完成（標完成／未完成走勾選圈）
+// 鍵盤與滑鼠同一套：作業清單的列 → 下方區（標完成）；下方區的列 → 作業清單（取消隱藏＋標回未完成）
 function keyboardMove(row, zones) {
   if (_dragCtx) return;                                          // 滑鼠拖曳進行中
   if (row.classList.contains('completing') || row.classList.contains('bursting')) return;
   const source = dragSourceOf(row);
-  const item = findAssignment(row.dataset.hideableId, currentCourseId);
-  const to = source !== 'hidden' ? 'hidden' : (item && isDone(item) ? 'done' : 'list');
+  const to = source === 'archive' ? 'list' : 'archive';
   if (!zones[to]) return;
   const ctx = {
     row, source, zones, targets: dragTargets(zones, source),
@@ -3786,16 +3834,14 @@ function keyboardMove(row, zones) {
   commitDrag(ctx, { viaKeyboard: true });
 }
 
-// 三區互拖（spec 2026-10-25-drop-submitted-filter）：列所在的區是來源，另外兩區都是放置目標——
-// 放到作業清單＝取消隱藏＋標回未完成；放到已完成＝取消隱藏＋標完成；放到已隱藏＝隱藏（完成狀態不動）
+// 兩區互拖（spec 2026-10-25-drop-submitted-filter）：作業清單 ↔ 下方「已隱藏」區。
+// 放到下方區＝標完成（隱藏狀態不動）；放回作業清單＝取消隱藏＋標回未完成
 function dragSourceOf(row) {
-  if (row.closest('.hidden-items')) return 'hidden';
-  if (row.closest('.done-items')) return 'done';
-  return 'list';
+  return row.closest('.archive-items') ? 'archive' : 'list';
 }
 
 function dragTargets(zones, source) {
-  return ['list', 'done', 'hidden'].filter((k) => k !== source && zones[k]).map((k) => ({ key: k, el: zones[k] }));
+  return ['list', 'archive'].filter((k) => k !== source && zones[k]).map((k) => ({ key: k, el: zones[k] }));
 }
 
 function trackDragFrom(e, row, zones) {
@@ -3934,77 +3980,125 @@ function endDrag(ctx, cancelled) {
   document.body.classList.remove('drag-active');
   if (!ctx.lifted) return;                        // 未達閾值＝點擊，無事發生
 
+  // 拿掉 .drop-active 會讓收合區的放置框縮回去、下面的東西跟著移動 → 先量（FLIP），落定後再滑過去
+  const first = dragFlipSnapshot(ctx);
   ctx.targets.forEach(({ el }) => el.classList.remove('drop-active', 'drop-hover'));
   // 放置目標已不在畫面（重繪／導覽離開但沒被 abort 到）或已換課 → 當取消，不寫入（QA #198）
   const target = ctx.targets.find((t) => t.key === ctx.over);
   const stillHere = !!target && target.el.isConnected && currentView === 'course' && currentCourseId === ctx.courseId;
   if (!cancelled && ctx.over && stillHere) {
-    commitDrag(ctx);
+    commitDrag(ctx, { first });
   } else {
+    // 先量返回的落點（最終位置）再播 FLIP：父層滑動中的列與 clone 在終點會合
     settleClone(ctx, ctx.row, { flash: false, after: () => {
       ctx.row.classList.remove('drag-source');
     } });
+    detailFlipPlay(first);
   }
+}
+
+// 放開前的詳情各塊位置（作業列、標題、成績計算器、兩個收合區）；被移動的那一列不算——它由 clone 飛過去接手
+function dragFlipSnapshot(ctx) {
+  const first = detailFlipSnapshot();
+  first.delete(`row:${ctx.id}`);
+  return first;
 }
 
 // 命中：依放到哪一區寫入隱藏／完成狀態（同步重繪詳情＋側欄）→ clone 飛入重繪後的實際落點
 // 焦點：鍵盤移動、或焦點本來就在被移動的那一列（例如先 Tab 到這一列、再用滑鼠拖；pointerdown 有 preventDefault，
 // 單純滑鼠按握把不會把焦點給它），重繪會把它拆掉 → 交給落地那一列的握把，並播報結果（#6）
-function commitDrag(ctx, { viaKeyboard = false } = {}) {
+// first：放開前的位置（dragFlipSnapshot）；重繪後其餘列、收合區從原位滑到新位置，不硬跳
+function commitDrag(ctx, { viaKeyboard = false, first = dragFlipSnapshot(ctx) } = {}) {
   const to = ctx.over;
   const savedScroll = ctx.zones.scroller ? ctx.zones.scroller.scrollTop : 0;
-  const hiddenWasOpen = !!(ctx.zones.hidden && ctx.zones.hidden.classList.contains('open'));
-  const doneWasOpen = !!(ctx.zones.done && ctx.zones.done.classList.contains('open'));
+  const archiveWasOpen = !!(ctx.zones.archive && ctx.zones.archive.classList.contains('open'));
   const keepFocus = viaKeyboard || ctx.row.contains(document.activeElement);
   const item = ((_currentData.assignments || {})[ctx.courseId] || []).find((x) => String(x.id) === String(ctx.id));
-  const name = item ? item.name : (ctx.row.querySelector('.assignment-title, .hidden-item-title')?.textContent || '').trim();
+  const name = item ? item.name : (ctx.row.querySelector('.assignment-title')?.textContent || '').trim();
   // 寫入綁定拖曳開始時的課程（ctx.courseId，QA #205）；兩種寫入都先不重繪，最後重繪一次
-  if (item) {
-    const makeHidden = to === 'hidden';
-    if (isHidden(item) !== makeHidden) setItemHiddenByDrag(ctx.id, makeHidden, ctx.courseId, { rerender: false });
-    if (to === 'done' && !isDone(item)) setCompletion(ctx.id, ctx.courseId, true);
-    if (to === 'list' && isDone(item)) setCompletion(ctx.id, ctx.courseId, false);
+  if (item && to === 'archive' && !isDone(item)) setCompletion(ctx.id, ctx.courseId, true);
+  if (item && to === 'list') {
+    if (isHidden(item)) setItemHiddenByDrag(ctx.id, false, ctx.courseId, { rerender: false });
+    if (isDone(item)) setCompletion(ctx.id, ctx.courseId, false);
   }
   rerenderDetailAndNav(ctx.courseId);
 
   const container = document.getElementById('course-detail-container');
   const scroller = container.querySelector('.detail-right-panel');
   // 落點以寫入後的實際狀態為準（拖曳期間考試可能剛結束，QA #178）
-  const lands = !item ? null : isHidden(item) ? 'hidden' : isDone(item) ? 'done' : 'list';
-  // 收合區開合：落點那一區強制展開（讓使用者看到落點），其餘維持拖曳前狀態。
-  // 新節點直接到位、不重播展開（instant）：重繪前畫面上它本來就開著（拖曳前開著，或拖曳中 .drop-active 已把它展開）；
-  // 鍵盤移動、原本收著的情況也直接打開——落點列要在這一幀就有最終位置，scrollIntoView 與 clone 的飛行才量得對
-  // （高度還在 0 時，清單裡的列被 overflow:clip 裁掉、不算進捲動範圍，捲不到落點）
-  const hidden = container.querySelector('.hidden-items');
-  if (hidden && (hiddenWasOpen || lands === 'hidden')) setFoldOpen(hidden, true, { instant: true });
-  const doneZone = container.querySelector('.done-items');
-  if (doneZone && (doneWasOpen || lands === 'done')) setFoldOpen(doneZone, true, { instant: true });
+  const lands = !item ? null : (isHidden(item) || isDone(item)) ? 'archive' : 'list';
+  // 下方區維持拖曳前的開合（拖曳中、落地後都不自動展開：項目很多時展開一長串很亂）。
+  // 重繪後的新節點從 height 0 起算 → 本來開著的以 instant 還原，不重播展開
+  const archive = container.querySelector('.archive-items');
+  if (archive && archiveWasOpen) setFoldOpen(archive, true, { instant: true });
   // 重繪會重置捲動位置 → 還原；在展開之後：先還原的話，收著的新清單會把 scrollTop 夾小
   if (scroller) scroller.scrollTop = savedScroll;
 
   const cssId = (window.CSS && CSS.escape) ? CSS.escape(String(ctx.id)) : String(ctx.id);
-  let landed = null;
-  if (lands === 'hidden') {
-    landed = container.querySelector(`.hidden-item-row[data-hideable-id="${cssId}"]`);
-  } else if (lands) {
-    const chk = container.querySelector(`${lands === 'done' ? '.done-items' : '.detail-assignments-list'} .assignment-check[data-assignment-id="${cssId}"]`);
-    landed = chk && chk.closest('.assignment-item');
+  const chk = lands && container.querySelector(`${lands === 'archive' ? '.archive-items' : '.detail-assignments-list'} .assignment-check[data-assignment-id="${cssId}"]`);
+  const landed = chk ? chk.closest('.assignment-item') : null;
+  // 落進收著的區：列看不到 → clone 原地淡出，改閃那一區的標題（計數已更新），焦點交給標題（收著的列 visibility:hidden，聚焦不上）
+  const fold = landed && landed.closest('.detail-fold');
+  const collapsed = !!fold && !fold.classList.contains('open');
+  if (keepFocus) {
+    if (collapsed) fold.querySelector('.fold-toggle').focus({ preventScroll: true });
+    else focusAfterMove(container, landed, lands || to);
   }
-  if (keepFocus) focusAfterMove(container, landed, lands || to);
-  const said = { list: 'a11yMovedToList', done: 'a11yMovedToDone', hidden: 'a11yMovedToHidden' }[lands || to];
+  const said = { list: 'a11yMovedToList', archive: 'a11yMovedToDone' }[lands || to];
   announce(tr(said).replace('{name}', name));
-  settleClone(ctx, landed, { flash: true });
+  // 先量落點（最終位置）再播 FLIP：父層還在滑的列與 clone 在終點會合
+  if (collapsed) {
+    absorbClone(ctx, fold.querySelector('.fold-toggle'), () => flashFoldHead(fold));
+  } else {
+    settleClone(ctx, landed, { flash: true });
+  }
+  detailFlipPlay(first);
   emitDueAction('drag', { to: lands || to });
 }
 
+// 落進收著的區：clone 飛向那一區的標題、同時縮小淡出（被「收進去」），到了標題才閃。
+// 標題的位置在 FLIP 之前量（最終位置）。減少動態：不飛、不縮，原地淡出
+function absorbClone(ctx, head, after) {
+  const clone = ctx.clone;
+  let fly = false;
+  if (head && !reduceMotion()) {
+    head.scrollIntoView({ block: 'nearest' });
+    const to = head.getBoundingClientRect();
+    if (to.width || to.height) {
+      fly = true;
+      clone.style.transformOrigin = 'left center';
+      clone.style.transition = cssTransition('transform', MOTION.reflow);
+      const dy = (to.top + to.height / 2) - (ctx.base.top + ctx.base.height / 2);
+      clone.style.transform = `translate(${to.left - ctx.base.left}px, ${dy}px) scale(${DRAG_ABSORB_SCALE})`;
+    }
+  }
+  const delay = fly ? DRAG_CROSSFADE_DELAY_MS : 0;
+  clone.animate([{ opacity: 1 }, { opacity: 0 }],
+    { duration: MOTION.fade.duration, delay, easing: MOTION.fade.easing, fill: 'forwards' });
+  setTimeout(() => {
+    clone.remove();
+    if (after) after();
+  }, Math.max(fly ? DRAG_SETTLE_MS : 0, delay + MOTION.fade.duration) + 30);
+}
+
+// 落點在收著的區：那一區的標題閃一下（同 drag-arrived 的淡橘），看得出東西放進去了
+function flashFoldHead(fold) {
+  const head = fold.querySelector('.fold-toggle');
+  if (!head) return;
+  head.classList.remove('drag-arrived');
+  head.getBoundingClientRect();   // forced reflow：連續放進同一區時重播閃示
+  head.classList.add('drag-arrived');
+  setTimeout(() => head.classList.remove('drag-arrived'), 900);
+}
+
 // 移動後的焦點落點：落地列的握把 → 同區最近一列有握把的（找不到落地列時，QA #178）→ 該區的標題／開關
-const ZONE_LIST_SEL = { list: '.detail-assignments-list', done: '.done-items .fold-list', hidden: '.hidden-items .fold-list' };
-const ZONE_HEAD_SEL = { list: '.detail-assignments-label', done: '.done-items .fold-toggle', hidden: '.hidden-items .fold-toggle' };
+const ZONE_LIST_SEL = { list: '.detail-assignments-list', archive: '.archive-items .fold-list' };
+const ZONE_HEAD_SEL = { list: '.detail-assignments-label', archive: '.archive-items .fold-toggle' };
 function focusAfterMove(container, landed, zoneKey) {
   const zone = (landed && landed.closest('.detail-assignments-list, .fold-list')) || container.querySelector(ZONE_LIST_SEL[zoneKey]);
   let to = landed && landed.querySelector('.drag-grip');
   if (!to && zone) {
-    const rows = [...zone.querySelectorAll('.assignment-item, .hidden-item-row')];
+    const rows = [...zone.querySelectorAll('.assignment-item')];
     const i = landed ? rows.indexOf(landed) : -1;
     const near = i >= 0
       ? [...rows.slice(i + 1), ...rows.slice(0, i).reverse()]
@@ -4083,7 +4177,7 @@ function abortActiveDrag() {
 
 // 「已完成」「已隱藏」區開合（按鈕點擊與拖曳／鍵盤移動後強制展開共用）：切 .open 並同步開關的 aria-expanded——
 // 鍵盤使用者要靠它知道裡面的列現在 Tab 得到（#6）。
-// instant：重繪後還原「畫面上本來就開著」的清單（拖曳中 .drop-active 已把它展開、或拖曳前就開著）——
+// instant：重繪後還原「畫面上本來就開著」的清單（拖曳前就開著、即時刷新前開著）——
 // 新節點從 height 0 起算，不跳過過渡的話整段清單會在落點前重新長一次，落點也會量在展開途中（#28／#41）
 function setFoldOpen(wrap, open, { instant = false } = {}) {
   const list = instant ? wrap.querySelector('.fold-list') : null;
@@ -4100,7 +4194,7 @@ function setFoldOpen(wrap, open, { instant = false } = {}) {
   if (btn) btn.setAttribute('aria-expanded', String(open));
 }
 
-// 展開面板的 chevron（已完成／已隱藏清單、成績計算器共用，#28）
+// 展開面板的 chevron（已隱藏清單、成績計算器共用，#28）
 const DISCLOSURE_CHEVRON = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>';
 
 // 截止日排序：升冪（最近要交的在前）或降冪（最近截止的在前）；無截止一律殿後
@@ -4124,93 +4218,54 @@ function foldSectionHtml({ cls, courseId, label, listId, inner, attrs = '' }) {
     </div>`;
 }
 
-// ── 「已完成」區：沒隱藏、已落地完成的項目（撤銷窗內的還在作業清單上）──
-// 與作業清單同一種列（勾選圈可標回未完成、描述、名稱連結、握把可拖到另外兩區）；最近截止的在上。
-// 也是放置目標（data-drophint）：拖進來＝標完成，所以沒有項目時照樣畫、顯示空狀態
-function doneItemsOf(asgns) {
-  return sortByDue(asgns.filter((a) => !isHidden(a) && isDoneLanded(a)), { recentFirst: true });
+// ── 下方「已隱藏」區（spec 2026-10-25-drop-submitted-filter）──
+// 已落地完成的（撤銷窗內的還在作業清單上）＋被隱藏的（自動隱藏的考試・簽到、手動隱藏的作業），合成一區。
+// 順序：作業 → 考試 → 簽到；同一類裡未完成的在前（截止升冪），已完成的在後（最近截止在前、內容淡化）。
+// 列與作業清單同一種（勾選圈、描述、名稱連結、握把可拖回清單、自訂作業編輯／刪除）；不顯示任何分數（決策 3）。
+// 也是放置目標：拖進來＝標完成，所以沒有項目時照樣畫、顯示空狀態
+const ARCHIVE_KIND_ORDER = ['assignment', 'exam', 'attendance'];
+function archiveKindOf(a) {
+  if (isExam(a)) return 'exam';
+  if (isAttendance(a)) return 'attendance';
+  return 'assignment';
 }
 
-function renderDoneItemsSection(items, groups, courseId) {
+function archiveItemsOf(asgns) {
+  const items = asgns.filter((a) => isHidden(a) || isDoneLanded(a));
+  return ARCHIVE_KIND_ORDER.flatMap((kind) => {
+    const ofKind = items.filter((a) => archiveKindOf(a) === kind);
+    return [
+      ...sortByDue(ofKind.filter((a) => !isDoneLanded(a))),
+      ...sortByDue(ofKind.filter((a) => isDoneLanded(a)), { recentFirst: true }),
+    ];
+  });
+}
+
+function renderArchiveSection(items, groups, courseId) {
   return foldSectionHtml({
-    cls: 'done-items',
+    cls: 'archive-items',
     courseId,
-    label: tr('doneItemsToggle').replace('{n}', items.length),
-    listId: `done-list-${courseId}`,
-    inner: items.map((a) => renderAssignmentRow(a, groups, courseId)).join('')
-      || `<div class="fold-empty">${esc(tr('doneItemsEmpty'))}</div>`,
+    label: tr('archiveToggle').replace('{n}', items.length),
+    listId: `archive-list-${courseId}`,
+    inner: items.map((a) => renderAssignmentRow(a, groups, courseId, { inArchive: true })).join('')
+      || `<div class="fold-empty">${esc(tr('archiveEmpty'))}</div>`,
     attrs: ` data-drophint="${esc(tr('dropToDone'))}"`,
   });
 }
 
-// 作業清單有一項完成落地後，就地重畫「已完成」區：沿用原本的外框（開合狀態、FLIP 位置都還在），只換計數與列
-function refreshDoneSection(view, cid) {
+// 作業清單有一項完成落地後，就地重畫下方區：沿用原本的外框（開合狀態、FLIP 位置都還在），只換計數與列
+function refreshArchiveSection(view, cid) {
   const { assignments = {}, assignmentGroups = {} } = _currentData;
   const tmp = document.createElement('div');
-  tmp.innerHTML = renderDoneItemsSection(doneItemsOf(assignments[cid] || []), assignmentGroups[cid] || [], cid);
+  tmp.innerHTML = renderArchiveSection(archiveItemsOf(assignments[cid] || []), assignmentGroups[cid] || [], cid);
   const fresh = tmp.firstElementChild;
-  const old = view.querySelector('.done-items');
-  if (!fresh) {
-    if (old) old.remove();
-    return;
-  }
-  if (old) {
-    old.querySelector('.fold-label').textContent = fresh.querySelector('.fold-label').textContent;
-    const inner = old.querySelector('.fold-list-inner');
-    inner.replaceChildren(...fresh.querySelector('.fold-list-inner').childNodes);
-    bindDetailRows(inner);
-    setupHideablePromoteDrag(view, inner);
-  } else {
-    const list = view.querySelector('.detail-assignments-list');
-    if (!list) return;
-    list.after(fresh);
-    bindDetailRows(fresh);
-    setupHideablePromoteDrag(view, fresh);
-  }
-}
-
-// ── 已隱藏區（精簡列；不顯示任何分數，見決策 3）──
-// 該課所有隱藏項，不分完成與否（spec 2026-10-25-drop-submitted-filter，取代 10-23 的跟隨完成過濾）：
-// 未完成的在前（截止升冪），已完成的在後（最近截止在前、內容淡化）；每一列都有握把可拖回清單（鍵盤同，#6）
-function renderHiddenItemsSection(items, groups, courseId) {
-  const ordered = [
-    ...sortByDue(items.filter((a) => !isDone(a))),
-    ...sortByDue(items.filter((a) => isDone(a)), { recentFirst: true }),
-  ];
-  const rows = ordered.map((a) => {
-    const examFlag = isExam(a);
-    // 帶 examFlag → 考試顯 due-exam 紫色；簽到走一般 due 色階（此處不傳 submitted，考試恆紫）
-    const uClass = urgencyClass(a.due_at, examFlag);
-    const groupName = findGroupName(a, groups);
-    const submitted = isSubmitted(a);
-    const isCustom = !!a._isCustom;
-    const titleHtml = isCustom
-      ? `<span>${esc(a.name)}</span>`
-      : `<span class="assignment-title-link" data-assignment-id="${esc(String(a.id))}" data-course-id="${courseId}">${esc(a.name)}</span>`;
-    // 已完成的隱藏列與「已完成」區同一套內容淡化（.submitted → --done-fade，不淡化握把）
-    return `
-      <div class="hidden-item-row${isDone(a) ? ' submitted' : ''}" data-drag="promote" data-hideable-id="${esc(String(a.id))}">
-        <div class="hidden-item-left">
-          <div class="hidden-item-title">${titleHtml}${dragGripHtml('promote')}</div>
-          ${groupName ? `<div class="assignment-group">${esc(groupName)}</div>` : ''}
-        </div>
-        <div class="hidden-item-right">
-          <div class="due-label ${uClass}">${dueLabelFor(a)}</div>
-          ${submitted ? `<div class="submitted-badge">${tr('submittedBadge')}</div>` : ''}
-          ${isCustom ? customActionsHtml(a, courseId) : ''}
-        </div>
-      </div>`;
-  }).join('');
-
-  // 整個 .hidden-items 為「降級」放置目標（data-drophint 供 .drop-active::after 顯示提示）
-  return foldSectionHtml({
-    cls: 'hidden-items',
-    courseId,
-    label: tr('hiddenItemsToggle').replace('{n}', items.length),
-    listId: `hidden-list-${courseId}`,
-    inner: rows || `<div class="fold-empty">${esc(tr('hiddenItemsEmpty'))}</div>`,
-    attrs: ` data-drophint="${esc(tr('dropToHide'))}"`,
-  });
+  const old = view.querySelector('.archive-items');
+  if (!old || !fresh) return;
+  old.querySelector('.fold-label').textContent = fresh.querySelector('.fold-label').textContent;
+  const inner = old.querySelector('.fold-list-inner');
+  inner.replaceChildren(...fresh.querySelector('.fold-list-inner').childNodes);
+  bindDetailRows(inner);
+  setupHideablePromoteDrag(view, inner);
 }
 
 // ── Weight Pie Chart ──
@@ -4611,7 +4666,8 @@ function customActionsHtml(a, courseId) {
             </div>`;
 }
 
-function renderAssignmentRow(a, groups, courseId) {
+// inArchive：列在下方「已隱藏」區（握把往上拖回作業清單）；否則在作業清單（握把往下拖＝標完成）
+function renderAssignmentRow(a, groups, courseId, { inArchive = false } = {}) {
   const submitted = isSubmitted(a); // Canvas 事實：已繳交 badge
   const done = isDone(a);           // 顯示狀態：列樣式 / 勾選圈（外部完成可被標回未完成）
   const examFlag = isExam(a);
@@ -4641,11 +4697,11 @@ function renderAssignmentRow(a, groups, courseId) {
   // 不在列上顯示分數（含升級回清單、Canvas 已評分的考試）：分數只出現在成績計算器（決策 3）
 
   return `
-    <div class="assignment-item${done ? ' submitted' : ''}${isCustom ? ' custom-assignment' : ''}${promotedHideable ? ' promoted-hideable' : ''}" data-drag="demote" data-hideable-id="${esc(String(a.id))}">
+    <div class="assignment-item${done ? ' submitted' : ''}${isCustom ? ' custom-assignment' : ''}${promotedHideable ? ' promoted-hideable' : ''}" data-drag="${inArchive ? 'promote' : 'demote'}" data-hideable-id="${esc(String(a.id))}">
       ${checkHtml}
       <div class="assignment-left">
         <button type="button" class="assignment-desc-toggle" aria-expanded="false" aria-controls="${descId}" aria-label="${esc(a.name)}"></button>
-        <div class="assignment-title">${titleHtml}${dragGripHtml('demote')}</div>
+        <div class="assignment-title">${titleHtml}${dragGripHtml(inArchive ? 'promote' : 'demote')}</div>
         ${customLabel}
         ${groupName ? `<div class="assignment-group">${esc(groupName)}</div>` : ''}
       </div>
@@ -4827,7 +4883,8 @@ function applyGradesOverviewLanguage() {
   if (ov && ov.classList.contains('open')) renderGradesOverview();
 }
 
-document.getElementById('nav-grades').addEventListener('click', openGradesOverview);
+// 側欄「成績」入口已於 2026-10-25 依 owner 決定拿掉（總覽程式保留、目前沒有入口）
+document.getElementById('nav-grades')?.addEventListener('click', openGradesOverview);
 document.getElementById('grades-close').addEventListener('click', closeGradesOverview);
 
 // 點一門課：關 modal → 進該課詳情（不帶卡片 → 同步渲染）→ 展開成績計算器
@@ -4987,11 +5044,11 @@ function renderEmptyState() {
     </div>`;
 }
 
-// 沒有課程時「+ 新增作業」「課程」「成績」無事可做 → 停用並以 title 說明，不留點了沒反應的死按鈕（QA #13/#171）
+// 沒有課程時「+ 新增作業」「課程」無事可做 → 停用並以 title 說明，不留點了沒反應的死按鈕（QA #13/#171）
 let _noCoursesMode = false;
 function setNoCoursesMode(on) {
   _noCoursesMode = on;
-  ['btn-add-assignment', 'nav-courses', 'nav-grades'].forEach((id) => {
+  ['btn-add-assignment', 'nav-courses'].forEach((id) => {
     const el = document.getElementById(id);
     if (!el) return;
     el.disabled = on;
@@ -5458,8 +5515,7 @@ function captureViewState() {
       return [sel, el ? el.scrollTop : 0];
     }),
     pageScroll: document.scrollingElement ? document.scrollingElement.scrollTop : 0,
-    hiddenOpen: !!(detail && detail.querySelector('.hidden-items.open')),
-    doneOpen: !!(detail && detail.querySelector('.done-items.open')),
+    archiveOpen: !!(detail && detail.querySelector('.archive-items.open')),
     gradeOpen: !!(detail && detail.querySelector('.grade-calc.open')),
     openDescIds: detail
       ? Array.from(detail.querySelectorAll('.assignment-desc.open')).map((d) => {
@@ -5487,11 +5543,8 @@ function openPanelInstant(classTarget, animated) {
 function restoreViewState(st) {
   const detail = document.getElementById('course-detail-container');
   if (detail && st.view === 'course' && currentView === 'course' && st.courseId === currentCourseId) {
-    const hidden = detail.querySelector('.hidden-items');
-    // 走 setFoldOpen：同步開關的 aria-expanded（#6），instant 不重播展開
-    if (st.hiddenOpen && hidden) setFoldOpen(hidden, true, { instant: true });
-    const done = detail.querySelector('.done-items');
-    if (st.doneOpen && done) setFoldOpen(done, true, { instant: true });
+    const archive = detail.querySelector('.archive-items');
+    if (st.archiveOpen && archive) setFoldOpen(archive, true, { instant: true });
     const calc = detail.querySelector('.grade-calc');
     if (st.gradeOpen && calc) openPanelInstant(calc, [calc.querySelector('.grade-calc-body'), calc.querySelector('.grade-calc-arrow')]);
     st.openDescIds.forEach((id) => {

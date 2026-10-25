@@ -302,9 +302,30 @@
 
     /* Course Nav */
     .course-nav {
+      position: relative;   /* 滑動 indicator 的定位基準；課程項的 offsetTop 也以此為準 */
       display: flex;
       flex-direction: column;
       gap: 2px;
+    }
+
+    /* 側欄課程列的 active 底色＋左側橘線：同主導航 #47 的 indicator recipe，換課時沿 spring.selection 滑過去，
+       沒有 active 項（回到清單）時原地淡出、回來時在新位置原地淡入。由 dashboard.js placeCourseNavIndicator() 定位 */
+    .course-nav-indicator {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 0;
+      height: var(--h, 0px);
+      translate: 0 var(--y, 0px);
+      border-radius: 5px;
+      background: var(--bg);
+      box-shadow: inset 2px 0 0 var(--orange);
+      pointer-events: none;
+      transition: translate var(--spring-selection), height var(--spring-selection), opacity var(--t-color), scale var(--spring-press);
+    }
+
+    .course-nav-indicator.is-off {
+      opacity: 0;
     }
 
     .nav-course-item {
@@ -322,7 +343,7 @@
       background: transparent;
       width: 100%;
       text-align: left;
-      transition: background-color var(--t-color), scale var(--spring-press);
+      transition: background-color var(--t-color), color var(--t-color), scale var(--spring-press);
       position: relative;
       user-select: none;   /* 雙擊重命名時不選取課名文字 */
     }
@@ -346,6 +367,17 @@
 
     .nav-course-item.active .nav-course-name {
       color: var(--orange);
+    }
+
+    /* indicator 接手後，active 項自己不畫底色與左線（不然兩層疊色）；padding 不再因左線縮 2px，換課時字不會左右跳 */
+    .course-nav.has-indicator > .nav-course-item.active {
+      background: transparent;
+      border-left: none;
+      padding-left: 10px;
+    }
+
+    .nav-course-name {
+      transition: color var(--t-color);
     }
 
     .nav-course-name {
@@ -1228,9 +1260,14 @@
     .wk-ring-bar {
       fill: none;
       stroke: var(--green);
-      stroke-width: 20;
+      stroke-width: 20;   /* = dashboard.js RING_W */
       stroke-linecap: round;
       transition: stroke-dashoffset var(--ring);
+    }
+
+    /* 全部完成：弧停在兩端圓帽相碰的位置後換成實心圓，12 點鐘不留 dash 接縫（dashboard.js ringOffset） */
+    .wk-ring-bar.is-full {
+      stroke-dasharray: none;
     }
 
     .wk-ring-center {
@@ -1278,6 +1315,8 @@
       letter-spacing: 0.08em;
       color: var(--muted);
       margin-top: 6px;
+      position: relative;
+      top: 6px;   /* 只把說明字往下挪，分子位置不動 */
     }
 
     /* 分級摘要：可點列，跳到右側對應區塊 */
@@ -1562,11 +1601,10 @@
       border-bottom: none;
     }
 
-    /* 已完成列淡化（「已完成」區＋已隱藏區裡已完成的列）：只套在內容上，不整列 opacity——整列會疊乘到
+    /* 已完成列淡化（下方「已隱藏」區裡已完成的列）：只套在內容上，不整列 opacity——整列會疊乘到
        拖曳握把與操作鈕（握把曾只剩約 1.6:1，QA #79）。用變數讓拖曳 clone／殘影歸零淡化，
        維持舊外觀（clone 全不透明、殘影只吃 .drag-source 的 0.3）*/
-    .assignment-item.submitted,
-    .hidden-item-row.submitted {
+    .assignment-item.submitted {
       --done-fade: 0.45;
     }
 
@@ -1578,10 +1616,7 @@
     .assignment-item.submitted > .assignment-check,
     .assignment-item.submitted .assignment-title > span:first-child,
     .assignment-item.submitted .assignment-left > :not(.assignment-title),
-    .assignment-item.submitted .assignment-right > :not(.custom-actions-row),
-    .hidden-item-row.submitted .hidden-item-title > span:first-child,
-    .hidden-item-row.submitted .hidden-item-left > :not(.hidden-item-title),
-    .hidden-item-row.submitted .hidden-item-right > :not(.custom-actions-row) {
+    .assignment-item.submitted .assignment-right > :not(.custom-actions-row) {
       opacity: var(--done-fade);
     }
 
@@ -1758,8 +1793,7 @@
       color: var(--dark);
     }
 
-    .assignment-title > span:first-child,
-    .hidden-item-title > span:first-child {
+    .assignment-title > span:first-child {
       min-width: 0;
       white-space: nowrap;
       overflow: hidden;
@@ -2025,7 +2059,7 @@
        內容從 2px 模糊清晰（blur.disclosure），三者與 chevron 同一個 transition.disclosure，讀起來是同一個動作。
        收合時 visibility:hidden（面板裡的連結、輸入框不在 Tab 順序裡，A17）：
        打開那一邊 visibility 立刻生效（0s，鍵盤移動後焦點要能馬上落進去，#6）；收合等淡出跑完才藏。
-       拖曳降級時（.drop-active）稽核清單也走同一個開合，不再硬切 */
+       拖曳中收合區維持收合（只亮起外框當放置目標，展開一長串已完成會很亂，spec 2026-10-25） */
     .detail-right-panel {
       interpolate-size: allow-keywords;
     }
@@ -2040,7 +2074,7 @@
       transition: height var(--t-disclosure), opacity var(--t-disclosure), filter var(--t-disclosure), visibility var(--t-disclosure);
     }
 
-    :is(.assignment-desc.open, .grade-calc.open .grade-calc-body, .detail-fold.open .fold-list, .detail-fold.drop-active .fold-list) {
+    :is(.assignment-desc.open, .grade-calc.open .grade-calc-body, .detail-fold.open .fold-list) {
       height: auto;
       opacity: 1;
       filter: none;
@@ -3760,9 +3794,8 @@
       font-size: 13px;
     }
 
-    /* ── 作業清單下方的兩個收合區（spec 2026-10-25-drop-submitted-filter）──
-       .done-items：已完成（沒隱藏）；.hidden-items：已隱藏（自動隱藏的考試・簽到＋手動拖進來的作業，不分完成與否）。
-       開關、箭頭、清單共用 .fold-* */
+    /* ── 作業清單下方的「已隱藏」收合區（.archive-items，spec 2026-10-25-drop-submitted-filter）──
+       已完成＋被隱藏（自動隱藏的考試・簽到、手動隱藏的作業）合成一區；開關、箭頭、清單用 .fold-* */
     .detail-fold {
       margin-top: 12px;
       padding-top: 10px;
@@ -3815,26 +3848,7 @@
       padding-top: 4px;
     }
 
-    /* 隱藏列不整列降透明：淡化只靠較小字級＋標題改 --mid＋分組/時間標籤 0.75（見下），不疊乘到握把與操作鈕（QA #79） */
-    .hidden-item-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 0;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .hidden-item-row:last-child {
-      border-bottom: none;
-    }
-
-    /* 分組/時間標籤是次要資訊：略降透明；已完成的隱藏列改由 --done-fade 覆寫（同元素覆寫，不疊乘） */
-    .hidden-item-row .assignment-group,
-    .hidden-item-row .due-label {
-      opacity: 0.75;
-    }
-
-    /* ── 拖曳隱藏／取消隱藏（作業清單 ↔ 已隱藏區；pointer 自繪拖曳，見 spec 2026-07-22、2026-10-23）── */
+    /* ── 拖曳（作業清單 ↔ 下方「已隱藏」區；pointer 自繪拖曳，見 spec 2026-07-22、2026-10-25）── */
     /* 握把：緊跟作業名稱後，唯一拖曳起點；靜止 0.75 對 --bg 約 3.2:1（UI 元件 ≥3:1，QA #79） */
     .drag-grip {
       flex: 0 0 auto;
@@ -3856,7 +3870,6 @@
 
     @media (hover: hover) and (pointer: fine) {
       /* 滑過該列握把全亮（靜止 0.75 之上，QA #79） */
-      .hidden-item-row:hover .drag-grip,
       .assignment-item:hover .drag-grip {
         opacity: 1;
       }
@@ -3870,18 +3883,13 @@
     /* 鍵盤焦點在該列（:has(:focus-visible)＝只算鍵盤）時握把跟 hover 一樣亮起；
        握把本身拿到焦點時全亮、第一幀就到位（#6 會把它改成 button）；
        觸控時以 0.85 常駐（#11） */
-    :is(.hidden-item-row, .assignment-item):has(:focus-visible) .drag-grip {
+    .assignment-item:has(:focus-visible) .drag-grip {
       opacity: 1;
     }
 
-    :is(.hidden-item-row, .assignment-item) .drag-grip:focus-visible {
+    .assignment-item .drag-grip:focus-visible {
       opacity: 1;
       transition: none;
-    }
-
-    /* 握把拿到鍵盤焦點時整列維持不透明，焦點框才不會跟著被淡掉（#6；已隱藏列現已不整列降透明（QA #79），此條為保險） */
-    .hidden-item-row:has(.drag-grip:focus-visible) {
-      opacity: 1;
     }
 
     @media not all and (hover: hover) and (pointer: fine) {
@@ -3969,9 +3977,9 @@
       line-height: 1.6;
       white-space: nowrap;
     }
-    .detail-fold.drop-active::after { padding: 8px 0 2px; }
+    /* 收合區拖曳中不展開（spec 2026-10-25），放置框只有標題一行太小、不好瞄準 → 提示字上下多留空間 */
+    .detail-fold.drop-active::after { padding: 18px 0 14px; }
 
-    /* 降級拖曳中：即使稽核區收合，也展開列表作為放置目標——走「展開面板」共用規則的開合（#28），不硬切 */
 
     /* 落點：clone 飛入、快到時與落地列交叉淡換（settleClone 以 inline opacity 處理，#41），落地後淡橘閃一下 */
     .drag-arrived {
@@ -4002,61 +4010,51 @@
       padding: 10px 0;
     }
 
-    .hidden-item-left {
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-      flex: 1;
-      min-width: 0;
-    }
-
-    .hidden-item-title {
-      display: flex;
-      align-items: center;
-      gap: 7px;
-      min-width: 0;
-      font-size: 14px;
-      color: var(--mid);
-    }
-
-    .hidden-item-right {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-      gap: 4px;
-      margin-left: 20px;
-      flex-shrink: 0;
-    }
-
     /* ── View Transitions — Card ↔ Detail Morph ──
        具名 deviation（#39）：group 曲線保留 cubic-bezier(0.22,1,0.36,1)（≈ ease.out）、0.28s。
        B2 對 morph 的角色曲線是 ease.inOut、recipe 是 spring.dialog 750ms，但這是高頻 drill-down，
        起步慢的曲線看起來像延遲、750ms 又太長。減少動態時 JS 不命名共享元素（見 setMorphName），只剩 root crossfade。 */
-    ::view-transition-group(course-shell),
-    ::view-transition-group(course-code),
-    ::view-transition-group(course-name),
-    ::view-transition-group(course-badge),
-    ::view-transition-group(course-meta) {
-      animation-duration: 0.28s;
-      animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+    ::view-transition-group(course-shell) {
+      /* 具名 deviation：Apple 系統動畫常用的 cubic-bezier(0.32,0.72,0,1)（起步快、收尾長而柔），0.36s */
+      animation-duration: 0.36s;
+      animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+      /* 外框：快照不縮放（object-fit:none，貼左上），只有 group 的框在長大／縮小，內容在框裡被裁切。
+         框線（1px 的 box-shadow 環）、陰影、底色畫在 group 上；dashboard.js startMorph 會用 WAAPI 讓它們
+         從出發那一端的實際樣子連續變到抵達那一端（hover 的橘框 → 詳情的灰框＋陰影）。這裡是動畫沒接上時的後備 */
+      overflow: clip;
+      border-radius: 8px;
+      background: var(--surface);
+      box-shadow: 0 0 0 1px var(--border);
     }
 
+    /* 不閃（2026-10-25，比照 macOS）：框裡墊著實心的 --surface（卡片與詳情同色），舊內容很快淡出、新內容稍後淡入，
+       中間露出的是同色的卡片底，不是頁面底色，也不會兩種版面的字疊在一起。VT 預設的 plus-lighter 混合會在
+       兩層交疊時變亮，一律改成 normal。文字全程原尺寸、不縮放（#16） */
     ::view-transition-old(course-shell),
     ::view-transition-new(course-shell) {
-      animation-duration: 0.22s;
+      /* 快照維持自己的原尺寸、貼在框的左上角（不縮放），框長大時多出來的部分露出 group 的實心底 */
+      width: auto;
+      height: auto;
+      mix-blend-mode: normal;
+      /* 快照自己的 1px 框線（與 hover 的陰影）裁掉：不然卡片的框會變成大框裡面的第二個小框；
+         框線只由 group 畫（見上方，會從出發端的樣子連續變到抵達端） */
+      clip-path: inset(1px round 7px);
     }
 
-    ::view-transition-old(course-code),
-    ::view-transition-old(course-name),
-    ::view-transition-old(course-badge),
-    ::view-transition-old(course-meta),
-    ::view-transition-new(course-code),
-    ::view-transition-new(course-name),
-    ::view-transition-new(course-badge),
-    ::view-transition-new(course-meta) {
-      animation-duration: 0.18s;
-      height: 100%;
-      overflow: hidden;
+    ::view-transition-old(course-shell) {
+      animation: vt-fade-away 0.1s ease-out both;
+    }
+
+    ::view-transition-new(course-shell) {
+      animation: vt-fade-over 0.2s cubic-bezier(0.32, 0.72, 0, 1) 0.06s both;
+    }
+
+    @keyframes vt-fade-away {
+      to { opacity: 0; }
+    }
+
+    @keyframes vt-fade-over {
+      from { opacity: 0; }
     }
 
     /* Sidebar: 不参与动画，保持静止 */
@@ -4069,25 +4067,18 @@
       animation: none;
     }
 
-    /* 页面其余部分：快速切换，不干扰 morph 动画 */
+    /* 頁面其餘部分：同一個原則——舊的不淡出、新的淡入蓋上去（normal 混合），整頁不會先變空再出現 */
+    ::view-transition-old(root),
+    ::view-transition-new(root) {
+      mix-blend-mode: normal;
+    }
+
     ::view-transition-old(root) {
-      animation: vt-root-out 0.08s ease forwards;
+      animation: none;
     }
 
     ::view-transition-new(root) {
-      animation: vt-root-in 0.1s ease 0.05s both;
-    }
-
-    @keyframes vt-root-out {
-      to {
-        opacity: 0;
-      }
-    }
-
-    @keyframes vt-root-in {
-      from {
-        opacity: 0;
-      }
+      animation: vt-fade-over 0.24s cubic-bezier(0.32, 0.72, 0, 1) both;
     }
 
     /* ── Weight Edit Modal ── */
@@ -5051,8 +5042,7 @@
         padding-left: 16px;
         padding-right: 16px;
       }
-      .assignment-right,
-      .hidden-item-right {
+      .assignment-right {
         margin-left: 12px;
       }
       .detail-card-bottom .due-label {
@@ -5111,7 +5101,8 @@
     }
 
     /* 按下的是 active 的學期待辦／課程：底色在 indicator 上（#47），跟著項目一起縮，整列看起來是同一塊 */
-    .side-nav:has(> .side-nav-item[data-page].active:active:not(:disabled)) > .side-nav-indicator {
+    .side-nav:has(> .side-nav-item[data-page].active:active:not(:disabled)) > .side-nav-indicator,
+    .course-nav:has(> .nav-course-item.active:active) > .course-nav-indicator {
       scale: var(--scale-choice);
     }
 
@@ -5185,7 +5176,7 @@
         transition: opacity var(--t-disclosure), filter var(--t-disclosure), visibility var(--t-disclosure);
       }
 
-      :is(.assignment-desc.open, .grade-calc.open .grade-calc-body, .detail-fold.open .fold-list, .detail-fold.drop-active .fold-list) {
+      :is(.assignment-desc.open, .grade-calc.open .grade-calc-body, .detail-fold.open .fold-list) {
         transition: opacity var(--t-disclosure), filter var(--t-disclosure), visibility 0s;
       }
 
@@ -5205,7 +5196,8 @@
       }
 
       /* 側欄 indicator（#47）：不滑，位置直接到位；淡出／淡入（is-off）保留 */
-      .side-nav-indicator {
+      .side-nav-indicator,
+      .course-nav-indicator {
         transition: opacity var(--t-color);
       }
 
@@ -5260,10 +5252,6 @@
           <button class="side-nav-item" data-page="courses" id="nav-courses">
             <span class="side-nav-name" id="nav-courses-label">課程</span>
             <span class="side-nav-count" id="nav-courses-count"></span>
-          </button>
-          <!-- 學期成績：開 modal（不是頁面）；分數只在這裡與各課成績計算器出現（決策 3，spec 2026-10-25-semester-grades） -->
-          <button class="side-nav-item" id="nav-grades" aria-haspopup="dialog">
-            <span class="side-nav-name" id="nav-grades-label">成績</span>
           </button>
         </nav>
 
@@ -5356,7 +5344,7 @@
                 </div>
                 <div class="welcome-dash-mock-body">
                   <div class="welcome-dash-mock-chart">
-                    <div class="welcome-dash-mock-ring" id="wmock-ring" role="img" aria-label="近期完成 3/5">
+                    <div class="welcome-dash-mock-ring" id="wmock-ring" role="img" aria-label="當週待辦 3/5">
                       <svg viewBox="0 0 48 48" aria-hidden="true">
                         <circle class="welcome-dash-mock-ring-track" cx="24" cy="24" r="20"></circle>
                         <circle class="welcome-dash-mock-ring-bar" cx="24" cy="24" r="20"
@@ -5366,7 +5354,7 @@
                         <div class="welcome-dash-mock-ring-frac"><b>3</b>/5</div>
                       </div>
                     </div>
-                    <div class="welcome-dash-mock-ring-cap" id="wmock-ring-cap">近期完成</div>
+                    <div class="welcome-dash-mock-ring-cap" id="wmock-ring-cap">當週待辦</div>
                     <div class="welcome-dash-mock-sum">
                       <div class="welcome-dash-mock-sum-row is-overdue"><span class="welcome-dash-mock-sum-num">1</span><span id="wmock-sum-overdue">已逾期</span></div>
                       <div class="welcome-dash-mock-sum-row is-urgent"><span class="welcome-dash-mock-sum-num">3</span><span id="wmock-sum-urgent">7天內</span></div>
