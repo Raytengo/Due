@@ -440,6 +440,8 @@ sidebar（300px）+ main-content（flex:1）
 - `← 返回` 按鈕與瀏覽器返回統一走 `history.back()` → `popstate`；按鈕常駐於 `.page-tabs`，click 只在 top-level 綁一次（不可綁在 `renderCourseDetailSection` 裡：詳情會被勾選／拖曳／即時刷新反覆重繪，listener 累積會一次連發多個 `history.back()` 退出 dashboard，QA P1-8）；`showGridView()` 現依 `currentPage` 回對應清單（不再寫死回 courses grid，順帶修正「從週待辦開課程、Back 卻回課程頁」）
 - 動導航函式（`showCourseDetail`/`showGridView`/`switchPage`/`goToPage`）時務必同步維護對應的 push/replace，否則返回行為會錯亂
 
+**互動導覽（`dashboard/tour.js`，2026-10-26 試行）：** 設定選單「使用教學」改開導覽（舊的 5 頁 modal 只剩首次安裝會開）。畫面變暗、只亮出這一步的元素（四塊透明 blocker 圍住亮框擋點擊），旁邊說明框：頂端進度條、`n / N`、右上 ✕、「下一步 →」（最後一步「開始使用」）；Esc 結束（焦點在輸入框時交給輸入框）。預設 5 步 `DEFAULT_STEPS`：打開一門課（可直接點課前進）→ 改課名（`reveal` 把 hover 才出現的鉛筆亮出來）→ 勾完成 → 拖曳到已完成／已隱藏 → AI 自動填權重（⚙）。需要換畫面的步驟由導覽代點側欄（`before`／`next`，代點期間不算使用者點擊），等目標出現才顯示；目標每幀重新查詢與量位置。字串自帶三語。其餘步驟（同步、學期待辦、評分比重、回學期待辦）留著給 dev 挑選頁比較：`dev/tour-review.html`；harness 用 `?tour=1`（預設）／`?tour=all`／`?tour=a,b&tourFrom=b`。尚未接到「首次同步完成後自動開始」
+
 **新手教學（Welcome Modal，5 頁）：**
 - 首次安裝自動開啟（`?welcome=1`），設定選單「使用教學」可重開；換頁為 translateX 滑動（track 500%、每步 20%，`welcomeGoStep` 位移 `(n-1)*20%`，完成頁按鈕判斷 `n===5`）。開過後以 `history.replaceState` 把 `welcome` 參數從網址拿掉（保留其他參數、hash 與 history state），重新整理不會再跳出（QA #48）
 - 只有目前那頁可互動：其餘投影片設 `inert`（`_welcomeSyncSlides`），Tab 不會聚焦到畫面外的連結而把 `overflow:hidden` 的軌道捲走；`.welcome-main-area.scrollLeft` 開教學／換頁時歸零；按鈕列固定兩個節點（上一步／主按鈕），換頁只就地改文字、`data-wgo` 與 class，焦點留在原按鈕上（上一步要消失時先交給主按鈕，#8）；focus trap 的頭尾排除 inert 子樹（QA P2-13）。`.welcome-main-area` 用 `overflow: clip`（不可捲動，Tab 也捲不歪）；開教學以 forced reflow 直接歸位到第 1 頁（不靠 rAF）；減少動態時換頁 crossfade（#9）

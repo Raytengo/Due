@@ -5149,13 +5149,13 @@ if (menuOpenTutorial) {
   });
 }
 
-// ?tour=1：直接開互動導覽；?tour=sync,course,check：只走這幾步；&tourFrom=check：從這一步開始
+// ?tour=1：直接開互動導覽（預設步驟）；?tour=all：全部步驟；?tour=sync,course,check：只走這幾步；&tourFrom=check：從這一步開始
 // （dev harness 與挑選頁 dev/tour-review.html 用）。tour.js 在 dashboard.js 之後才載入：到 timer 裡才查得到 DueTour
 (() => {
   const params = new URLSearchParams(location.search);
   const tour = params.get('tour');
   if (!tour) return;
-  const only = tour === '1' ? null : tour.split(',').filter(Boolean);
+  const only = tour === '1' ? null : tour === 'all' ? 'all' : tour.split(',').filter(Boolean);
   setTimeout(() => {   // 也等第一次 render 把側欄課程列畫出來
     if (typeof DueTour !== 'undefined') DueTour.start({ only, from: params.get('tourFrom') });
   }, 600);

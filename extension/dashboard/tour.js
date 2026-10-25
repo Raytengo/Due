@@ -145,6 +145,9 @@
     { key: 'back', target: '#nav-week', advanceOn: '#nav-week', next: goHome },
   ];
 
+  // 預設只走這 5 步（2026-10-26 依挑選頁拍板：只教自己找不到的東西）；其餘步驟留著給 dev/tour-review.html 比較
+  const DEFAULT_STEPS = ['course', 'rename', 'check', 'drag', 'ai'];
+
   const PAD = 6;              // 亮框比目標大一圈
   const GAP = 18;             // 說明框與亮框的距離
   const EDGE = 14;            // 說明框離視窗邊緣的最小距離
@@ -373,6 +376,8 @@
   // 「下一步」：這一步有代做的事（打開課程、回學期待辦）就先做，等畫面換完再前進；最後一步＝結束
   async function next() {
     if (!_state || _state.moving) return;
+    _state.moving = true;   // 代點換畫面那段等待也要擋住：連點兩下不能連跳兩步
+    _state.root.classList.add('is-moving');
     const step = _state.steps[_state.i];
     if (step.next) {
       act(step.next);
@@ -408,10 +413,12 @@
     end();
   }
 
-  // opts.only：只走這些步驟（key 陣列，照 STEPS 的順序）；opts.from：從這一步開始（挑選頁預覽單步用）
+  // opts.only：只走這些步驟（key 陣列，照 STEPS 的順序；'all'＝全部；省略＝DEFAULT_STEPS）；
+  // opts.from：從這一步開始（挑選頁預覽單步用）
   function start(opts = {}) {
     if (_state) end(true);
-    const only = Array.isArray(opts.only) && opts.only.length ? opts.only : null;
+    const only = opts.only === 'all' ? null
+      : (Array.isArray(opts.only) && opts.only.length ? opts.only : DEFAULT_STEPS);
     const steps = only ? STEPS.filter((s) => only.includes(s.key)) : STEPS.slice();
     if (!steps.length) return;
     const from = Math.max(0, steps.findIndex((s) => s.key === opts.from));
