@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "Due — Canvas 作业与截止日",
+    "description": "扩展名称（Chrome 与商店，上限 75 字符）"
+  },
+  "extDescription": {
+    "message": "Canvas 的作业、截止日和评分比重一页看完。点一下工具栏就知道这周要交什么，逾期的自动置顶。",
+    "description": "商店摘要与 chrome://extensions 说明（上限 132 字符）"
+  }
+}

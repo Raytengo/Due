@@ -35,7 +35,7 @@ owner 拍板：D1 採 (b) 材料指紋；D2 採 (c)，標示只分三種（AI �
 | ID | 狀態 | 說明 |
 |---|---|---|
 | P0-1 | 已修 | privacy-policy.md 改寫 AI 段落（每次同步只分析沒有權重的課、材料沒變不重跑、所有供應商都會收 PDF 或抽出文字、檔名清單只在大綱找不到比重時送、Remove key 刪什麼留什麼）、加 Limited Use 段、Last updated 2026-10-25；README 兩檔同步。政策裡無法證實的 `chrome://extensions`「Clear extension storage」改成「移除擴充功能即刪除所有資料」 |
-| P0-2 | 已修（商店文案除外） | consent 三語改寫，點名供應商（隨表單切換）、送什麼、用誰的額度；`consentedAt` 只在有 key 時寫。`docs/store-listing.md` 由另一個 session 編修中，AI 段落未動 |
+| P0-2 | 已修 | consent 三語改寫，點名供應商（隨表單切換）、送什麼、用誰的額度；`consentedAt` 只在有 key 時寫。`docs/store-listing.md`（2026-10-25 商店頁面定稿）三語都有 AI 段落：選用、自備金鑰、資料從瀏覽器直接送到所選供應商並依其條款處理 |
 | P1-1 | 已修（D1） | `materialFingerprint`／`isUnchangedNotFound`；暫時性失敗不記指紋 |
 | P1-6 | 部分 | AI 挑檔失敗且沒有其他結果 → 記 error 帶原因；Gemini thinkingConfig 未動 |
 | P2-6 | 已修（D4，改法不同） | 報告原建議「看到 % 就跳過 Step 3」。改採兩階段：先只用大綱頁＋連結 PDF 問，AI 說找不到才翻課程檔案。理由：大綱頁常有「遲交每天扣 10%」，用 % 判斷會誤跳過真正有比重的 PDF，加上 D1 指紋不變就不重跑，會永久漏掉 |

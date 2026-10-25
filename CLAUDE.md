@@ -24,6 +24,7 @@ cc/
 ├── CLAUDE.md
 └── extension/
     ├── manifest.json              ← 擴充功能設定（Manifest V3；LLM 不佔必要權限，PDF 下載走 optional_host_permissions）
+    ├── _locales/{en,zh_TW,zh_CN}/messages.json ← 只放擴充功能名稱與摘要（extName／extDescription），商店名稱與摘要也來自這裡；介面字串仍在各頁的 I18N
     ├── background.js              ← Service worker：Canvas API 同步 + Claude 用量；importScripts 載入 ai/ 三檔
     ├── background.test.js         ← background.js 測試（vm 載入 + stub chrome/fetch）
     ├── ai/
@@ -52,6 +53,7 @@ cc/
 ### Chrome 擴充功能
 
 - **Manifest Version**：3（必須用 V3）
+- **名稱與摘要在地化**：`name`／`description` 是 `__MSG_extName__`／`__MSG_extDescription__`，`default_locale: "en"`；改名稱或商店摘要就改三份 `_locales/*/messages.json`（名稱上限 75、摘要上限 132 字元），要發新版本才會到商店。商店的詳細說明與素材文案在 `docs/store-listing.md`
 - **Permissions**：`storage`、`tabs`、`webNavigation`、`scripting`
 - **Host Permissions**：`https://*.instructure.com/*`、`https://claude.ai/*`（後者供 popup 的 Claude 用量顯示與 content script）
 - **Optional Host Permissions**：`https://*.canvas-user-content.com/*`（AI 分析下載 Canvas PDF 用；所有供應商都會請求）、`https://integrate.api.nvidia.com/*`（僅選 NVIDIA NIM 供應商時用）；兩者都在儲存 AI 設定時才請求。LLM 端點原則上靠供應商 CORS、不佔必要權限，NVIDIA 是唯一例外（見 AI 章節）

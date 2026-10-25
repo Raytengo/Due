@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "Due — Canvas Deadline Dashboard",
+    "description": "Extension name in Chrome and the Chrome Web Store (max 75 characters)"
+  },
+  "extDescription": {
+    "message": "Every Canvas deadline at a glance. Auto-syncs assignments, due dates and grade weights, with overdue work pinned on top.",
+    "description": "Store summary and chrome://extensions description (max 132 characters)"
+  }
+}
