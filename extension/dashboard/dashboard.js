@@ -102,6 +102,22 @@ const I18N = {
     // grade calculator
     gradeCalcTitle: '成績計算器',
     gradeExcused: '已免除',
+    // 成績計算器吃自訂權重＋學期成績總覽（spec 2026-10-25-semester-grades）
+    calcUnmappedTitle: '未計入',
+    calcUnmappedHint: '沒對上權重項目，不算進總分；用下拉指定',
+    calcMapUnassigned: '未歸類',
+    calcMapExclude: '不計入',
+    calcMapLabel: '{name} 計入哪個權重項目',
+    navGrades: '成績',
+    gradesTitle: '學期成績',
+    gradesNote: '只算已評分的部分，未評分不當 0 分。點課程看明細與試算。',
+    gradesGraded: '已評分 {n}%',
+    gradesNoWeights: '沒有評分比重',
+    gradesNoScores: '尚無成績',
+    gradesUnmapped: '{n} 項未歸類',
+    gradesSourceCustom: '自訂',
+    gradesEmpty: '還沒有課程資料',
+    gradesClose: '關閉',
     // assignment row
     noDesc: '（無描述）',
     submittedBadge: '已繳',
@@ -254,6 +270,21 @@ const I18N = {
     weightItemName: '项目名称',
     gradeCalcTitle: '成绩计算器',
     gradeExcused: '已免除',
+    calcUnmappedTitle: '未计入',
+    calcUnmappedHint: '没对上权重项目，不算进总分；用下拉指定',
+    calcMapUnassigned: '未归类',
+    calcMapExclude: '不计入',
+    calcMapLabel: '{name} 计入哪个权重项目',
+    navGrades: '成绩',
+    gradesTitle: '学期成绩',
+    gradesNote: '只算已评分的部分，未评分不当 0 分。点课程看明细与试算。',
+    gradesGraded: '已评分 {n}%',
+    gradesNoWeights: '没有评分比重',
+    gradesNoScores: '暂无成绩',
+    gradesUnmapped: '{n} 项未归类',
+    gradesSourceCustom: '自定义',
+    gradesEmpty: '还没有课程数据',
+    gradesClose: '关闭',
     noDesc: '（无描述）',
     submittedBadge: '已交',
     markDone: '标记完成',
@@ -401,6 +432,21 @@ const I18N = {
     weightItemName: 'Item name',
     gradeCalcTitle: 'Grade Calculator',
     gradeExcused: 'Excused',
+    calcUnmappedTitle: 'Not counted',
+    calcUnmappedHint: "These don't match a weight item and aren't in the total. Pick one from the menu.",
+    calcMapUnassigned: 'Unassigned',
+    calcMapExclude: "Don't count",
+    calcMapLabel: 'Weight item for {name}',
+    navGrades: 'Grades',
+    gradesTitle: 'Semester grades',
+    gradesNote: 'Only graded work counts; ungraded work is not treated as zero. Click a course for the breakdown.',
+    gradesGraded: '{n}% graded',
+    gradesNoWeights: 'No grading weights',
+    gradesNoScores: 'No grades yet',
+    gradesUnmapped: '{n} unassigned',
+    gradesSourceCustom: 'Custom',
+    gradesEmpty: 'No courses yet',
+    gradesClose: 'Close',
     noDesc: '(No description)',
     submittedBadge: 'Submitted',
     markDone: 'Mark done',
@@ -609,6 +655,8 @@ function applyUILanguage() {
   setText('nav-courses-label', 'tabCourses');
   setText('btn-add-assignment', 'addAssignment');
   setText('nav-submitted-label', 'submittedBtn');
+  setText('nav-grades-label', 'navGrades');
+  applyGradesOverviewLanguage();
   const backLabel = document.querySelector('#detail-back-btn .detail-back-label');
   if (backLabel) backLabel.textContent = tr('back');
   else setText('detail-back-btn', 'back');
@@ -859,10 +907,9 @@ function esc(str) {
 // 作業是否屬於某個 assignment group：以作業本身的 assignment_group_id 對應
 // （同步不再帶 include[]=assignments，group 不內嵌作業清單）；
 // 作業缺 assignment_group_id 時（舊 mock 資料）才退回比對舊資料殘留的 group.assignments。自訂作業不屬於任何 group
+// 規則在 gradeCalc.js（成績計算器與學期成績總覽共用）
 function inGroup(a, g) {
-  if (!a || !g) return false;
-  if (a.assignment_group_id != null) return a.assignment_group_id === g.id;
-  return !!(g.assignments && g.assignments.some((ga) => ga.id === a.id));
+  return DueGradeCalc.inGroup(a, g);
 }
 
 function findGroup(assignment, groups) {
@@ -886,7 +933,7 @@ function saveLocal(obj, cb) {
 
 // ── 共享 storage key 的 read-modify-write（QA P1-2）──
 // popup／其他 dashboard 分頁也會寫同一批 key（manualDone、manualUndone、manualShown、manualHidden、
-// scores、courseNames、customAssignments、customWeights）。不可拿本頁 _currentData 快照整包覆寫（會吃掉別處的變更），
+// scores、courseNames、customAssignments、customWeights、gradeItemMap）。不可拿本頁 _currentData 快照整包覆寫（會吃掉別處的變更），
 // 一律：讀 storage 最新值 → 套用這次修改 → 寫回 → 結果併回 _currentData。
 // mutate(cur) 收各 key 目前值（缺 key → undefined）、回傳要寫入的 patch；必須是「目標狀態」寫法（冪等、不 mutate 輸入），
 // 因為它會套兩次：
@@ -894,7 +941,7 @@ function saveLocal(obj, cb) {
 //   2) 排進本頁寫入佇列：前一筆 set 完成才讀下一筆（同頁連點時第二筆讀得到第一筆的結果），以 storage 最新值為底再套一次
 // optimistic:false 只做 2)（customAssignments 這類寫完才重繪的；結果仍會併回 _currentData）；done(patch) 在 set 完成後呼叫。
 // 跨 context 的同毫秒競寫仍可能（沒有鎖），但窗口從「分頁存活期間」縮到一次 get→set 之間。
-const SHARED_USER_KEYS = ['manualDone', 'manualUndone', 'manualShown', 'manualHidden', 'scores', 'courseNames', 'customAssignments', 'customWeights'];
+const SHARED_USER_KEYS = ['manualDone', 'manualUndone', 'manualShown', 'manualHidden', 'scores', 'courseNames', 'customAssignments', 'customWeights', 'gradeItemMap'];
 let _writeQueue = Promise.resolve();
 const _selfWrites = {};   // key → 本頁寫出、尚待 onChanged 回聲的值（canonical JSON）；回聲只併資料、不觸發重繪
 
@@ -2856,18 +2903,6 @@ function renderCourseDetailSection(course, asgns, groups, scores) {
     });
   });
 
-  el.querySelectorAll('.grade-calc-header').forEach((header) => {
-    header.addEventListener('click', () => {
-      header.closest('.grade-calc').classList.toggle('open');
-    });
-  });
-
-  el.querySelectorAll('.grade-calc-pts input').forEach((input) => {
-    input.addEventListener('input', () => {
-      recalculateGrades(parseInt(input.dataset.courseId, 10), { changedId: input.dataset.assignmentId });
-    });
-  });
-
   bindEditWeightsBtns(el);
 
   // 「已隱藏」區展開/收合（不持久化，每次進詳情預設收合；切換已繳交／即時刷新由 captureViewState 保留）
@@ -2882,10 +2917,8 @@ function renderCourseDetailSection(course, asgns, groups, scores) {
   // 拖曳升級／降級隱藏項
   setupHideablePromoteDrag(el);
 
-  // 開頁時主動算一次「顯示用」總分（persist:false → 不把 Canvas 預填值固化成手動值）
-  if (el.querySelector('.grade-calc')) {
-    recalculateGrades(course.id, { persist: false });
-  }
+  // 成績計算器：綁事件＋開頁時算一次「顯示用」總分（persist:false → 不把 Canvas 預填值固化成手動值）
+  bindGradeCalc(el);
 }
 
 // ── 作業描述裡的頁內錨點（#xxx，見 descSanitizer 的 'fragment'，QA #158）──
@@ -3213,11 +3246,13 @@ function weightItemLabel(item) {
 }
 
 // Canvas 是否實際依分組加權：課程關掉「依組別加權」（apply_assignment_group_weights === false）時，
-// API 仍可能帶著殘留的 group_weight → 視為不加權，圓餅、計算器、權重編輯器預填都忽略（QA #93）
+// API 仍可能帶著殘留的 group_weight → 視為不加權，圓餅、計算器、權重編輯器預填都忽略（QA #93；規則在 gradeCalc.js）
 function courseUsesGroupWeights(courseId, groups) {
-  const course = (_currentData.courses || []).find((c) => c.id === courseId);
-  if (course && course.apply_assignment_group_weights === false) return false;
-  return (groups || []).some((g) => g.group_weight);
+  return DueGradeCalc.usesGroupWeights(courseById(courseId), groups);
+}
+
+function courseById(courseId) {
+  return (_currentData.courses || []).find((c) => c.id === courseId) || null;
 }
 
 // AI 分析是否已設定 key（AI 規則在 ai/gradingRules.js；dashboard 只拿布林）
@@ -3319,8 +3354,8 @@ function bindEditWeightsBtns(root) {
   });
 }
 
-// 權重存檔／還原後只換左欄圓餅（成績計算器用 Canvas 分組權重、不吃自訂權重）：
-// 右欄的計算器 accordion、已隱藏區、展開的描述與捲動位置都不動（QA #169）。已離開該課詳情 → 不畫，下次進詳情自然是新資料
+// 權重存檔／還原後換左欄圓餅＋右欄成績計算器（計算器與圓餅吃同一份權重，spec 2026-10-25-semester-grades）：
+// 已隱藏區、展開的描述與捲動位置都不動（QA #169）。已離開該課詳情 → 不畫，下次進詳情自然是新資料
 function refreshWeightPanel(courseId) {
   if (currentView !== 'course' || currentCourseId !== courseId) return;
   const panel = document.querySelector('#course-detail-container .detail-left-panel');
@@ -3329,6 +3364,7 @@ function refreshWeightPanel(courseId) {
   panel.innerHTML = renderWeightPie(groups, courseId);
   fitLegendText(panel);
   bindEditWeightsBtns(panel);
+  refreshGradeCalc(courseId);
   // 觸發 modal 的「編輯」鈕已被換掉（modal 關閉時無處還原焦點）→ 焦點交給新的那顆
   const ae = document.activeElement;
   const overlay = document.getElementById('weight-edit-overlay');
@@ -3339,21 +3375,40 @@ function refreshWeightPanel(courseId) {
 }
 
 // ── 成績計算器 ──
+// 結構（哪些作業、各歸哪一桶）與數學都在 gradeCalc.js：權重來源與圓餅一致（自訂優先 → Canvas 實際加權），
+// 自訂權重的作業歸類走 DueGradeCalc.matchItem（手動指定 → 作業名稱 → 組名 → 未歸類）
+function gradePlan(course, asgns, groups) {
+  return DueGradeCalc.plan({
+    course,
+    groups,
+    assignments: asgns,
+    customWeights: (_currentData.customWeights || {})[course.id],
+    itemMap: (_currentData.gradeItemMap || {})[course.id],
+  });
+}
+
+// 自訂權重模式每列的小下拉：這筆計入哪個權重項目（選項值＝桶索引；"none"＝不計入；未歸類時多一個停用的佔位）
+function gradeMapSelectHtml(r, buckets, courseId) {
+  const unassigned = r.how === 'none'
+    ? `<option value="" selected disabled>${esc(tr('calcMapUnassigned'))}</option>`
+    : '';
+  const items = buckets.map((b, i) =>
+    `<option value="${i}"${r.bucket === i ? ' selected' : ''}>${esc(weightItemLabel(b))}</option>`).join('');
+  const exclude = `<option value="none"${r.how === 'excluded' ? ' selected' : ''}>${esc(tr('calcMapExclude'))}</option>`;
+  const label = tr('calcMapLabel').replace('{name}', () => r.a.name || '');
+  return `<select class="grade-calc-map${r.how === 'none' ? ' is-unassigned' : ''}" data-assignment-id="${esc(String(r.a.id))}" data-course-id="${courseId}" aria-label="${esc(label)}">${unassigned}${items}${exclude}</select>`;
+}
+
 function renderGradeCalculator(course, asgns, groups, scores) {
-  // Only show for courses with weighted groups（課程關掉依組別加權 → 殘留 group_weight 不算，QA #93）
-  const hasWeights = courseUsesGroupWeights(course.id, groups);
-  if (!groups.length || !hasWeights) return '';
+  const plan = gradePlan(course, asgns, groups);
+  if (plan.mode === 'none' || !plan.rows.length) return '';
+  const custom = plan.mode === 'custom';
 
-  const groupRows = groups.map((g) => {
-    const groupAsgns = asgns.filter((a) => inGroup(a, g))
-      .filter((a) => a.points_possible != null && a.points_possible > 0);
-
-    if (!groupAsgns.length) return '';
-
-    const rows = groupAsgns.map((a) => {
-      // Canvas 已免除（excused）：不給輸入框、標「已免除」，不計入分子分母（Canvas 本身也排除，QA #94）
-      if (a.submission && a.submission.excused) {
-        return `
+  const rowHtml = (r) => {
+    const a = r.a;
+    // Canvas 已免除（excused）：不給輸入框、標「已免除」，不計入分子分母（Canvas 本身也排除，QA #94）
+    if (a.submission && a.submission.excused) {
+      return `
         <div class="grade-calc-row is-excused">
           <span class="grade-calc-asgn-name" title="${esc(a.name)}">${esc(a.name)}</span>
           <div class="grade-calc-pts">
@@ -3361,57 +3416,132 @@ function renderGradeCalculator(course, asgns, groups, scores) {
             <span class="grade-calc-possible">/ ${a.points_possible}</span>
           </div>
         </div>`;
-      }
-      // 三態：scores 自有該 id → null 代表使用者清空過（顯示空）、數字則顯示；
-      //       scores 無該 id → 有 Canvas 已評分成績就預填，否則空
-      let savedScore;
-      if (Object.prototype.hasOwnProperty.call(scores, a.id)) {
-        savedScore = scores[a.id] === null ? '' : scores[a.id];
-      } else if (a.submission && a.submission.score != null) {
-        savedScore = a.submission.score;
-      } else {
-        savedScore = '';
-      }
-      return `
+    }
+    // 三態：scores 自有該 id → null 代表使用者清空過（顯示空）、數字則顯示；沒有 → Canvas 已評分就預填
+    const value = DueGradeCalc.inputValue(a, scores);
+    return `
         <div class="grade-calc-row">
           <span class="grade-calc-asgn-name" title="${esc(a.name)}">${esc(a.name)}</span>
+          ${custom ? gradeMapSelectHtml(r, plan.buckets, course.id) : ''}
           <div class="grade-calc-pts">
             <input
               type="number"
               min="0"
               max="${a.points_possible}"
               placeholder="—"
-              value="${savedScore}"
+              value="${esc(String(value))}"
               data-assignment-id="${a.id}"
               data-course-id="${course.id}"
             />
             <span class="grade-calc-possible">/ ${a.points_possible}</span>
           </div>
         </div>`;
-    }).join('');
+  };
 
+  const groupsHtml = plan.buckets.map((b, i) => {
+    const rows = plan.rows.filter((r) => r.bucket === i);
+    // Canvas 模式只列有作業的組（舊行為）；自訂模式每個項目都列——沒有作業的組頭照樣在，看得出這部分還沒算進去
+    if (!rows.length && !custom) return '';
     return `
       <div class="grade-calc-group">
         <div class="grade-calc-group-header">
-          <span class="grade-calc-group-name">${esc(g.name)} · ${g.group_weight || 0}%</span>
-          <span class="grade-calc-group-score" id="group-score-${g.id}">—</span>
+          <span class="grade-calc-group-name">${esc(custom ? weightItemLabel(b) : b.name)} · ${b.weight}%</span>
+          <span class="grade-calc-group-score" data-bucket="${i}">—</span>
         </div>
-        ${rows}
+        ${rows.map(rowHtml).join('')}
       </div>`;
   }).join('');
+  if (!groupsHtml.trim()) return '';
 
-  if (!groupRows.trim()) return '';
+  // 自訂模式：未歸類＋手動不計入的作業收在最下面「未計入」，明講不算進總分（寧可不算、不可算錯）
+  const outRows = custom ? plan.rows.filter((r) => r.bucket < 0) : [];
+  const outHtml = outRows.length ? `
+      <div class="grade-calc-group grade-calc-out">
+        <div class="grade-calc-group-header">
+          <span class="grade-calc-group-name">${esc(tr('calcUnmappedTitle'))}</span>
+        </div>
+        ${outRows.some((r) => r.how === 'none') ? `<div class="grade-calc-out-hint">${esc(tr('calcUnmappedHint'))}</div>` : ''}
+        ${outRows.map(rowHtml).join('')}
+      </div>` : '';
 
   return `
-    <div class="grade-calc">
+    <div class="grade-calc" data-course-id="${course.id}" data-mode="${plan.mode}">
       <div class="grade-calc-header">
         <span class="grade-calc-title">${tr('gradeCalcTitle')}</span>
-        <span class="grade-calc-final-display" id="final-grade-${course.id}">—</span>
+        <span class="grade-calc-final-display">—</span>
       </div>
       <div class="grade-calc-body">
-        ${groupRows}
+        ${groupsHtml}${outHtml}
       </div>
     </div>`;
+}
+
+// 計算器的事件綁定＋開頁時算一次「顯示用」總分（詳情整段重繪與 refreshGradeCalc 共用）。
+// 畫面當下的 plan 掛在元素上：之後即時試算用同一份對應，不會因為資料在輸入途中被別處更新而跟畫面錯位
+function bindGradeCalc(root) {
+  root.querySelectorAll('.grade-calc').forEach((calc) => {
+    const courseId = parseInt(calc.dataset.courseId, 10);
+    const course = courseById(courseId);
+    if (!course) return;
+    calc._plan = gradePlan(course,
+      (_currentData.assignments || {})[courseId] || [],
+      (_currentData.assignmentGroups || {})[courseId] || []);
+    const header = calc.querySelector('.grade-calc-header');
+    if (header) header.addEventListener('click', () => calc.classList.toggle('open'));
+    calc.querySelectorAll('.grade-calc-pts input').forEach((input) => {
+      input.addEventListener('input', () => {
+        recalculateGrades(courseId, { changedId: input.dataset.assignmentId });
+      });
+    });
+    calc.querySelectorAll('.grade-calc-map').forEach((sel) => {
+      sel.addEventListener('change', () => setGradeItem(courseId, sel.dataset.assignmentId, sel.value, calc._plan));
+    });
+    // persist:false → 不把 Canvas 預填值固化成手動值
+    recalculateGrades(courseId, { persist: false });
+  });
+}
+
+// 下拉改歸類：存項目名稱（名稱之後被改掉 → 規則略過、回到自動歸類）；"none" 存 null＝不計入。寫完當場重畫計算器
+function setGradeItem(courseId, assignmentId, value, plan) {
+  const bucket = value === 'none' ? null : (plan && plan.buckets[Number(value)]);
+  if (value !== 'none' && !bucket) return;
+  const target = bucket ? bucket.name : null;
+  updateShared(['gradeItemMap'], (cur) => {
+    const all = { ...(cur.gradeItemMap || {}) };
+    all[courseId] = { ...(all[courseId] || {}), [assignmentId]: target };
+    return { gradeItemMap: all };
+  });
+  refreshGradeCalc(courseId, { focusAssignmentId: assignmentId });
+}
+
+// 只換右欄的成績計算器（權重存檔、改歸類後）：保留 accordion 開合與右欄捲動；計算器從無到有、從有到無都處理
+function refreshGradeCalc(courseId, { focusAssignmentId = null } = {}) {
+  if (currentView !== 'course' || currentCourseId !== courseId) return;
+  const right = document.querySelector('#course-detail-container .detail-right-panel');
+  const course = courseById(courseId);
+  if (!right || !course) return;
+  const old = right.querySelector('.grade-calc');
+  const wasOpen = !!(old && old.classList.contains('open'));
+  const scrollTop = right.scrollTop;
+  const tmp = document.createElement('div');
+  tmp.innerHTML = renderGradeCalculator(course,
+    (_currentData.assignments || {})[courseId] || [],
+    (_currentData.assignmentGroups || {})[courseId] || [],
+    _currentData.scores || {}).trim();
+  const next = tmp.firstElementChild;
+  if (old && next) old.replaceWith(next);
+  else if (old) old.remove();
+  else if (next) right.insertBefore(next, right.firstChild);
+  if (next) {
+    if (wasOpen) next.classList.add('open');
+    bindGradeCalc(right);
+  }
+  right.scrollTop = scrollTop;
+  if (next && focusAssignmentId != null) {
+    const css = (window.CSS && CSS.escape) ? CSS.escape(String(focusAssignmentId)) : String(focusAssignmentId);
+    const sel = next.querySelector(`.grade-calc-map[data-assignment-id="${css}"]`);
+    if (sel) sel.focus({ preventScroll: true });
+  }
 }
 
 // ── 成績即時計算 ──
@@ -3419,13 +3549,13 @@ function renderGradeCalculator(course, asgns, groups, scores) {
 // 不把 Canvas 預填值固化成手動值。顯示一律從輸入框現值讀，確保預填與手動輸入一致。
 // changedId：只持久化這一格（使用者正在輸入的那格）——其他格可能是較舊的畫面值，不可整門課覆寫別處的變更
 function recalculateGrades(courseId, { persist = true, changedId = null } = {}) {
-  const { assignments = {}, assignmentGroups = {} } = _currentData;
+  const { assignments = {} } = _currentData;
   const asgns = assignments[courseId] || [];
-  const groups = assignmentGroups[courseId] || [];
+  const calc = document.querySelector(`#course-detail-container .grade-calc[data-course-id="${courseId}"]`);
 
-  const inputFor = (a) => document.querySelector(
-    `.grade-calc-pts input[data-assignment-id="${a.id}"][data-course-id="${courseId}"]`
-  );
+  const inputFor = (a) => (calc
+    ? calc.querySelector(`.grade-calc-pts input[data-assignment-id="${a.id}"][data-course-id="${courseId}"]`)
+    : null);
 
   // 每個作業的「有效分數」＝輸入框現值（含預填）；只在可解析為「非負」有限數時記錄。
   // 負分不合理 → 輸入框標紅、不計入、也不寫入 storage（QA #25；超過配分則照收，可能是加分題）。
@@ -3443,40 +3573,15 @@ function recalculateGrades(courseId, { persist = true, changedId = null } = {}) 
     if (Number.isFinite(v) && !invalid) effective[a.id] = v;
   });
 
-  // 分組小計＋加權總分（只有有限數且有配分才計入）
-  let weightedSum = 0;
-  let weightedTotal = 0;
-  groups.forEach((g) => {
-    const groupAsgns = asgns.filter((a) => inGroup(a, g));
-
-    let earnedSum = 0;
-    let possibleSum = 0;
-    let hasScore = false;
-    groupAsgns.forEach((a) => {
-      if (Number.isFinite(effective[a.id]) && a.points_possible) {
-        earnedSum += effective[a.id];
-        possibleSum += a.points_possible;
-        hasScore = true;
-      }
+  // 分組小計＋加權總分：與學期成績總覽同一套數學（DueGradeCalc.compute），差別只在分數來自輸入框現值
+  if (calc && calc._plan) {
+    const result = DueGradeCalc.compute(calc._plan, (a) => (Number.isFinite(effective[a.id]) ? effective[a.id] : null));
+    calc.querySelectorAll('.grade-calc-group-score[data-bucket]').forEach((el) => {
+      const b = result.buckets[Number(el.dataset.bucket)];
+      el.textContent = b && b.percent != null ? `${b.percent.toFixed(1)}%` : '—';
     });
-
-    const scoreEl = document.getElementById(`group-score-${g.id}`);
-    if (scoreEl) {
-      if (hasScore && possibleSum > 0) {
-        scoreEl.textContent = `${((earnedSum / possibleSum) * 100).toFixed(1)}%`;
-        weightedSum += (earnedSum / possibleSum) * (g.group_weight || 0);
-        weightedTotal += (g.group_weight || 0);
-      } else {
-        scoreEl.textContent = '—';
-      }
-    }
-  });
-
-  const finalEl = document.getElementById(`final-grade-${courseId}`);
-  if (finalEl) {
-    finalEl.textContent = weightedTotal > 0
-      ? `${((weightedSum / weightedTotal) * 100).toFixed(1)}%`
-      : '—';
+    const finalEl = calc.querySelector('.grade-calc-final-display');
+    if (finalEl) finalEl.textContent = result.percent != null ? `${result.percent.toFixed(1)}%` : '—';
   }
 
   if (!persist) return;
@@ -3659,6 +3764,118 @@ document.getElementById('nav-submitted').addEventListener('click', () => {
   loadData();
 });
 
+// ── 學期成績總覽（spec 2026-10-25-semester-grades）──
+// 決策 3：日常視圖不顯示分數 → 跨課分數只在側欄「成績」主動點開的 modal 裡；數字與各課計算器同一套規則（DueGradeCalc），
+// 只算已評分的部分。依課程代碼排序（順序穩定，不跟著截止日跳）。開著時 isUiIdle 為 false，外部更新等它關掉再重繪
+function gradeSourceLabel(courseId, mode) {
+  if (mode === 'canvas') return tr('weightSourceCanvas');
+  if (mode !== 'custom') return '';
+  return isAiCustomWeights(courseId, (_currentData.customWeights || {})[courseId]) ? tr('weightSourceAi') : tr('gradesSourceCustom');
+}
+
+function renderGradesOverview() {
+  const list = document.getElementById('grades-list');
+  if (!list) return;
+  const { courses = [], assignments = {}, assignmentGroups = {}, scores = {}, customWeights = {}, gradeItemMap = {} } = _currentData;
+  if (!courses.length) {
+    list.innerHTML = `<div class="grades-empty">${esc(tr('gradesEmpty'))}</div>`;
+    return;
+  }
+  const key = (c) => String(c.course_code || c.name || '');
+  const sorted = [...courses].sort((a, b) => key(a).localeCompare(key(b)));
+  list.innerHTML = sorted.map((c) => {
+    const g = DueGradeCalc.courseGrade({
+      course: c,
+      groups: assignmentGroups[c.id] || [],
+      assignments: assignments[c.id] || [],
+      scores,
+      customWeights: customWeights[c.id],
+      itemMap: gradeItemMap[c.id],
+    });
+    let value = '—';
+    let sub = tr('gradesNoScores');
+    let bar = '';
+    if (g.mode === 'none') {
+      sub = tr('gradesNoWeights');
+    } else {
+      const coverage = g.totalWeight > 0 ? Math.min(100, (g.gradedWeight / g.totalWeight) * 100) : 0;
+      if (g.percent != null) {
+        value = `${g.percent.toFixed(1)}%`;
+        sub = tr('gradesGraded').replace('{n}', Math.round(coverage));
+      }
+      // 已評分佔總權重多少：95% 只建立在 10% 的權重上時一眼看得出來
+      bar = `<span class="grades-bar" aria-hidden="true"><span style="width:${coverage.toFixed(1)}%"></span></span>`;
+    }
+    // 小字：權重來源；有已評分卻未歸類的作業（不在總分裡）→ 接「N 項未歸類」
+    const meta = [];
+    const source = gradeSourceLabel(c.id, g.mode);
+    if (source) meta.push(esc(source));
+    if (g.unmappedGraded) meta.push(`<span class="grades-warn">${esc(tr('gradesUnmapped').replace('{n}', g.unmappedGraded))}</span>`);
+    const metaHtml = meta.join(' · ');
+    return `
+      <button class="grades-row${g.percent == null ? ' is-empty' : ''}" data-course-id="${c.id}">
+        <span class="grades-course">
+          <span class="grades-code">${esc(c.course_code || '')}</span>
+          <span class="grades-name">${esc(getCourseName(c))}</span>
+          ${metaHtml ? `<span class="grades-meta">${metaHtml}</span>` : ''}
+        </span>
+        <span class="grades-score">
+          <span class="grades-value">${value}</span>
+          <span class="grades-sub">${esc(sub)}</span>
+          ${bar}
+        </span>
+      </button>`;
+  }).join('');
+}
+
+function openGradesOverview() {
+  if (_noCoursesMode) return;
+  renderGradesOverview();
+  document.getElementById('grades-overlay').classList.add('open');
+}
+
+function closeGradesOverview() {
+  document.getElementById('grades-overlay').classList.remove('open');
+}
+
+// 靜態文字（標題、說明、關閉鈕）；modal 開著時連列表一起換語言
+function applyGradesOverviewLanguage() {
+  const set = (id, key) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = tr(key);
+  };
+  set('grades-title', 'gradesTitle');
+  set('grades-note', 'gradesNote');
+  const close = document.getElementById('grades-close');
+  if (close) {
+    close.setAttribute('aria-label', tr('gradesClose'));
+    close.title = tr('gradesClose');
+  }
+  const ov = document.getElementById('grades-overlay');
+  if (ov && ov.classList.contains('open')) renderGradesOverview();
+}
+
+document.getElementById('nav-grades').addEventListener('click', openGradesOverview);
+document.getElementById('grades-close').addEventListener('click', closeGradesOverview);
+
+// 點一門課：關 modal → 進該課詳情（不帶卡片 → 同步渲染）→ 展開成績計算器
+document.getElementById('grades-list').addEventListener('click', (e) => {
+  const row = e.target.closest('.grades-row');
+  if (!row) return;
+  const courseId = Number(row.dataset.courseId);
+  closeGradesOverview();
+  showCourseDetail(courseId);
+  if (currentView !== 'course' || currentCourseId !== courseId) return;
+  const calc = document.querySelector('#course-detail-container .grade-calc');
+  if (calc) calc.classList.add('open');
+});
+
+const _gradesOverlay = document.getElementById('grades-overlay');
+trackBackdropPress(_gradesOverlay);
+_gradesOverlay.addEventListener('click', (e) => {
+  if (isBackdropClick(_gradesOverlay, e)) closeGradesOverview();
+});
+
 // ── 同步按鈕 ──
 document.getElementById('sync-btn').addEventListener('click', () => {
   const btn = document.getElementById('sync-btn');
@@ -3783,7 +4000,7 @@ function renderEmptyState() {
 let _noCoursesMode = false;
 function setNoCoursesMode(on) {
   _noCoursesMode = on;
-  ['btn-add-assignment', 'nav-courses', 'nav-submitted'].forEach((id) => {
+  ['btn-add-assignment', 'nav-courses', 'nav-submitted', 'nav-grades'].forEach((id) => {
     const el = document.getElementById(id);
     if (!el) return;
     el.disabled = on;
@@ -3815,7 +4032,7 @@ document.getElementById('main-section')?.addEventListener('click', (e) => {
 // ── 讀取資料 ──
 function loadData() {
   chrome.storage.local.get(
-    ['lastSync', 'schoolName', 'canvasBaseUrl', 'canvasBaseCandidate', 'courses', 'assignments', 'customAssignments', 'assignmentGroups', 'scores', 'courseNames', 'customWeights', 'manualDone', 'manualUndone', 'manualShown', 'manualHidden', 'gradingAnalysis', 'aiConfig'],
+    ['lastSync', 'schoolName', 'canvasBaseUrl', 'canvasBaseCandidate', 'courses', 'assignments', 'customAssignments', 'assignmentGroups', 'scores', 'courseNames', 'customWeights', 'manualDone', 'manualUndone', 'manualShown', 'manualHidden', 'gradeItemMap', 'gradingAnalysis', 'aiConfig'],
     (raw) => {
       // 候選網址另存在 _canvasCandidate（不進 _currentData），在 _currentData 的 canvasBaseUrl 更新後再畫提示；
       // aiConfig 只取「有沒有設定 key」，不進 _currentData
@@ -3859,6 +4076,7 @@ function loadData() {
         manualUndone: data.manualUndone || {},
         manualShown: data.manualShown || {},
         manualHidden: data.manualHidden || {},
+        gradeItemMap: data.gradeItemMap || {},   // 成績計算器：作業 → 自訂權重項目的手動指定
         // 一定要有這個 key：常駐 onChanged 只合併 _currentData 裡已有的 key，AI 之後寫的紀錄才會進來（D2 來源標示）
         gradingAnalysis: data.gradingAnalysis || {},
       });
@@ -4107,7 +4325,7 @@ const REFRESH_RETRY_MS = 800;             // 非閒置時隔一段再試
 const META_TICK_MS = 60 * 1000;           // header「N 分鐘前」每分鐘重算
 const STALE_ON_SHOW_MS = 60 * 1000;       // 分頁回到前景：距上次 render 超過此值就重繪
 const IDLE_RERENDER_MS = 5 * 60 * 1000;   // 前景時每 5 分鐘重繪一次（逾期分組、7/30 天邊界、考試結束都隨時間變）
-const MODAL_OVERLAY_IDS = ['custom-assignment-overlay', 'weight-edit-overlay', 'welcome-overlay', 'confirm-overlay', 'ai-settings-overlay'];
+const MODAL_OVERLAY_IDS = ['custom-assignment-overlay', 'weight-edit-overlay', 'welcome-overlay', 'confirm-overlay', 'ai-settings-overlay', 'grades-overlay'];
 const MORPH_STALE_MS = 2000;              // view-transition-name 殘留超過此值視為已結束
 let _refreshPending = false;
 let _refreshTimer = 0;
@@ -4586,12 +4804,13 @@ _weightOverlay.addEventListener('click', (e) => {
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
   if (isImeComposing(e)) return;   // 組字中的 Esc 是取消候選字，不關 modal（連同未存輸入，QA P2-14）
-  // 優先序：確認框 → AI 設定 → 新增/編輯作業 → 權重 → 教學（一次只關最上層；經 close 函式一併清狀態）
+  // 優先序：確認框 → AI 設定 → 新增/編輯作業 → 權重 → 學期成績 → 教學（一次只關最上層；經 close 函式一併清狀態）
   const closers = [
     ['confirm-overlay', closeConfirmDialog],
     ['ai-settings-overlay', () => { if (typeof DueAiSettings !== 'undefined') DueAiSettings.close(); }],
     ['custom-assignment-overlay', closeCustomAssignmentModal],
     ['weight-edit-overlay', () => document.getElementById('weight-edit-overlay').classList.remove('open')],
+    ['grades-overlay', closeGradesOverview],
     ['welcome-overlay', closeWelcomeModal],
   ];
   for (const [id, close] of closers) {
@@ -4603,7 +4822,7 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// ── Modal 無障礙：focus trap ＋ 開啟聚焦第一元素 ＋ 關閉還原焦點到觸發元素（五個 overlay 共用）──
+// ── Modal 無障礙：focus trap ＋ 開啟聚焦第一元素 ＋ 關閉還原焦點到觸發元素（六個 overlay 共用）──
 function _focusablesIn(container) {
   const sel = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
   // inert 子樹（教學畫面外的投影片）不可聚焦，不算進 trap 的頭尾
@@ -4658,6 +4877,6 @@ function setupModalA11y(overlay) {
   if (overlay.classList.contains('open')) activate();   // 設定時已開著（如首次載入教學）也啟用
 }
 
-['custom-assignment-overlay', 'weight-edit-overlay', 'welcome-overlay', 'confirm-overlay', 'ai-settings-overlay']
+['custom-assignment-overlay', 'weight-edit-overlay', 'welcome-overlay', 'confirm-overlay', 'ai-settings-overlay', 'grades-overlay']
   .forEach((id) => setupModalA11y(document.getElementById(id)));
 

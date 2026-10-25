@@ -1510,6 +1510,73 @@
       min-width: 44px;
     }
 
+    /* 自訂權重模式：每列「計入哪個權重項目」的小下拉（spec 2026-10-25-semester-grades）。
+       平時像一行註記（無框、--mid），hover／focus 才出框線；caret 用兩道漸層畫，不用圖檔 */
+    .grade-calc-map {
+      flex: 0 1 8.5em;           /* 固定欄寬：各列的下拉左緣對齊，像一欄「計入項目」 */
+      width: 8.5em;
+      min-width: 5.5em;
+      padding: 3px 16px 3px 6px;
+      border: 1px solid transparent;
+      border-radius: 4px;
+      background-color: transparent;
+      background-image:
+        linear-gradient(45deg, transparent 50%, var(--mid) 50%),
+        linear-gradient(135deg, var(--mid) 50%, transparent 50%);
+      background-position: calc(100% - 9px) 55%, calc(100% - 6px) 55%;
+      background-size: 3px 3px, 3px 3px;
+      background-repeat: no-repeat;
+      -webkit-appearance: none;
+      appearance: none;
+      color: var(--mid);
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      cursor: pointer;
+      transition: border-color 0.12s, color 0.12s;
+    }
+
+    .grade-calc-map:hover {
+      border-color: var(--border);
+      color: var(--dark);
+    }
+
+    .grade-calc-map:focus-visible {
+      outline: none;
+      border-color: var(--orange);
+      color: var(--dark);
+    }
+
+    /* 窄視窗：下拉欄讓一點寬度給作業名（全名在 title） */
+    @media (max-width: 767px) {
+      .grade-calc-map {
+        flex-basis: 6.5em;
+        width: 6.5em;
+      }
+    }
+
+    /* 未歸類：虛線框＋深色字，看得出「這筆還沒算進去」，但不用警示色 */
+    .grade-calc-map.is-unassigned {
+      border-style: dashed;
+      border-color: var(--border);
+      color: var(--dark);
+    }
+
+    /* 「未計入」區：與上面的權重項目用虛線隔開 */
+    .grade-calc-out {
+      padding-top: 12px;
+      border-top: 1px dashed var(--border);
+    }
+
+    .grade-calc-out-hint {
+      margin: -2px 0 6px;
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--mid);
+    }
+
     .btn-delete-custom-assignment {
       width: 26px;
       height: 26px;
@@ -3328,6 +3395,182 @@
 
     .weight-edit-total.over { color: var(--orange); }
 
+    /* ── 學期成績總覽 modal（spec 2026-10-25-semester-grades）── */
+    .grades-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.35);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .grades-overlay.open { display: flex; }
+
+    .grades-modal {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      width: 560px;
+      max-width: 92vw;
+      max-height: 84vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.14);
+    }
+
+    .grades-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 18px 20px 14px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .grades-title {
+      font-family: 'Source Serif 4', Georgia, serif;
+      font-size: 18px;
+      color: var(--dark);
+    }
+
+    .grades-note {
+      margin-top: 4px;
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--mid);
+    }
+
+    .grades-close {
+      flex-shrink: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px;
+      border: none;
+      border-radius: 4px;
+      background: none;
+      color: var(--mid);
+      cursor: pointer;
+      transition: color 0.12s, background 0.12s;
+    }
+
+    .grades-close:hover {
+      color: var(--dark);
+      background: var(--surface);
+    }
+
+    .grades-list {
+      overflow-y: auto;
+      padding: 4px 8px 8px;
+    }
+
+    .grades-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      width: 100%;
+      padding: 14px 12px;
+      border: none;
+      border-bottom: 1px solid var(--border);
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+      transition: background 0.12s;
+    }
+
+    .grades-row:last-child { border-bottom: none; }
+
+    .grades-row:hover { background: var(--surface); }
+
+    .grades-row:focus-visible {
+      outline: 2px solid var(--orange);
+      outline-offset: -2px;
+    }
+
+    .grades-course {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      min-width: 0;
+    }
+
+    .grades-code {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      color: var(--mid);
+    }
+
+    .grades-name {
+      font-family: 'Source Serif 4', Georgia, serif;
+      font-size: 15px;
+      color: var(--dark);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .grades-meta {
+      font-family: 'DM Mono', monospace;
+      font-size: 10.5px;
+      letter-spacing: 0.02em;
+      color: var(--mid);
+    }
+
+    .grades-warn { color: var(--overdue); }
+
+    .grades-score {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 4px;
+      flex-shrink: 0;
+      min-width: 96px;
+    }
+
+    .grades-value {
+      font-family: 'DM Mono', monospace;
+      font-size: 18px;
+      color: var(--dark);
+    }
+
+    .grades-row.is-empty .grades-value { color: var(--mid); }
+
+    .grades-sub {
+      font-family: 'DM Mono', monospace;
+      font-size: 10.5px;
+      color: var(--mid);
+      white-space: nowrap;
+    }
+
+    /* 已評分佔總權重多少（綠＝已定案的部分，與本週進度環同色） */
+    .grades-bar {
+      display: block;
+      width: 96px;
+      height: 2px;
+      border-radius: 1px;
+      background: var(--border);
+      overflow: hidden;
+    }
+
+    .grades-bar > span {
+      display: block;
+      height: 100%;
+      background: var(--green);
+    }
+
+    .grades-empty {
+      padding: 24px 12px;
+      font-size: 13px;
+      color: var(--mid);
+    }
+
     .weight-edit-footer-left {
       display: flex;
       align-items: center;
@@ -3973,6 +4216,10 @@
             <span class="side-nav-name" id="nav-submitted-label">已繳交</span>
             <span class="side-nav-count" id="nav-submitted-count"></span>
           </button>
+          <!-- 學期成績：開 modal（不是頁面）；分數只在這裡與各課成績計算器出現（決策 3，spec 2026-10-25-semester-grades） -->
+          <button class="side-nav-item" id="nav-grades" aria-haspopup="dialog">
+            <span class="side-nav-name" id="nav-grades-label">成績</span>
+          </button>
         </nav>
 
         <div class="sidebar-section" style="flex:1;min-height:0;">
@@ -4353,6 +4600,20 @@
     </div>
   </div>
 
+  <!-- 學期成績總覽（側欄「成績」；列表由 dashboard.js renderGradesOverview 填入）-->
+  <div class="grades-overlay" id="grades-overlay">
+    <div class="grades-modal" role="dialog" aria-modal="true" aria-labelledby="grades-title" aria-describedby="grades-note">
+      <div class="grades-header">
+        <div>
+          <div class="grades-title" id="grades-title">學期成績</div>
+          <div class="grades-note" id="grades-note">只算已評分的部分，未評分不當 0 分。點課程看明細與試算。</div>
+        </div>
+        <button class="grades-close" id="grades-close" aria-label="關閉" title="關閉"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+      </div>
+      <div class="grades-list" id="grades-list"></div>
+    </div>
+  </div>
+
   <!-- AI 分析設定 modal（spec 2026-09-03；所有文字由 aiSettings.js 依語言填入）-->
   <div class="ai-settings-overlay" id="ai-settings-overlay">
     <div class="ai-settings-modal" role="dialog" aria-modal="true" aria-labelledby="ai-settings-title">
@@ -4426,6 +4687,7 @@
   <script src="customAssignments.js"></script>
   <script src="completion.js"></script>
   <script src="descSanitizer.js"></script>
+  <script src="gradeCalc.js"></script>
   <script src="../ai/gradingRules.js"></script>
   <script src="dashboard.js"></script>
   <script src="aiSettings.js"></script>

@@ -41,6 +41,7 @@ cc/
         ├── taskRules.js           ← 共用規則：考試/簽到判定（結構規則優先＋名稱備援）、緊急度色階、逾期窗（含測試，popup 共用）
         ├── completion.js          ← 完成標記單一真相來源：isDone / setDone（勾選寫入入口）/ toggleManualDone（含測試）
         ├── customAssignments.js   ← 自訂作業建立與合併（含測試）
+        ├── gradeCalc.js           ← 成績計算純規則：權重來源、自訂權重的作業歸類、加權分數（含測試；計算器與學期成績總覽共用）
         └── descSanitizer.js       ← 作業描述 HTML 白名單 sanitize（含測試）
 ```
 
@@ -100,6 +101,7 @@ GET /api/v1/accounts/self、/api/v1/accounts/:account_id
   "manualShown": { "assignmentId": true },
   "manualHidden": { "assignmentId": true },
   "customWeights": { "courseId": [{ "name": "Homework", "weight": 30 }] },
+  "gradeItemMap": { "courseId": { "assignmentId": "Homework | null" } },
   "courseNames": { "courseId": "自訂名稱" },
   "uiLanguage": "zh-TW",
   "showClaudeUsageInPopup": true,
@@ -241,7 +243,7 @@ sidebar（300px）+ main-content（flex:1）
 │  同步/設定            │
 ```
 
-> 主導航（`.side-nav`）：`學期待辦`／`課程` 為兩個頁面（互斥 active，切換帶水平 slide），`已繳交` 為過濾切換（`showSubmitted`，開啟時獨立高亮）。三者右側各顯示數量（待辦數／課程數／已完成數）。active 狀態、數量與頂部 `#page-title` 由 `updateSideNav()` 統一更新；在課程詳情頁點 `學期待辦`／`課程` 會先退出詳情再切換（見 `goToPage()`）。頂部 `.page-tabs` 只保留頁面標題（詳情模式下由 CSS 隱藏，改顯示返回鍵）與「新增作業」。
+> 主導航（`.side-nav`）：`學期待辦`／`課程` 為兩個頁面（互斥 active，切換帶水平 slide），`已繳交` 為過濾切換（`showSubmitted`，開啟時獨立高亮）。三者右側各顯示數量（待辦數／課程數／已完成數）。第四顆 `成績`（`#nav-grades`，`aria-haspopup="dialog"`）不是頁面：開「學期成績」modal（見下方），不 active、沒有計數，沒有課程時與課程／已繳交一起停用（`setNoCoursesMode`）。active 狀態、數量與頂部 `#page-title` 由 `updateSideNav()` 統一更新；在課程詳情頁點 `學期待辦`／`課程` 會先退出詳情再切換（見 `goToPage()`）。頂部 `.page-tabs` 只保留頁面標題（詳情模式下由 CSS 隱藏，改顯示返回鍵）與「新增作業」。
 >
 > **已繳交固定用各課程 grid 版面**：`render()` 選版面的條件為 `currentPage === 'week' && !showSubmitted` 才走週待辦（圓餅圖）版面，否則一律 `renderCardGrid()`。因此不論從「學期待辦」或「課程」頁開啟已繳交，都顯示各課程 grid；關閉後回到原本所在頁面。
 
@@ -266,7 +268,7 @@ sidebar（300px）+ main-content（flex:1）
   - **來源小字**（D2，`weightSourceHtml`，圖例最後一行、`.detail-weight-source` DM Mono 10.5px `--mid`，title 說明）只有三種情況：`customWeights` 與 AI 的 done 紀錄逐項相同（`isAiCustomWeights` → `DueGradingRules.isAiWeights`）→「AI 分析」；畫的是 Canvas 分組權重 →「Canvas 設定」；其餘（自己填的、改過的、沒有權重）不標。`loadData` 一定把 `gradingAnalysis`（預設 `{}`）放進 `_currentData`，常駐 onChanged 才會合併 AI 之後寫的紀錄；`aiConfig` 只取布林 `_aiConfigured`（`isAiConfigured`），不進 `_currentData`
   - **`customWeights[courseId]` 存在（含空陣列）＝使用者覆寫**：總和 > 0 畫自訂圓餅；全刪／總和 0 → 「沒有評分資訊」（與編輯器一致，不偷偷回退 Canvas 權重，QA #168）；回到 Canvas 權重只走編輯器的清除鈕（刪 key，覆寫存在時才顯示該鈕；文字依 `DueGradingRules.resetButtonKind`（有測試）存成 `_weightResetKey`：Canvas 權重生效 →「還原 Canvas 權重」；否則 AI 已設定且上次不是 notFound →「清除並重新分析」；其餘（沒設定 key，或 AI 上次判 notFound——材料沒變時指紋會擋掉、按了也不會重跑）→「清除權重」；`applyUILanguage` 沿用目前的 key）。**既有資料的語意變更（不遷移）**：v2.0.0 以前「全刪後儲存」也會存成 `[]`，當時圓餅會回退顯示 Canvas 權重；升級後這類舊 `[]` 改顯示「沒有評分資訊」，編輯器列 0 項且「還原 Canvas 權重」鈕可見，按下即回到 Canvas 權重
   - 權重編輯器（`openWeightEditModal`）：總和 > 100%、有負數、或仍有「會被存下的項目」（`weightRowKept`：有名稱或權重 > 0，與存檔過濾同一規則）但總和 0 → 儲存鈕 disabled＋`#weight-edit-msg` 說明原因（`weightEditProblem()`；總計字樣沿用 `.over` 橘色；名稱與權重欄的 `input` 都會重算）。名稱空且 0% 的空白列不觸發「總和 0」——在 0 列編輯器按「+ 新增項目」不會立刻報錯。全部刪光可以存：Canvas 有生效權重 → 存 `[]`（明確「不顯示權重」），沒有 → 直接刪 key。未命名項目存 `name: ''`，圖例／aria-label 顯示時才套當前語言的 `unnamedWeight`（`weightItemLabel`）；名稱空且 0% 的列存檔時丟掉（QA #170）
-  - 存檔／還原只換左欄圓餅（`refreshWeightPanel`），右欄的計算器 accordion、已隱藏區、展開描述與捲動不動（QA #169）
+  - 存檔／還原換左欄圓餅＋右欄成績計算器（`refreshWeightPanel` → `refreshGradeCalc`：計算器與圓餅吃同一份權重，保留 accordion 開合與右欄捲動），已隱藏區、展開描述不動（QA #169）
   - **課程關掉「依組別加權」**（`course.apply_assignment_group_weights === false`）→ 殘留的 `group_weight` 一律忽略（`courseUsesGroupWeights`）：圓餅、計算器、編輯器預填都視為不加權（QA #93）
 - 右下：成績計算器（accordion）+ 作業清單
   - 成績計算器：輸入分數即時計算加權總分；**Canvas 已評分自動預填**（可改可清；清空會記住 → `scores[id]=null`），詳見下方「成績計算器」
@@ -279,13 +281,23 @@ sidebar（300px）+ main-content（flex:1）
   - 拖曳健壯性：寫入綁定**拖曳開始時的課程**（`ctx.courseId`，不讀當下 `currentCourseId`）；`showGridView`／`goToPage`／`switchPage`／`showCourseDetail`／`popstate` 與重繪前一律 `abortActiveDrag()`（clone 直接移除、不寫入）；放開時放置目標已不在 DOM 或已換課 → 當取消。落點當下重新判定完成桶（拖曳中考試剛結束等時間差）：照樣寫入並重繪，若該項已不屬於目前視圖則 clone 原地淡出
 
 **成績計算器（Canvas 預填 + 三態）：**
-- 日常視圖（學期待辦／課程 grid／作業列／已隱藏列）一律**不顯示分數**（決策 3）；分數只出現在成績計算器。考試被拖曳升級回作業清單、Canvas 已評分時也一樣（初版遺留的列上 `.exam-grade`「18 / 20 · 90.0%」已於 2026-10-23 移除）
+- 日常視圖（學期待辦／課程 grid／作業列／已隱藏列）一律**不顯示分數**（決策 3）；分數只出現在成績計算器與「學期成績」總覽（側欄獨立入口開的 modal，主動點了才看到）。考試被拖曳升級回作業清單、Canvas 已評分時也一樣（初版遺留的列上 `.exam-grade`「18 / 20 · 90.0%」已於 2026-10-23 移除）
 - `scores[id]` 三態：無此 key → 有 Canvas `submission.score` 就預填、否則空；值為數字 → 顯示該數字；值為 `null` → 使用者清空過 → 顯示空
 - `recalculateGrades(courseId, { persist, changedId })`：開詳情主動算一次傳 `persist:false`（只算顯示、**不把預填值固化成手動值**）；使用者輸入的 `input` 事件走 `persist:true` 並帶 `changedId`——**只寫正在輸入的那一格**（read-modify-write，不以畫面上其他格的舊值覆寫整門課）。顯示與計算一律從輸入框現值讀（`Number.isFinite` 才計入），預填與手動輸入一致
 - persist 規則：欄位空且該作業有 Canvas 分數 → `scores[id]=null`（記住清空）；空且無 Canvas 分數 → 刪除 key；有值 → 存數字
 - 負分：輸入框標紅（`.invalid`＋`aria-invalid`）、不計入、不寫入 storage（維持原值）；超過配分照收（可能是加分題）（QA #25）。鍵盤打負數時先按的「-」會讓 number input 進入 `validity.badInput`（`value` 讀回 `''`）：同樣標紅、不計入，persist **跳過**（不當成清空寫 null／刪 key），原值不會在打字途中被清掉
 - Canvas 已免除（`submission.excused`）：不給輸入框、顯示「已免除」，不計入分子分母（殘留的 `scores[id]` 也忽略，QA #94）
-- 只在 Canvas 實際依分組加權的課顯示（`courseUsesGroupWeights`）；計算器用 Canvas 的 `group_weight`，不吃 `customWeights`
+- **權重來源與圓餅一致**（spec 2026-10-25-semester-grades，規則在 `gradeCalc.js` 的 `DueGradeCalc.weightMode`，含測試）：`customWeights[cid]` 是陣列 → 總和 > 0 用自訂（`custom`）、空陣列／總和 0 → 不顯示計算器；否則 Canvas 實際加權（`usesGroupWeights`，`courseUsesGroupWeights` 委派它）→ 用 `group_weight`（`canvas`）；都沒有 → 不顯示。AI 寫入的權重也走 `custom`
+- 結構與數學抽成純函式：`DueGradeCalc.plan`（哪些作業、各歸哪一桶；只收有配分的作業）→ `compute(plan, scoreOf)`（各桶 Σearned/Σpossible，總分＝Σ(桶%×權重)/Σ(有成績的桶的權重)——只算已評分的部分）。DOM 計算器把輸入框現值當 `scoreOf`；`bindGradeCalc` 把當下的 plan 掛在 `.grade-calc._plan`，即時試算用同一份對應（資料在輸入途中被別處更新也不會與畫面錯位，閒置後的重繪才換新）
+- **Canvas 模式**外觀不變：只列有作業的組。**自訂模式**：依權重項目分組（順序同圓餅；沒有作業的項目照樣列組頭、小計 `—`），每列多一個小下拉 `.grade-calc-map`（選項＝各項目＋「不計入」，未歸類時多一個停用的「未歸類」佔位、虛線框），改了就寫 `gradeItemMap` 並 `refreshGradeCalc`（焦點留在同一筆的下拉）；最下面「未計入」區（`.grade-calc-out`）收未歸類＋手動不計入，有未歸類時附說明句
+- **自訂權重的作業歸類**（`DueGradeCalc.matchItem`，寧可不算、不可算錯：只有唯一最佳候選才歸，平手或零分 → 未歸類）：① `gradeItemMap[cid][aid]` 手動指定（字串＝項目名稱，名稱已不在 → 當作沒指定；`null`＝不計入）→ ② 作業名稱關鍵字唯一最佳 → ③ Canvas 組名與項目名稱相同（英文單數化、去標點）→ ④ Canvas 組名關鍵字唯一最佳 → ⑤ 未歸類。關鍵字（`keysOf`）：同義詞表（homework/quiz/exam/midterm/final/project/lab/participation/presentation/report/paper/reading，中英繁簡）＋其他 ≥3 字母英文字（去停用字），單獨的 midterm／final 補 `exam`，含中文的項目名整串出現在作業名稱裡加 1。**大雜燴組**：同組作業依 ①② 已對到兩個以上不同項目（例如 Canvas 預設的 Assignments 組）→ 組名不可信，該組對不上名稱的跳過 ③④
+- `gradeItemMap` 為共享使用者 key（`SHARED_USER_KEYS`，`updateShared` read-modify-write，`loadData` 預設 `{}`）；不主動清理，殘留名稱被 ① 略過
+
+**學期成績總覽（modal，spec 2026-10-25-semester-grades）：**
+- 入口：側欄主導航「成績」（`openGradesOverview`）；`#grades-overlay` 共用 modal 機制（`MODAL_OVERLAY_IDS`、Esc `closers`、`setupModalA11y`、`trackBackdropPress`／`isBackdropClick`），開著時 `isUiIdle` 為 false
+- 每門課一列（依課程代碼排序）：代碼＋名稱（含自訂名稱）＋權重來源小字（`Canvas 設定`／`AI 分析`（`isAiCustomWeights`）／`自訂`），有已評分卻未歸類的作業接「· N 項未歸類」（`.grades-warn`）；右側加權分數（`DueGradeCalc.courseGrade`，與該課計算器同數字）＋「已評分 N%」（`gradedWeight/totalWeight`）＋ 2px 綠色細條。沒有權重 →「沒有評分比重」、有權重沒成績 →「尚無成績」
+- 點一列：關 modal → `showCourseDetail(cid)`（不帶卡片，同步渲染）→ 展開計算器 accordion
+- 不算學期平均（Canvas API 拿不到學分）；Canvas 沒開加權也沒有自訂權重的課維持「沒有評分比重」，不用總配分硬算
 
 **課程自訂名稱：**
 - 課程詳情頁的課程名稱旁有鉛筆圖示（hover 顯示）
@@ -413,5 +425,5 @@ sidebar（300px）+ main-content（flex:1）
 
 ## 待開發功能
 
-- 成績計算器顯示優化（目前 accordion 折疊）
+- 成績計算器顯示優化（目前 accordion 折疊；header 是 div，鍵盤無法開合）
 - 多學期 / 歸檔課程過濾
