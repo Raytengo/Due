@@ -2382,13 +2382,6 @@
       color: var(--mid);
     }
 
-    .welcome-lang-switch-row {
-      display: flex;
-      justify-content: flex-end;
-      margin-top: 4px;
-      margin-bottom: 16px;
-    }
-
     .welcome-lang-switch {
       display: flex;
       gap: 2px;
@@ -2565,11 +2558,55 @@
       margin: 0 0 20px 0;
     }
 
-    /* 新手卡片只剩一頁、沒有頁數小點：按鈕靠右 */
+    /* 新手卡片：語言切換在左下、主按鈕在右下（兩邊各自對齊卡片內距） */
     .welcome-footer {
       display: flex;
       align-items: center;
-      justify-content: flex-end;
+      justify-content: space-between;
+    }
+
+    .welcome-footer > .welcome-lang-switch {
+      margin: 0 0 24px 40px;
+    }
+
+    /* 卡片外的手繪箭頭：指向瀏覽器右上角（擴充功能圖示在那）＋「（應該在這）」 */
+    .welcome-pin-arrow {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+      pointer-events: none;
+    }
+
+    .welcome-pin-arrow-line,
+    .welcome-pin-arrow-halo {
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .welcome-pin-arrow-line {
+      stroke: var(--orange);
+      stroke-width: 2;
+    }
+
+    .welcome-pin-arrow-halo {
+      stroke: var(--bg);
+      stroke-opacity: 0.55;
+      stroke-width: 6;
+    }
+
+    .welcome-pin-arrow-label {
+      fill: var(--orange);
+      stroke: var(--bg);
+      stroke-width: 4px;
+      stroke-linejoin: round;
+      paint-order: stroke;
+      font-family: 'Source Serif 4', Georgia, serif;
+      font-style: italic;
+      font-size: 16px;
+      dominant-baseline: middle;
     }
 
     .welcome-dot {
@@ -5234,6 +5271,13 @@
 
   <!-- Welcome Modal -->
   <div class="welcome-overlay" id="welcome-overlay">
+    <!-- 手繪箭頭：從卡片右上角指向瀏覽器右上角（擴充功能圖示的位置），由 drawWelcomePinArrow 擺 -->
+    <svg class="welcome-pin-arrow" id="welcome-pin-arrow" aria-hidden="true">
+      <path class="welcome-pin-arrow-halo"></path>
+      <path class="welcome-pin-arrow-line"></path>
+      <path class="welcome-pin-arrow-line welcome-pin-arrow-head"></path>
+      <text class="welcome-pin-arrow-label"></text>
+    </svg>
     <div class="welcome-card">
       <button class="welcome-close" id="welcome-close"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
 
@@ -5251,26 +5295,19 @@
                 </svg>
               </div>
             </div>
-            <div class="welcome-title" id="wstep-1-title">這是一個巨大的 TODO list，用以表達遊子思鄉之情</div>
+            <div class="welcome-title" id="wstep-1-title">世界是一個巨大的 TODO list，以表達遊子思鄉之情</div>
             <div class="welcome-body split" style="flex:1">
               <div class="welcome-body-text">
                 <span id="wstep-1-body">釘選瀏覽器右上角的 popup，那個很好用</span>
                 <ul class="welcome-inst-list">
                   <div style="margin-bottom: 15px;"></div>
-                  <li><span class="welcome-inst-num">1</span><span class="welcome-inst-text" id="wstep-1-li1">點擊瀏覽器右上角的<strong>拼圖圖示</strong>（擴充功能）</span></li>
-                  <li><span class="welcome-inst-num">2</span><span class="welcome-inst-text" id="wstep-1-li2">找到 <strong>Due</strong>，點擊旁邊的<strong>釘選圖示</strong></span></li>
-                  <li><span class="welcome-inst-num">3</span><span class="welcome-inst-text" id="wstep-1-li3">工具列出現 Due 圖示後即完成</span></li>
+                  <li><span class="welcome-inst-num">1</span><span class="welcome-inst-text" id="wstep-1-li1">點擊瀏覽器右上角的<strong>拼圖</strong></span></li>
+                  <li><span class="welcome-inst-num">2</span><span class="welcome-inst-text" id="wstep-1-li2">找到 <strong>Due</strong>，點下<strong>釘選圖示</strong></span></li>
+                  <li><span class="welcome-inst-num">3</span><span class="welcome-inst-text" id="wstep-1-li3">有問題 mail 我 <a class="welcome-inline-link" href="mailto:0610raymond@gmail.com">0610raymond@gmail.com</a></span></li>
                 </ul>
               </div>
               <div class="welcome-preview square" style="align-self: flex-start; background: var(--bg);">
                 <img src="../icons/pin_guide.png" id="wstep-1-img" alt="釘選 Due 到工具列的步驟示意圖" />
-              </div>
-            </div>
-            <div class="welcome-lang-switch-row">
-              <div class="welcome-lang-switch" id="welcome-lang-switch">
-                <button data-lang="zh-TW" id="welcome-lang-zh-tw">繁中</button>
-                <button data-lang="zh-CN" id="welcome-lang-zh-cn">简中</button>
-                <button data-lang="en" id="welcome-lang-en">EN</button>
               </div>
             </div>
           </div>
@@ -5281,6 +5318,12 @@
       <div class="welcome-shared-footer">
         <div class="welcome-divider"></div>
         <div class="welcome-footer">
+          <!-- 語言切換在左下，主按鈕在右下 -->
+          <div class="welcome-lang-switch" id="welcome-lang-switch">
+            <button data-lang="zh-TW" id="welcome-lang-zh-tw">繁中</button>
+            <button data-lang="zh-CN" id="welcome-lang-zh-cn">简中</button>
+            <button data-lang="en" id="welcome-lang-en">EN</button>
+          </div>
           <div class="welcome-btn-row" id="welcome-btn-row">
             <!-- Buttons injected by JS -->
           </div>

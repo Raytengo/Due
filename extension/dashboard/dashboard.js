@@ -231,9 +231,9 @@ const I18N = {
     wTitle3: '釘選 Due 到工具列',
     wBody3: '釘選後點一下圖示就能查看 7 天待辦',
     wBody3Joke: '（是為了這碟醋包的餃子btw）',
-    wStep3Li1: '點擊瀏覽器右上角的<strong>拼圖圖示</strong>（擴充功能）',
-    wStep3Li2: '找到 <strong>Due</strong>，點擊旁邊的<strong>釘選圖示</strong>',
-    wStep3Li3: '工具列出現 Due 圖示後即完成',
+    wIntroLi1: '點擊瀏覽器右上角的<strong>拼圖</strong>',
+    wIntroLi2: '找到 <strong>Due</strong>，點下<strong>釘選圖示</strong>',
+    wIntroLi3: '有問題 mail 我 <a class="welcome-inline-link" href="mailto:0610raymond@gmail.com">0610raymond@gmail.com</a>',
     wTitle4: '拖曳整理作業清單',
     wBody4: 'Due 會自動把考試、簽到收到下方<br>做完的作業拖下去就算完成',
     wStep4Li1: '進入任一<strong>課程頁</strong>，按住作業的 <strong>⠿</strong> 拖到底部「<strong>已隱藏</strong>」區即可標記完成；拖回作業清單就變回未完成',
@@ -256,7 +256,8 @@ const I18N = {
     wBtnNext: '下一步',
     wBtnDone: '開始使用',
     // 新手卡片（只剩一頁）：開發者的話＋釘選 popup；按鈕接互動導覽
-    wIntroTitle: '這是一個巨大的 TODO list，用以表達遊子思鄉之情',
+    wIntroTitle: '世界是一個巨大的 TODO list，以表達遊子思鄉之情',
+    wIntroHere: '（應該在這）',   // 卡片外手繪箭頭指向瀏覽器右上角（擴充功能圖示）旁的字
     wIntroBody: '釘選瀏覽器右上角的 popup，那個很好用',
     wBtnTour: '開始導覽 →',
   },
@@ -398,9 +399,9 @@ const I18N = {
     wTitle3: '固定 Due 到工具栏',
     wBody3: '固定后点一下图标就能查看 7 天待办',
     wBody3Joke: '（是为了这碟醋包的饺子btw）',
-    wStep3Li1: '点击浏览器右上角的<strong>拼图图标</strong>（扩展程序）',
-    wStep3Li2: '找到 <strong>Due</strong>，点击旁边的<strong>固定图标</strong>',
-    wStep3Li3: '工具栏出现 Due 图标后即完成',
+    wIntroLi1: '点击浏览器右上角的<strong>拼图</strong>',
+    wIntroLi2: '找到 <strong>Due</strong>，点下<strong>固定图标</strong>',
+    wIntroLi3: '有问题 mail 我 <a class="welcome-inline-link" href="mailto:0610raymond@gmail.com">0610raymond@gmail.com</a>',
     wTitle4: '拖拽整理作业清单',
     wBody4: 'Due 会自动把考试、签到收到下方<br>做完的作业拖下去就算完成',
     wStep4Li1: '进入任一<strong>课程页</strong>，按住作业的 <strong>⠿</strong> 拖到底部「<strong>已隐藏</strong>」区即可标记完成；拖回作业清单就变回未完成',
@@ -421,7 +422,8 @@ const I18N = {
     wBtnPrev: '上一步',
     wBtnNext: '下一步',
     wBtnDone: '开始使用',
-    wIntroTitle: '这是一个巨大的 TODO list，用以表达游子思乡之情',
+    wIntroTitle: '世界是一个巨大的 TODO list，以表达游子思乡之情',
+    wIntroHere: '（应该在这）',
     wIntroBody: '把浏览器右上角的 popup 固定起来，那个很好用',
     wBtnTour: '开始导览 →',
   },
@@ -563,9 +565,9 @@ const I18N = {
     wTitle3: 'Pin Due to Toolbar',
     wBody3: 'Pin it and tap the icon to see your 7-day tasks at a glance',
     wBody3Joke: "(it's for the dumpling dipped in vinegar, btw)",
-    wStep3Li1: 'Click the <strong>puzzle icon</strong> (Extensions) in the top-right of your browser',
-    wStep3Li2: 'Find <strong>Due</strong> and click the <strong>pin icon</strong> next to it',
-    wStep3Li3: 'Done when the Due icon appears in your toolbar',
+    wIntroLi1: 'Click the <strong>puzzle icon</strong> at the top right of your browser',
+    wIntroLi2: 'Find <strong>Due</strong> and click its <strong>pin icon</strong>',
+    wIntroLi3: 'Questions? Mail me at <a class="welcome-inline-link" href="mailto:0610raymond@gmail.com">0610raymond@gmail.com</a>',
     wTitle4: 'Organize by dragging',
     wBody4: 'Due tucks exams and attendance items away below<br>drag finished work down to mark it done',
     wStep4Li1: 'Open any <strong>course page</strong>, grab an assignment\'s <strong>⠿</strong> and drop it into <strong>Hidden</strong> at the bottom to mark it done; drag it back to the list to undo',
@@ -586,7 +588,8 @@ const I18N = {
     wBtnPrev: 'Back',
     wBtnNext: 'Next',
     wBtnDone: 'Start Using Due',
-    wIntroTitle: 'This is one giant to-do list, written to express a wanderer’s homesickness',
+    wIntroTitle: 'The world is one giant to-do list, written to express a wanderer’s homesickness',
+    wIntroHere: '(should be up here)',
     wIntroBody: 'Pin the popup at the top right of your browser. It’s really handy',
     wBtnTour: 'Start the tour →',
   },
@@ -607,9 +610,10 @@ function applyWelcomeTranslations() {
   };
   setText('wstep-1-title', 'wIntroTitle');
   setText('wstep-1-body', 'wIntroBody');
-  setHTML('wstep-1-li1', 'wStep3Li1');
-  setHTML('wstep-1-li2', 'wStep3Li2');
-  setText('wstep-1-li3', 'wStep3Li3');
+  setHTML('wstep-1-li1', 'wIntroLi1');
+  setHTML('wstep-1-li2', 'wIntroLi2');
+  setHTML('wstep-1-li3', 'wIntroLi3');
+  drawWelcomePinArrow();   // 箭頭旁的字跟著語言換
   const pinImg = document.getElementById('wstep-1-img');
   if (pinImg) pinImg.alt = tr('wPinAlt');
   document.querySelectorAll('.welcome-lang-switch button').forEach((btn) => {
@@ -5211,6 +5215,61 @@ function _welcomeSyncSlides(n) {
   if (area) area.scrollLeft = 0;
 }
 
+// 卡片外的手繪箭頭：從卡片右上角往右鼓一道弧，指向瀏覽器右上角（擴充功能圖示所在，在頁面外的工具列上）。
+// 用卡片的 offset 量（不受進場縮放影響）；卡片貼太近頂端畫不下就不畫。play：開卡片時從起點畫到終點（減少動態：直接出現）
+function drawWelcomePinArrow({ play = false } = {}) {
+  const svg = document.getElementById('welcome-pin-arrow');
+  const card = document.querySelector('#welcome-overlay .welcome-card');
+  if (!svg || !card) return;
+  const [halo, line, head] = svg.querySelectorAll('path');
+  const label = svg.querySelector('text');
+  const vw = window.innerWidth;
+  const sx = card.offsetLeft + card.offsetWidth - 70;
+  const sy = card.offsetTop - 10;
+  const ex = vw - 64;
+  const ey = 14;
+  const L = Math.hypot(ex - sx, ey - sy);
+  if (sy - ey < 50 || L < 60) {
+    [halo, line, head].forEach((p) => p.setAttribute('d', ''));
+    label.textContent = '';
+    return;
+  }
+  const f = (v) => v.toFixed(1);
+  const ux = (ex - sx) / L;
+  const uy = (ey - sy) / L;
+  let px = -uy;   // 往右鼓（先往右、再往上指進工具列）
+  let py = ux;
+  if (px < 0) { px = -px; py = -py; }
+  const bow = Math.min(L * 0.3, 70, Math.max(0, vw - Math.max(sx, ex) - 16));
+  const c1 = { x: sx + ux * L * 0.2 + px * bow, y: sy + uy * L * 0.2 + py * bow };
+  const c2 = { x: sx + ux * L * 0.8 + px * bow, y: sy + uy * L * 0.8 + py * bow };
+  const d = `M ${f(sx)} ${f(sy)} C ${f(c1.x)} ${f(c1.y)} ${f(c2.x)} ${f(c2.y)} ${f(ex)} ${f(ey)}`;
+  line.setAttribute('d', d);
+  halo.setAttribute('d', d);
+  const tl = Math.hypot(ex - c2.x, ey - c2.y) || 1;
+  const tx = (ex - c2.x) / tl;
+  const ty = (ey - c2.y) / tl;
+  const wing = (deg) => {
+    const a = (deg * Math.PI) / 180;
+    return `${f(ex - (tx * Math.cos(a) - ty * Math.sin(a)) * 11)} ${f(ey - (tx * Math.sin(a) + ty * Math.cos(a)) * 11)}`;
+  };
+  head.setAttribute('d', `M ${wing(30)} L ${f(ex)} ${f(ey)} L ${wing(-30)}`);
+  label.textContent = tr('wIntroHere');
+  label.setAttribute('x', f(ex - 18));
+  label.setAttribute('y', f(ey + 24));
+  label.setAttribute('text-anchor', 'end');
+  if (!play || reduceMotion()) return;
+  const len = line.getTotalLength();
+  [halo, line].forEach((p) => p.animate(
+    [{ strokeDasharray: `${len}`, strokeDashoffset: `${len}` }, { strokeDasharray: `${len}`, strokeDashoffset: '0' }],
+    { duration: 700, delay: 350, easing: 'cubic-bezier(0.65, 0, 0.35, 1)', fill: 'backwards' },
+  ));
+  [head, label].forEach((p) => p.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 250, delay: 1000, fill: 'backwards' }));
+}
+window.addEventListener('resize', () => {
+  if (document.getElementById('welcome-overlay')?.classList.contains('open')) drawWelcomePinArrow();
+});
+
 function openWelcomeModal() {
   _welcomeStep = 1;
   const track = document.getElementById('welcome-track');
@@ -5227,6 +5286,7 @@ function openWelcomeModal() {
   _welcomeSyncSlides(1);
   const overlay = document.getElementById('welcome-overlay');
   if (overlay) overlay.classList.add('open');
+  drawWelcomePinArrow({ play: true });
 }
 
 function closeWelcomeModal() {
