@@ -142,7 +142,16 @@ const I18N = {
     // empty states
     // 空狀態：從未同步 vs 已同步但沒有進行中的課程（QA P2-6）
     emptyNeverTitle: '尚未同步',
-    emptyNeverBody: '登入你學校的 Canvas，Due 會自動同步課程與作業，待辦就會出現在這裡。',
+    emptyNeverBody: '選擇你的學校並登入 Canvas，Due 會自動同步課程與作業，待辦就會出現在這裡。',
+    schoolLabel: '你的學校',
+    schoolPlaceholder: '搜尋學校名稱，或貼上 Canvas 網址…',
+    schoolFeatured: '常用',
+    schoolAll: '全部學校 · {n}',
+    schoolUse: '使用 {host}',
+    schoolNone: '找不到「{q}」',
+    schoolLoading: '載入學校清單…',
+    schoolLoadFailed: '學校清單載入失敗，請重新整理頁面',
+    schoolUnsupported: '找不到？網址不是 .instructure.com 的學校（例如 canvas.ust.hk）目前還不支援',
     emptyNoCoursesTitle: '目前沒有進行中的課程',
     emptyNoCoursesBody: 'Due 只顯示 Canvas 上進行中的課程。學期開始或選課生效後，下次打開 Canvas 就會自動出現。',
     emptyOpenCanvas: '前往 {canvas} ↗',
@@ -322,7 +331,16 @@ const I18N = {
     hoursAgo: '小时前同步',
     daysAgo: '天前同步',
     emptyNeverTitle: '尚未同步',
-    emptyNeverBody: '登录你学校的 Canvas，Due 会自动同步课程和作业，待办就会出现在这里。',
+    emptyNeverBody: '选择你的学校并登录 Canvas，Due 会自动同步课程和作业，待办就会出现在这里。',
+    schoolLabel: '你的学校',
+    schoolPlaceholder: '搜索学校名称，或粘贴 Canvas 网址…',
+    schoolFeatured: '常用',
+    schoolAll: '全部学校 · {n}',
+    schoolUse: '使用 {host}',
+    schoolNone: '找不到“{q}”',
+    schoolLoading: '加载学校列表…',
+    schoolLoadFailed: '学校列表加载失败，请刷新页面',
+    schoolUnsupported: '找不到？网址不是 .instructure.com 的学校（例如 canvas.ust.hk）目前还不支持',
     emptyNoCoursesTitle: '目前没有进行中的课程',
     emptyNoCoursesBody: 'Due 只显示 Canvas 上进行中的课程。学期开始或选课生效后，下次打开 Canvas 就会自动出现。',
     emptyOpenCanvas: '前往 {canvas} ↗',
@@ -487,7 +505,16 @@ const I18N = {
     hoursAgo: 'hr ago',
     daysAgo: 'd ago',
     emptyNeverTitle: 'Not synced yet',
-    emptyNeverBody: "Log in to your school's Canvas and Due syncs your courses and assignments automatically. Your to-dos will show up here.",
+    emptyNeverBody: 'Pick your school and log in to Canvas. Due syncs your courses and assignments automatically, and your to-dos will show up here.',
+    schoolLabel: 'Your school',
+    schoolPlaceholder: 'Search schools, or paste your Canvas address…',
+    schoolFeatured: 'Popular',
+    schoolAll: 'All schools · {n}',
+    schoolUse: 'Use {host}',
+    schoolNone: 'No school matches “{q}”',
+    schoolLoading: 'Loading schools…',
+    schoolLoadFailed: 'Couldn’t load the school list — reload the page',
+    schoolUnsupported: 'Not listed? Schools whose Canvas address doesn’t end in .instructure.com (e.g. canvas.ust.hk) aren’t supported yet',
     emptyNoCoursesTitle: 'No active courses right now',
     emptyNoCoursesBody: "Due only shows courses that are active on Canvas. Once your term starts or your enrollment is confirmed, they'll appear the next time you open Canvas.",
     emptyOpenCanvas: 'Open {canvas} ↗',
@@ -4940,19 +4967,33 @@ document.getElementById('canvas-candidate-ignore')?.addEventListener('click', ()
 
 // ── 空狀態（QA P2-6：#13 #44 #64 #171）──
 // 從未同步（無 lastSync）vs 已同步但沒有進行中的課程（有 lastSync、courses 為空）：文案不同，
-// 兩者都給明確的下一步「前往 Canvas」（已偵測到學校 → 該校；否則同教學：連 HKUST(GZ)，並說明其他學校怎麼做）
+// 兩者都給明確的下一步「前往 Canvas」。已偵測到學校 → 開該校；還沒有 → 上方多一個「你的學校」選單
+// （schoolPickerUi.js：可搜尋的下拉，預設 HKUST(GZ)），按鈕開選到的那一所
+let _pickedCanvasOrigin = null;   // 使用者在選單選的學校 origin（storage 的 pickedCanvasOrigin；沒選過＝預設學校）
 function renderEmptyState() {
   const main = document.getElementById('main-section');
   if (!main) return;
   const { lastSync, canvasBaseUrl } = _currentData;
   const synced = !!lastSync;
+  const needsSchool = !canvasBaseUrl && typeof DueSchoolPicker !== 'undefined';
   main.innerHTML = `
     <div class="state-msg">
       <div class="big">${esc(tr(synced ? 'emptyNoCoursesTitle' : 'emptyNeverTitle'))}</div>
       <div class="body">${esc(tr(synced ? 'emptyNoCoursesBody' : 'emptyNeverBody'))}</div>
+      ${needsSchool ? '<div id="school-pick-mount"></div>' : ''}
       <button type="button" class="state-msg-action" id="empty-open-canvas">${esc(tr('emptyOpenCanvas').replace('{canvas}', () => 'Canvas'))}</button>
-      ${canvasBaseUrl ? '' : `<div class="state-msg-sub">${esc(tr('wCanvasOtherSchool'))}</div>`}
     </div>`;
+  const mountEl = document.getElementById('school-pick-mount');
+  if (mountEl) {
+    DueSchoolPicker.mount(mountEl, {
+      tr,
+      origin: _pickedCanvasOrigin,
+      onPick(origin) {
+        _pickedCanvasOrigin = origin;
+        chrome.storage.local.set({ pickedCanvasOrigin: origin }, () => void chrome.runtime.lastError);
+      },
+    });
+  }
 }
 
 // 沒有課程時「+ 新增作業」「課程」無事可做 → 停用並以 title 說明，不留點了沒反應的死按鈕（QA #13/#171）
@@ -4969,12 +5010,15 @@ function setNoCoursesMode(on) {
 }
 
 // 開 Canvas 分頁（空狀態的「前往 Canvas」，新手導覽第一步亮的就是它）：點擊當下讀 storage 的 canvasBaseUrl
-// （尚未同步出課程時 _currentData 是空的），沒有就開預設學校。armReturn：同步落地後自動跳回 dashboard
+// （尚未同步出課程時 _currentData 是空的），沒有就開選單選的學校（沒選過＝預設學校）。
+// armReturn：同步落地後自動跳回 dashboard
 function openCanvasTab({ armReturn = false } = {}) {
-  chrome.storage.local.get(['canvasBaseUrl'], (d) => {
+  chrome.storage.local.get(['canvasBaseUrl', 'pickedCanvasOrigin'], (d) => {
     const base = (d && d.canvasBaseUrl) || null;
+    // storage 的值不盲信：只接受合法的 https *.instructure.com（DueSchools.parseInstructure 同 background 的 isCanvasHost 規則）
+    const picked = DueSchools.parseInstructure(d && d.pickedCanvasOrigin);
     if (!chrome.tabs?.create) return;
-    chrome.tabs.create({ url: base || DEFAULT_CANVAS_URL, active: true }, (tab) => {
+    chrome.tabs.create({ url: base || (picked && picked.origin) || DEFAULT_CANVAS_URL, active: true }, (tab) => {
       if (armReturn && tab) _armCanvasReturn(tab.id);
     });
   });
@@ -4990,11 +5034,12 @@ document.getElementById('main-section')?.addEventListener('click', (e) => {
 // onRendered（選用）：畫面重建完之後呼叫——需要在重建後用 id 找回焦點的路徑用（自訂作業編輯／刪除，#8）
 function loadData(onRendered) {
   chrome.storage.local.get(
-    ['lastSync', 'schoolName', 'canvasBaseUrl', 'canvasBaseCandidate', 'courses', 'assignments', 'customAssignments', 'assignmentGroups', 'scores', 'courseNames', 'customWeights', 'manualDone', 'manualUndone', 'manualShown', 'manualHidden', 'gradeItemMap', 'gradingAnalysis', 'aiConfig'],
+    ['lastSync', 'schoolName', 'canvasBaseUrl', 'canvasBaseCandidate', 'pickedCanvasOrigin', 'courses', 'assignments', 'customAssignments', 'assignmentGroups', 'scores', 'courseNames', 'customWeights', 'manualDone', 'manualUndone', 'manualShown', 'manualHidden', 'gradeItemMap', 'gradingAnalysis', 'aiConfig'],
     (raw) => {
       // 候選網址另存在 _canvasCandidate（不進 _currentData），在 _currentData 的 canvasBaseUrl 更新後再畫提示；
       // aiConfig 只取「有沒有設定 key」，不進 _currentData
-      const { canvasBaseCandidate, aiConfig, ...data } = raw || {};
+      const { canvasBaseCandidate, aiConfig, pickedCanvasOrigin, ...data } = raw || {};
+      _pickedCanvasOrigin = pickedCanvasOrigin || null;
       _aiConfigured = isAiConfigured(aiConfig);
       if (!data.courses || !data.courses.length) {
         currentView = 'grid';
