@@ -65,6 +65,43 @@
       --warm: #b09050;
       --purple: #a86070;
       --overdue: #b3452c;
+
+      /* ── 動效 token（Animate UI；一個角色一個值，popup.html 宣告同一組，見 docs/motion-review-2026-10-22.md #39）──
+         JS 端（WAAPI／setTimeout／inline transition）用 dashboard.js 的 MOTION，數值與此同步：改一邊要改另一邊。
+         減少動態時位移/縮放類 token 歸零（見檔尾 prefers-reduced-motion 區塊）。 */
+      --ease-color: cubic-bezier(0.25, 0.1, 0.25, 1);     /* ease.color：hover 換色、highlight 出現/消失 */
+      --ease-out: cubic-bezier(0.23, 1, 0.32, 1);         /* ease.out：進場／出場、淡入淡出 */
+      --ease-soft: cubic-bezier(0.215, 0.61, 0.355, 1);   /* ease.soft：選單、disclosure 展開 */
+      --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);     /* ease.inOut：兩頁一起移動（push） */
+      --ease-ring: cubic-bezier(0.16, 1, 0.3, 1);         /* 進度環弧與分子 tick（使用者拍板，只命名、數值不動） */
+      --ease-draw: cubic-bezier(0, 0, 0.58, 1);           /* ease.draw：勾號畫出 */
+      --ease-away: cubic-bezier(0.33, 0.17, 0.67, 0.5);   /* ease.away：dialog 關閉、加速離開 */
+      --t-color: 200ms var(--ease-color);                 /* transition.color */
+      --t-fade: 200ms var(--ease-out);                    /* transition.fade */
+      --t-swap: 150ms var(--ease-out);                    /* transition.swap */
+      --t-reveal: 300ms var(--ease-out);                  /* transition.reveal */
+      --t-menu: 220ms var(--ease-soft);                   /* transition.menu */
+      --t-disclosure: 350ms var(--ease-soft);             /* transition.disclosure */
+      --t-check: 300ms var(--ease-draw);                  /* transition.check：勾號在填色後畫出（delay 200ms 另寫，同 popup） */
+      --t-overlay: 400ms var(--ease-soft);                /* transition.overlay：modal 背景變暗／模糊，進出同一條 */
+      --t-dialog-fade: 400ms var(--ease-soft);            /* transition.dialogFade：modal 卡片淡入 */
+      --t-dismiss: 200ms var(--ease-away);                /* transition.dismiss：modal 卡片關閉 */
+      /* spring（stiffness/damping → CSS linear()；由 skill 的 css-timing 轉出） */
+      --spring-press: 400ms linear(0, 0.0261, 0.0935, 0.188, 0.2977, 0.4132, 0.5271, 0.6343, 0.7313, 0.8159, 0.8872, 0.9452, 0.9906, 1.0244, 1.048, 1.063, 1.0709, 1.0732, 1.0713, 1.0663, 1.0594, 1.0514, 1.0429, 1.0346, 1.0267, 1.0196, 1.0134, 1.0082, 1.004, 1.0007, 0.9982, 0.9965, 1, 0.9948, 0.9946, 0.9948, 1, 1, 1, 1);   /* spring.press 550/30 */
+      --spring-highlight: 300ms linear(0, 0.0233, 0.0813, 0.1598, 0.2483, 0.3396, 0.4288, 0.5126, 0.5894, 0.658, 0.7183, 0.7704, 0.8149, 0.8524, 0.8837, 0.9094, 0.9303, 0.9472, 0.9607, 0.9713, 0.9796, 0.986, 0.9908, 0.9944, 0.997, 0.9988, 1.0001, 1.001, 1.0015, 1);   /* spring.highlight 500/40 */
+      --reflow: var(--spring-highlight);                  /* spring.reflow（同為 500/40）：補位、落點 */
+      --spring-selection: 500ms linear(0, 0.0141, 0.0509, 0.1035, 0.1663, 0.2349, 0.306, 0.3769, 0.4459, 0.5115, 0.573, 0.6297, 0.6814, 0.728, 0.7696, 0.8064, 0.8387, 0.8668, 0.8911, 0.9119, 0.9296, 0.9445, 0.957, 0.9673, 0.9758, 0.9827, 0.9882, 0.9926, 0.9961, 0.9987, 1.0007, 1.0021, 1.0031, 1.0038, 1.0041, 1, 1, 1, 1.004, 1.0038, 1.0035, 1.0032, 1.0029, 1.0026, 1.0023, 1.002, 1.0017, 1.0015, 1, 1);   /* spring.selection 300/30 */
+      --spring-dialog: 750ms linear(0, 0.0071, 0.0261, 0.0541, 0.0886, 0.1279, 0.1702, 0.2143, 0.2592, 0.3041, 0.3485, 0.3918, 0.4336, 0.4738, 0.5121, 0.5485, 0.5829, 0.6153, 0.6456, 0.674, 0.7004, 0.725, 0.7479, 0.769, 0.7886, 0.8066, 0.8233, 0.8386, 0.8527, 0.8656, 0.8775, 0.8884, 0.8983, 0.9074, 0.9158, 0.9234, 0.9303, 0.9367, 0.9424, 0.9477, 0.9525, 0.9569, 0.9609, 0.9645, 0.9678, 0.9708, 0.9735, 0.976, 0.9782, 0.9803, 0.9821, 0.9838, 0.9853, 0.9867, 0.9879, 0.9891, 0.9901, 0.9911, 0.9919, 0.9927, 0.9934, 0.994, 0.9946, 0.9951, 0.9955, 0.996, 0.9964, 0.9967, 0.997, 0.9973, 0.9976, 0.9978, 1, 1, 1);   /* spring.dialog：modal 卡片放大到位 */
+      --ring: 800ms var(--ease-ring);                     /* 進度環弧 */
+      --ring-tick: 400ms var(--ease-ring);                /* 進度環分子變動的微上滑 tick */
+      /* 位移／縮放量（減少動態時歸零或 1） */
+      --lift: -2px;                                       /* 卡片 hover 上浮 */
+      --scale-press: 0.97;                                /* scale.press：按鈕按下 */
+      --scale-choice: 0.985;                              /* scale.choice：整張卡片／整列按下 */
+      --modal-from: scale(0.96);                          /* modal 進出場的起點縮放 */
+      --scale-menu: 0.9;                                  /* scale.menu：設定選單／子選單從觸發點長出的起點 */
+      --blur-swap: blur(2px);                             /* blur.icon／blur.disclosure：標籤淡換、展開面板的內容 */
+      --blur-surface: blur(4px);                          /* blur.surface：首次同步後內容從模糊清晰 */
     }
 
     * {
@@ -152,13 +189,36 @@
 
     /* Sidebar main nav */
     .side-nav {
+      position: relative;   /* 滑動 indicator 的定位基準；項目的 offsetTop 也以此為準（#47） */
       display: flex;
       flex-direction: column;
       gap: 2px;
       margin-bottom: 22px;
     }
 
+    /* 學期待辦／課程共用一塊 active 底色（indicator recipe，#47）：換頁時沿 spring.selection 從上一項滑到下一項，
+       不再是兩處底色各自淡出淡入。位置由 dashboard.js placeSideNavIndicator() 寫入 --y／--h；
+       沒有 active 項（課程詳情、已繳交）時 .is-off 原地淡出（transition.color）。用獨立的 translate 屬性，
+       按下 active 項時的 scale（#24）才疊得上去、以 indicator 自己的中心縮放。減少動態：位置直接到位（檔尾） */
+    .side-nav-indicator {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 0;
+      height: var(--h, 0px);
+      translate: 0 var(--y, 0px);
+      border-radius: 6px;
+      background: rgba(217, 119, 87, 0.09);
+      pointer-events: none;
+      transition: translate var(--spring-selection), opacity var(--t-color), scale var(--spring-press);
+    }
+
+    .side-nav-indicator.is-off {
+      opacity: 0;
+    }
+
     .side-nav-item {
+      position: relative;   /* 疊在 indicator 之上（兩者皆定位、z-index auto，DOM 順序在後） */
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -171,16 +231,25 @@
       padding: 8px 12px;
       cursor: pointer;
       color: var(--dark);
-      transition: background 0.12s, color 0.12s;
+      transition: background-color var(--t-color), color var(--t-color), scale var(--spring-press);
     }
 
-    .side-nav-item:hover {
-      background: var(--bg);
+    @media (hover: hover) and (pointer: fine) {
+      .side-nav-item:hover {
+        background: var(--bg);
+      }
     }
 
     .side-nav-item.active {
       background: rgba(217, 119, 87, 0.09);
       color: var(--orange);
+    }
+
+    /* 學期待辦／課程的 active 底色改由 indicator 畫（#47），本身不再上底色（含 hover）。
+       .has-indicator 由 placeSideNavIndicator() 第一次定位時加上：在那之前（JS 還沒跑的第一次繪製）底色仍畫在項目上，
+       載入那一幀就看得到選取。「已繳交」是獨立的過濾切換，保留上面自己的 .active 底色 */
+    .side-nav.has-indicator > .side-nav-item[data-page].active {
+      background: transparent;
     }
 
     /* 沒有課程時停用（課程／已繳交）：淡化、不給 hover（title 說明原因，見 setNoCoursesMode） */
@@ -253,7 +322,7 @@
       background: transparent;
       width: 100%;
       text-align: left;
-      transition: background 0.12s;
+      transition: background-color var(--t-color), scale var(--spring-press);
       position: relative;
       user-select: none;   /* 雙擊重命名時不選取課名文字 */
     }
@@ -262,8 +331,10 @@
       display: none;
     }
 
-    .nav-course-item:hover {
-      background: var(--bg);
+    @media (hover: hover) and (pointer: fine) {
+      .nav-course-item:hover {
+        background: var(--bg);
+      }
     }
 
     .nav-course-item.active {
@@ -357,11 +428,13 @@
       font-size: 11px;
       letter-spacing: 0.03em;
       color: var(--muted);
-      transition: color 0.12s;
+      transition: color var(--t-color), scale var(--spring-press);
     }
 
-    .canvas-candidate-btn:hover {
-      color: var(--orange);
+    @media (hover: hover) and (pointer: fine) {
+      .canvas-candidate-btn:hover:not(:disabled) {
+        color: var(--orange);
+      }
     }
 
     .canvas-candidate-btn:disabled {
@@ -388,18 +461,48 @@
       background: var(--bg);
       color: var(--muted);
       cursor: pointer;
-      transition: all 0.12s;
+      transition: border-color var(--t-color), color var(--t-color), scale var(--spring-press);   /* 不列 outline：focus ring 第一幀就完整（#26）；scale＝按壓（#24） */
       text-align: center;
     }
 
-    .btn-sync:hover {
-      border-color: var(--orange);
-      color: var(--orange);
+    @media (hover: hover) and (pointer: fine) {
+      .btn-sync:hover {
+        border-color: var(--orange);
+        color: var(--orange);
+      }
     }
 
     .btn-sync.sync-error {
       border-color: var(--orange);
       color: var(--orange);
+    }
+
+    /* 同步按鈕的四個狀態疊在同一格（#30）：閒置／三點／「✓ 已同步」／「同步失敗」，依 data-status 只亮一個，
+       opacity＋blur(2px) 原地淡換（transition.swap＋blur.icon）。格子寬＝最寬的標籤，換狀態按鈕不變寬。
+       沒亮的那幾個 visibility:hidden → 按鈕的可及名稱只有目前那一個；visibility 跟著 swap 時長走，
+       離場的標籤淡完才藏起，進場的第一幀就 visible（離散屬性往 visible 的方向立即生效） */
+    .sync-swap {
+      display: inline-grid;
+      place-items: center;
+      vertical-align: middle;
+    }
+
+    .sync-swap > * {
+      grid-area: 1 / 1;
+      opacity: 0;
+      filter: var(--blur-swap);
+      visibility: hidden;
+      white-space: nowrap;
+      transition: opacity var(--t-swap), filter var(--t-swap), visibility var(--t-swap);
+    }
+
+    [data-status="idle"] > .sync-swap > .s-idle,
+    [data-status="loading"] > .sync-swap > .s-loading,
+    [data-status="done"] > .sync-swap > .s-done,
+    [data-status="error"] > .sync-swap > .s-error {
+      opacity: 1;
+      filter: none;
+      visibility: visible;
     }
 
     @keyframes dot-bounce {
@@ -438,12 +541,14 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: all 0.12s;
+      transition: border-color var(--t-color), color var(--t-color), background-color var(--t-color), scale var(--spring-press);
     }
 
-    .btn-theme-toggle:hover {
-      border-color: var(--orange);
-      color: var(--orange);
+    @media (hover: hover) and (pointer: fine) {
+      .btn-theme-toggle:hover {
+        border-color: var(--orange);
+        color: var(--orange);
+      }
     }
 
     .btn-theme-toggle.open {
@@ -472,6 +577,17 @@
       display: none;
       z-index: 10;
       overflow: visible;
+      /* 從齒輪長出來、關閉時縮回去（#50，menu recipe）：origin 對準底部小箭頭（right 10px＋6px 邊）；
+         開關同一條 transition.menu，display 延後到淡出結束才 none（allow-discrete），起點見 @starting-style */
+      opacity: 0;
+      scale: var(--scale-menu);
+      transform-origin: calc(100% - 16px) 100%;
+      transition: opacity var(--t-menu), scale var(--t-menu), display var(--t-menu) allow-discrete;
+    }
+
+    /* 收合淡出中的那 220ms 還畫著：不接指標，避免點到正在消失的項目 */
+    .settings-menu:not(.open) {
+      pointer-events: none;
     }
 
     .settings-menu::after {
@@ -502,6 +618,15 @@
 
     .settings-menu.open {
       display: block;
+      opacity: 1;
+      scale: 1;
+    }
+
+    @starting-style {
+      .settings-menu.open {
+        opacity: 0;
+        scale: var(--scale-menu);
+      }
     }
 
     .settings-menu-item {
@@ -518,12 +643,14 @@
       align-items: center;
       justify-content: space-between;
       cursor: pointer;
-      transition: background 0.12s, color 0.12s;
+      transition: background-color var(--t-color), color var(--t-color);
     }
 
-    .settings-menu-item:hover {
-      background: var(--surface);
-      color: var(--orange);
+    @media (hover: hover) and (pointer: fine) {
+      .settings-menu-item:hover {
+        background: var(--surface);
+        color: var(--orange);
+      }
     }
 
     .settings-submenu {
@@ -538,13 +665,26 @@
       visibility: hidden;
       pointer-events: none;
       z-index: 9999;
-      transition: opacity 0.16s ease, visibility 0.16s ease;
+      /* 與母選單同一組參數（#50）：從「語言」那一列長出來——子選單在該列右側 8px，origin 取左緣往左 8px、垂直置中 */
+      scale: var(--scale-menu);
+      transform-origin: -8px 50%;
+      transition: opacity var(--t-menu), scale var(--t-menu), visibility var(--t-menu);
     }
 
+    /* 打開那一邊 visibility 立刻切換（0s）：visibility 跟著 0.22s 過渡的話，打開的那一刻按鈕仍是 hidden、
+       鍵盤打開後 focus 第一個語言會失敗（#10）；收合仍等淡出結束才 hidden */
     .settings-submenu.submenu-visible {
       opacity: 1;
+      scale: 1;
       visibility: visible;
       pointer-events: auto;
+      transition: opacity var(--t-menu), scale var(--t-menu), visibility 0s;
+    }
+
+    /* 「語言」改成點擊開關（N1）：子選單開著時這一列維持 hover 的樣子，滑鼠移開也看得出它是哪一列打開的 */
+    .settings-menu-item[aria-expanded="true"] {
+      background: var(--surface);
+      color: var(--orange);
     }
 
     .settings-submenu button {
@@ -558,12 +698,14 @@
       font-size: 12px;
       font-family: 'DM Sans', sans-serif;
       cursor: pointer;
-      transition: background 0.12s, color 0.12s;
+      transition: background-color var(--t-color), color var(--t-color);
     }
 
-    .settings-submenu button:hover {
-      background: var(--surface);
-      color: var(--orange);
+    @media (hover: hover) and (pointer: fine) {
+      .settings-submenu button:hover {
+        background: var(--surface);
+        color: var(--orange);
+      }
     }
 
     /* ── Main Content ── */
@@ -613,11 +755,13 @@
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      transition: color 0.12s;
+      transition: color var(--t-color), scale var(--spring-press);
     }
 
-    .detail-back-tab:hover {
-      color: var(--orange);
+    @media (hover: hover) and (pointer: fine) {
+      .detail-back-tab:hover {
+        color: var(--orange);
+      }
     }
 
     .page-tabs.detail-mode .detail-back-tab {
@@ -638,13 +782,15 @@
       text-transform: uppercase;
       letter-spacing: 0.05em;
       cursor: pointer;
-      transition: all 0.15s;
+      transition: border-color var(--t-color), color var(--t-color), scale var(--spring-press);
       white-space: nowrap;
     }
 
-    .btn-add-assignment:hover {
-      border-color: var(--dark);
-      color: var(--dark);
+    @media (hover: hover) and (pointer: fine) {
+      .btn-add-assignment:hover {
+        border-color: var(--dark);
+        color: var(--dark);
+      }
     }
 
     .btn-add-assignment:disabled,
@@ -662,21 +808,8 @@
       display: flex;
       flex-direction: column;
       position: relative;
-    }
-
-    /* ── Page Transition ── */
-    .page-slider {
-      display: flex;
-      width: 200%;
-      height: 100%;
-    }
-
-    .page-slide {
-      width: 50%;
-      flex-shrink: 0;
-      height: 100%;
-      display: flex;
-      flex-direction: column;
+      /* 課程 grid 在矮視窗會超出這一區、由 Tab 的焦點捲動帶進畫面：留 6px，貼齊下緣的卡片焦點框不被裁（#4） */
+      scroll-padding-block: 6px;
     }
 
     /* ── Week Page ── */
@@ -741,7 +874,7 @@
       stroke: var(--green);
       stroke-width: 20;
       stroke-linecap: round;
-      transition: stroke-dashoffset .8s cubic-bezier(0.16, 1, 0.3, 1);
+      transition: stroke-dashoffset var(--ring);
     }
 
     .wk-ring-center {
@@ -779,7 +912,7 @@
 
     .wk-ring-frac b.tick {
       display: inline-block;
-      animation: wk-frac-tick .4s cubic-bezier(0.16, 1, 0.3, 1) both;
+      animation: wk-frac-tick var(--ring-tick) both;
     }
 
     .wk-ring-cap {
@@ -809,19 +942,23 @@
       padding: 8px 12px;
       border-radius: 7px;
       cursor: pointer;
-      transition: background 0.12s;
+      transition: background-color var(--t-color), scale var(--spring-press);
     }
 
-    .wk-sum-row:hover {
-      background: rgba(217, 119, 87, 0.06);
+    @media (hover: hover) and (pointer: fine) {
+      .wk-sum-row:hover {
+        background: rgba(217, 119, 87, 0.06);
+      }
     }
 
     .wk-sum-row.is-overdue {
       background: color-mix(in srgb, var(--overdue) 8%, transparent);
     }
 
-    .wk-sum-row.is-overdue:hover {
-      background: color-mix(in srgb, var(--overdue) 13%, transparent);
+    @media (hover: hover) and (pointer: fine) {
+      .wk-sum-row.is-overdue:hover {
+        background: color-mix(in srgb, var(--overdue) 13%, transparent);
+      }
     }
 
     .wk-sum-num {
@@ -865,7 +1002,10 @@
       min-width: 0;
       min-height: 0;
       overflow-y: auto;
-      padding-right: 8px;
+      /* 左、上各留 4px 給焦點框（2px ring＋2px offset）：捲動容器會裁掉超出 padding box 的部分，
+         摘要列把焦點交給組標題（#33）時，第一組標題的上緣、每個標題的左緣都會被裁；負 margin 抵銷，內容位置不變 */
+      padding: 4px 8px 0 4px;
+      margin: -4px 0 0 -4px;
     }
 
     .week-right::-webkit-scrollbar {
@@ -881,8 +1021,10 @@
       border-radius: 3px;
     }
 
-    .week-right::-webkit-scrollbar-thumb:hover {
-      background: var(--mid);
+    @media (hover: hover) and (pointer: fine) {
+      .week-right::-webkit-scrollbar-thumb:hover {
+        background: var(--mid);
+      }
     }
 
     .week-group {
@@ -953,11 +1095,19 @@
       display: flex;
       flex-direction: column;
       gap: 6px;
-      transition: border-color 0.12s;
+      /* 整張卡可點（開課程詳情）：與課程卡同一組 card recipe（#25）——框與陰影走 transition.color，
+         上浮走 spring.highlight（滑鼠離開立即 retarget），按下走 spring.press（#24）。上浮／按下用獨立的
+         translate／scale 屬性：互相疊加，也不跟 FLIP 補位與出場層的 WAAPI transform 打架 */
+      cursor: pointer;
+      transition: border-color var(--t-color), box-shadow var(--t-color), translate var(--spring-highlight), scale var(--spring-press);
     }
 
-    .week-task-card:hover {
-      border-color: var(--orange);
+    @media (hover: hover) and (pointer: fine) {
+      .week-task-card:not(.bursting):hover {
+        border-color: var(--orange);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        translate: 0 var(--lift);
+      }
     }
 
     /* 週卡片右上角完成勾選圈（視覺沿用 .assignment-check，改為 absolute 定位）
@@ -970,9 +1120,9 @@
       margin: 0;
     }
 
-    /* 撤銷窗口內，卡片內的「↩ 撤銷」hint 維持內容寬度（不隨 flex column 撐滿） */
-    .week-task-card .complete-undo-hint {
-      align-self: flex-start;
+    /* 撤銷窗口內裁切卡片內容：底部倒數條沿內側圓角走，不凸出外框（#44；碎點畫在 #burst-layer，不受裁切） */
+    .week-task-card.completing {
+      overflow: clip;
     }
 
     /* 頂部兩行文字讓出勾選圈空間，避免疊字 */
@@ -1013,6 +1163,8 @@
 
     /* Assignment List */
     .assignment-item {
+      position: relative;    /* hover 底色層（::before）與撤銷倒數條的定位基準，不影響版面 */
+      isolation: isolate;    /* ::before 的 z-index:-1 留在列自己的堆疊脈絡裡：畫在內容下面、不掉到清單底色後面 */
       display: flex;
       align-items: flex-start;
       justify-content: space-between;
@@ -1020,6 +1172,34 @@
       border-bottom: 1px solid var(--border);
       cursor: pointer;
       line-height: 1.8;
+      transition: scale var(--spring-press);   /* 整列按下（#24） */
+    }
+
+    /* 整列可點（展開描述）：hover 時淺色底（#37，card recipe 的 row）。畫在溢出層，不改版面——
+       左右各外擴 8px，剛好落在 .detail-right-panel 的 8px 側邊留白內；列下面是 --bg，用 --surface 才看得見。
+       拖曳中、出場中、殘影、落地閃色（.drag-arrived，游標通常就停在落點上）時不亮，閃示才看得見 */
+    .assignment-item::before {
+      content: '';
+      position: absolute;
+      inset: 0 -8px;
+      border-radius: 6px;
+      background: var(--surface);
+      opacity: 0;
+      transition: opacity var(--t-color);
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+      body:not(.drag-active) .assignment-item:not(.bursting):not(.drag-source):not(.drag-clone):not(.drag-arrived):hover::before {
+        opacity: 1;
+      }
+    }
+
+    /* 完成離場的列：底色層停在離場當下的值，隨整列一起淡出（不在出場第一幀切掉；見 dashboard.js freezeHoverLook） */
+    .assignment-item.exit-frozen::before {
+      opacity: var(--hover-lit, 0);
+      transition: none;
     }
 
     .assignment-item:last-child {
@@ -1062,7 +1242,7 @@
       background: transparent;
       cursor: pointer;
       position: relative;
-      transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+      transition: background-color var(--t-color), border-color var(--t-color), box-shadow var(--t-color);
     }
 
     /* 擴大點擊/hover 範圍：圓圈外約 7px（仍小於與文字的 12px 間距，不壓到字） */
@@ -1074,10 +1254,12 @@
     }
 
     /* 進入範圍即「亮起」：綠框 + 微綠填充 + 柔光暈（暗示可點範圍比圓圈大一圈） */
-    .assignment-check:hover {
-      border-color: var(--green);
-      background: color-mix(in srgb, var(--green) 12%, transparent);
-      box-shadow: 0 0 0 4px color-mix(in srgb, var(--green) 10%, transparent);
+    @media (hover: hover) and (pointer: fine) {
+      .assignment-check:hover {
+        border-color: var(--green);
+        background: color-mix(in srgb, var(--green) 12%, transparent);
+        box-shadow: 0 0 0 4px color-mix(in srgb, var(--green) 10%, transparent);
+      }
     }
 
     .assignment-check[data-done="true"] {
@@ -1097,11 +1279,19 @@
       transform: rotate(45deg);
     }
 
-    /* 完成過渡：底部撤銷倒數條歸零後「原地碎點爆」（不放大不縮小） */
-    @keyframes complete-burst {
-      from { opacity: 1; }
-      to   { opacity: 0; }
+    /* 勾號畫出（#46）：底色在點下去那一幀就開始填（上面的 background-color 過渡），勾號在填色之後
+       由短邊往長邊畫出（transition.check，delay 200ms，同 popup）。只在「勾下去的這一下」播（.just-checked），
+       重繪出來就已勾選的框不播；這是揭示不是位移，減少動態時保留 */
+    @keyframes check-draw {
+      from { clip-path: inset(100% 0 0 0); }
+      to   { clip-path: inset(0); }
     }
+    .assignment-check.just-checked[data-done="true"]::after {
+      animation: check-draw var(--t-check) 200ms both;
+    }
+
+    /* 完成過渡：撤銷倒數條歸零 → 碎點從勾選圈迸出、項目原地淡出縮小、其餘 FLIP 補位
+       （出場與補位由 dashboard.js 的 exitInPlace／flipPlay 以 WAAPI 執行） */
     @keyframes complete-dot {
       to { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0.3); }
     }
@@ -1109,16 +1299,9 @@
       from { transform: scaleX(1); }
       to   { transform: scaleX(0); }
     }
-    .assignment-item.completing { position: relative; }
-    .assignment-item.bursting,
-    .week-task-card.bursting {
-      animation: complete-burst 0.4s ease-out forwards;
-      pointer-events: none;   /* 爆完的列/卡可能留在原位等批次重繪（其他撤銷窗口未結束），不可再互動或拖曳 */
-    }
-    /* 爆開列下方若展開著描述，一起淡出（不然批次重繪前會留下一段孤立的描述） */
-    .assignment-item.bursting + .assignment-desc {
-      animation: complete-burst 0.4s ease-out forwards;
-    }
+    /* 倒數條的定位基準：.assignment-item 本身已是 position:relative（見上方 Assignment List） */
+    /* 爆開中的列/週卡（離場殘影交給 exitInPlace，展開著的描述也一起離場）：不可再互動或拖曳 */
+    .bursting { pointer-events: none; }
     .complete-countdown {
       position: absolute;
       left: 0;
@@ -1128,35 +1311,64 @@
       background: var(--orange);
       transform-origin: left;
     }
-    /* 疊在 due 標籤原位（showUndoHint 算 top／left／right），不佔版面：撤銷窗口期間列／卡的高度不變 */
+
+    /* 截止日期與「↩ 撤銷」從一開始就疊在同一格（.due-slot）：撤銷窗只切 .completing 淡換
+       （transition.swap＋blur.icon），格子尺寸從頭到尾不變，列與卡片不長高、其他項目不被推動（#13）。
+       只有淡入淡出與 blur，減少動態時保留 */
+    .due-slot {
+      display: grid;
+    }
+    .assignment-right .due-slot {
+      justify-items: end;
+    }
+    .week-task-card .due-slot {
+      justify-items: start;
+    }
+    .due-slot > * {
+      grid-area: 1 / 1;
+      align-self: center;
+      transition: opacity var(--t-swap), filter var(--t-swap);
+    }
     .complete-undo-hint {
-      position: absolute;
-      z-index: 1;
-      transform: translateY(-50%);
-      white-space: nowrap;
       font-family: 'DM Mono', monospace;
       font-size: 12px;
       color: var(--orange);
       background: var(--surface);
       border-radius: 999px;
-      padding: 2px 10px;
+      padding: 0 10px;
+      opacity: 0;
+      filter: blur(2px);
+    }
+    .completing .due-slot > .complete-undo-hint {
+      opacity: 1;
+      filter: none;
+    }
+    .completing .due-slot > :not(.complete-undo-hint) {
+      opacity: 0;
+      filter: blur(2px);
+    }
+
+    /* 出場層：碎點與離場殘影畫在這裡（fixed、不吃指標；見 dashboard.js burstLayer／exitInPlace）。
+       不在捲動容器或淡出中的列裡：碎點不會被列的淡出乘掉，也不會被容器裁切（#20） */
+    #burst-layer {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 50;
+    }
+    #burst-layer .exit-clip {
+      position: absolute;
     }
     .complete-burst-dot {
       position: absolute;
-      left: 26px;
-      top: 50%;
       width: 7px;
       height: 7px;
+      margin: -3.5px 0 0 -3.5px;   /* 點的中心對齊勾選圈中心（left/top 由 JS 寫入） */
       border-radius: 50%;
       pointer-events: none;
       animation: complete-dot 0.5s ease-out forwards;
     }
-    /* 週卡的勾選圈在右上角：碎點從圈心噴出（圈 18px、距右/上緣 11px → 圈心 20px，再扣半顆 3.5px） */
-    .week-task-card .complete-burst-dot {
-      left: auto;
-      right: 16.5px;
-      top: 16.5px;
-    }
+    /* 週卡的碎點同樣畫在出場層、從勾選圈圈心迸出（spawnBurstDots 量勾選圈的 rect 寫入 left/top），不需另外定位 */
 
     .assignment-left {
       display: flex;
@@ -1164,6 +1376,20 @@
       gap: 3px;
       flex: 1;
       min-width: 0;
+      position: relative;   /* 描述開關（.assignment-desc-toggle）蓋滿左欄的定位基準 */
+    }
+
+    /* 描述開關（#7）：鍵盤用的真按鈕，透明地蓋滿左欄；pointer-events:none → 滑鼠照樣點在下面的標題、握把、左欄上，
+       整列點擊展開描述不變。Enter／Space 的 click 冒泡到列，走同一個開關；焦點框就是左欄的外框 */
+    .assignment-desc-toggle {
+      position: absolute;
+      inset: 0;
+      margin: 0;
+      padding: 0;
+      border: 0;
+      border-radius: 4px;
+      background: none;
+      pointer-events: none;
     }
 
     /* 標題列：名稱 + （可拖列）緊跟其後的拖曳握把；名稱過長由內層 span 做 ellipsis */
@@ -1187,12 +1413,14 @@
     .assignment-title-link {
       display: inline;
       cursor: pointer;
-      transition: color 0.15s;
+      transition: color var(--t-color);
     }
 
-    .assignment-title-link:hover {
-      color: var(--orange);
-      text-decoration: underline;
+    @media (hover: hover) and (pointer: fine) {
+      .assignment-title-link:hover {
+        color: var(--orange);
+        text-decoration: underline;
+      }
     }
 
     .assignment-group {
@@ -1226,22 +1454,18 @@
       letter-spacing: 0.04em;
     }
 
-    /* Assignment Description (accordion) */
+    /* Assignment Description (accordion)：開合動效見下方「展開面板」共用規則（#28） */
     .assignment-desc {
-      display: none;
-      padding: 12px 0 8px;
       font-size: 13px;
       color: var(--muted);
       line-height: 1.7;
-      border-bottom: 1px solid var(--border);
     }
 
-    .assignment-desc.open {
-      display: block;
-    }
-
+    /* padding 與底線放在內層：外層 height:0 才收得乾淨（外層有 padding 的話收合後仍有 20px＋1px） */
     .assignment-desc-inner {
-      max-height: 240px;
+      padding: 12px 0 8px;
+      border-bottom: 1px solid var(--border);
+      max-height: 260px;   /* 240px 內容＋20px padding（border-box） */
       overflow-y: auto;
     }
 
@@ -1361,11 +1585,13 @@
       font-size: 13px;
       letter-spacing: 0.04em;
       cursor: pointer;
-      transition: background 0.15s;
+      transition: background-color var(--t-color), scale var(--spring-press);
     }
 
-    .state-msg-action:hover {
-      background: rgba(217, 119, 87, 0.08);
+    @media (hover: hover) and (pointer: fine) {
+      .state-msg-action:hover {
+        background: rgba(217, 119, 87, 0.08);
+      }
     }
 
     .state-msg-sub {
@@ -1399,6 +1625,14 @@
       text-transform: uppercase;
       letter-spacing: 0.08em;
       color: var(--mid);
+      transition: color var(--t-color);
+    }
+
+    /* 標頭整條可點（開合）：hover 時標題轉橘（#37） */
+    @media (hover: hover) and (pointer: fine) {
+      .grade-calc-header:hover .grade-calc-title {
+        color: var(--orange);
+      }
     }
 
     .grade-calc-final-display {
@@ -1407,13 +1641,55 @@
       color: var(--orange);
     }
 
-    .grade-calc-body {
-      display: none;
+    /* 標頭的開合指示（#28）：與「已隱藏 N 項」同一顆 chevron、同一個 timing，開著轉 90° */
+    .grade-calc-head {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .grade-calc-arrow {
+      display: inline-flex;
+      align-items: center;
+      color: var(--mid);
+      transition: transform var(--t-disclosure);
+    }
+
+    .grade-calc.open .grade-calc-arrow {
+      transform: rotate(90deg);
+    }
+
+    /* padding 在內層（外層 height:0 才收得乾淨）；開合見下方「展開面板」共用規則（#28） */
+    .grade-calc-body-inner {
       padding: 14px 16px;
     }
 
-    .grade-calc.open .grade-calc-body {
+    /* ── 展開面板（disclosure recipe，#28）：作業描述、成績計算器、已隱藏清單 ──
+       面板高度 0 ↔ auto（interpolate-size，Chrome 129+；更舊的版本高度照舊直接跳，淡入仍有效）、
+       內容從 2px 模糊清晰（blur.disclosure），三者與 chevron 同一個 transition.disclosure，讀起來是同一個動作。
+       收合時 visibility:hidden（面板裡的連結、輸入框不在 Tab 順序裡，A17）：
+       打開那一邊 visibility 立刻生效（0s，鍵盤移動後焦點要能馬上落進去，#6）；收合等淡出跑完才藏。
+       拖曳降級時（.drop-active）稽核清單也走同一個開合，不再硬切 */
+    .detail-right-panel {
+      interpolate-size: allow-keywords;
+    }
+
+    :is(.assignment-desc, .grade-calc-body, .hidden-items-list) {
       display: block;
+      height: 0;
+      overflow: clip;
+      opacity: 0;
+      filter: var(--blur-swap);
+      visibility: hidden;
+      transition: height var(--t-disclosure), opacity var(--t-disclosure), filter var(--t-disclosure), visibility var(--t-disclosure);
+    }
+
+    :is(.assignment-desc.open, .grade-calc.open .grade-calc-body, .hidden-items.open .hidden-items-list, .hidden-items.drop-active .hidden-items-list) {
+      height: auto;
+      opacity: 1;
+      filter: none;
+      visibility: visible;
+      transition: height var(--t-disclosure), opacity var(--t-disclosure), filter var(--t-disclosure), visibility 0s;
     }
 
     .grade-calc-group {
@@ -1481,11 +1757,13 @@
       font-size: 12px;
       text-align: right;
       outline: none;
-      transition: border-color 0.12s;
+      transition: border-color var(--t-color);
     }
 
+    /* focus 邊框是唯一的焦點指示：第一幀就到位、不淡入（blur 時才走上面的淡回，#26） */
     .grade-calc-pts input:focus {
       border-color: var(--orange);
+      transition: none;
     }
 
     /* 負分：標紅、不計入總分（QA #25） */
@@ -1594,13 +1872,15 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      transition: all 0.12s;
+      transition: border-color var(--t-color), color var(--t-color), background-color var(--t-color), scale var(--spring-press);
     }
 
-    .btn-delete-custom-assignment:hover {
-      border-color: var(--orange);
-      color: var(--orange);
-      background: rgba(217, 119, 87, 0.08);
+    @media (hover: hover) and (pointer: fine) {
+      .btn-delete-custom-assignment:hover {
+        border-color: var(--orange);
+        color: var(--orange);
+        background: rgba(217, 119, 87, 0.08);
+      }
     }
 
     .assignment-item.custom-assignment .assignment-title {
@@ -1620,16 +1900,27 @@
       display: none;
       position: fixed;
       inset: 0;
-      background: rgba(20, 20, 19, 0.55);
+      background-color: transparent;
       z-index: 200;
       align-items: center;
       justify-content: center;
       padding: 24px;
-      backdrop-filter: blur(2px);
+      backdrop-filter: blur(0px);
+      /* 背景暗度與模糊從 0 淡入、同一條淡出（#29，transition.overlay）；只有教學這層有模糊 */
+      transition: background-color var(--t-overlay), backdrop-filter var(--t-overlay), display var(--t-overlay) allow-discrete;
     }
 
     .welcome-overlay.open {
       display: flex;
+      background-color: rgba(20, 20, 19, 0.55);
+      backdrop-filter: blur(2px);
+    }
+
+    @starting-style {
+      .welcome-overlay.open {
+        background-color: transparent;
+        backdrop-filter: blur(0px);
+      }
     }
 
     .welcome-card {
@@ -1642,30 +1933,46 @@
       max-height: calc(100vh - 64px);
       position: relative;
       box-shadow: 0 24px 64px rgba(20, 20, 19, 0.18);
-      animation: welcomeIn 0.28s ease;
       display: flex;
       flex-direction: column;
       overflow: hidden;
+    }
+
+    /* ── 四個 modal 的卡片進出場（#29，modal recipe）──
+       進場：淡入 transition.dialogFade＋從 0.96 放大到位 spring.dialog（起點見 @starting-style）；
+       出場：倒著走、比進場快——transition.dismiss（200ms ease.away）淡出並縮回 0.96，背景再用 transition.overlay 淡回透明。
+       overlay 的 display 延後到背景淡完才 none（allow-discrete），出場中的 overlay 由 setupModalA11y 設 inert，接不到焦點與點擊。
+       減少動態：--modal-from 為 none（檔尾 media 區塊），只淡入淡出、不縮放（連 @starting-style 一起生效） */
+    :is(.welcome-card, .custom-assignment-modal, .weight-edit-modal, .confirm-modal) {
+      opacity: 0;
+      transform: var(--modal-from);
+      transition: opacity var(--t-dismiss), transform var(--t-dismiss);
+    }
+
+    .open > :is(.welcome-card, .custom-assignment-modal, .weight-edit-modal, .confirm-modal) {
+      opacity: 1;
+      transform: none;
+      transition: opacity var(--t-dialog-fade), transform var(--spring-dialog);
+    }
+
+    @starting-style {
+      .open > :is(.welcome-card, .custom-assignment-modal, .weight-edit-modal, .confirm-modal) {
+        opacity: 0;
+        transform: var(--modal-from);
+      }
     }
 
     .welcome-main-area {
       flex: 1;
       width: 100%;
       height: 100%;
-      overflow: hidden;
+      /* clip 而不是 hidden（#9）：hidden 仍是捲動容器，焦點落到畫面外的 step 會把它捲歪、之後每次換頁都錯位；
+         clip 不是捲動容器，捲不動 */
+      overflow: clip;
+      /* 但 clip 不是捲動容器，flex 項目的 min-height:auto 就會解析成內容高度（hidden 時是 0）——
+         內容區壓不下去，把底部按鈕列擠出 448px 的卡片外、被裁掉一截。明寫 0 讓它照舊能縮 */
+      min-height: 0;
       position: relative;
-    }
-
-    @keyframes welcomeIn {
-      from {
-        opacity: 0;
-        transform: scale(0.96) translateY(8px);
-      }
-
-      to {
-        opacity: 1;
-        transform: scale(1) translateY(0);
-      }
     }
 
     .welcome-close {
@@ -1683,20 +1990,22 @@
       align-items: center;
       justify-content: center;
       border-radius: 6px;
-      transition: background 0.15s, color 0.15s;
+      transition: background-color var(--t-color), color var(--t-color), scale var(--spring-press);
       z-index: 2;
     }
 
-    .welcome-close:hover {
-      background: var(--surface);
-      color: var(--dark);
+    @media (hover: hover) and (pointer: fine) {
+      .welcome-close:hover {
+        background: var(--surface);
+        color: var(--dark);
+      }
     }
 
     .welcome-track {
       display: flex;
       width: 500%;
       height: 100%;
-      transition: transform 0.38s cubic-bezier(0.4, 0, 0.2, 1);
+      transition: transform 380ms var(--ease-in-out);   /* route：兩頁一起移動（push）用 ease.inOut */
     }
 
     .welcome-step {
@@ -1945,7 +2254,7 @@
       height: 6px;
       border-radius: 50%;
       background: var(--border);
-      transition: background 0.2s, width 0.2s;
+      transition: background-color var(--t-color), width var(--t-color);
       cursor: pointer;
     }
 
@@ -1955,6 +2264,13 @@
       border-radius: 3px;
     }
 
+    /* 可點的圓點（跳到該步）：未選中的 hover 加深（#37，換色走上面的 background-color transition） */
+    @media (hover: hover) and (pointer: fine) {
+      .welcome-dot:not(.active):hover {
+        background: var(--mid);
+      }
+    }
+
     .welcome-btn {
       padding: 8px 18px;
       border-radius: 6px;
@@ -1962,16 +2278,18 @@
       font-weight: 400;
       font-size: 13px;
       cursor: pointer;
-      transition: all 0.15s;
+      transition: background-color var(--t-color), border-color var(--t-color), color var(--t-color), scale var(--spring-press);
       border: 1px solid var(--dark);
       background: var(--dark);
       color: var(--bg);
       white-space: nowrap;
     }
 
-    .welcome-btn:hover {
-      background: #2a2a27;
-      border-color: #2a2a27;
+    @media (hover: hover) and (pointer: fine) {
+      .welcome-btn:hover {
+        background: #2a2a27;
+        border-color: #2a2a27;
+      }
     }
 
     .welcome-btn.sec {
@@ -1980,9 +2298,11 @@
       color: var(--muted);
     }
 
-    .welcome-btn.sec:hover {
-      border-color: var(--orange);
-      color: var(--orange);
+    @media (hover: hover) and (pointer: fine) {
+      .welcome-btn.sec:hover {
+        border-color: var(--orange);
+        color: var(--orange);
+      }
     }
 
     .welcome-btn.ora {
@@ -1991,9 +2311,11 @@
       color: #fff;
     }
 
-    .welcome-btn.ora:hover {
-      background: #c4683f;
-      border-color: #c4683f;
+    @media (hover: hover) and (pointer: fine) {
+      .welcome-btn.ora:hover {
+        background: #c4683f;
+        border-color: #c4683f;
+      }
     }
 
     /* ── Welcome inline link ── */
@@ -2001,12 +2323,14 @@
       color: var(--orange);
       text-decoration: none;
       border-bottom: 1px solid transparent;
-      transition: border-color 0.15s;
+      transition: border-color var(--t-color);
       cursor: pointer;
     }
 
-    .welcome-inline-link:hover {
-      border-bottom-color: var(--orange);
+    @media (hover: hover) and (pointer: fine) {
+      .welcome-inline-link:hover {
+        border-bottom-color: var(--orange);
+      }
     }
 
     /* ── Welcome step 4：拖曳示意圖 ── */
@@ -2289,16 +2613,24 @@
     .custom-assignment-overlay {
       position: fixed;
       inset: 0;
-      background: rgba(20, 20, 19, 0.28);
+      background-color: transparent;
       display: none;
       align-items: center;
       justify-content: center;
       padding: 24px;
       z-index: 2500;
+      transition: background-color var(--t-overlay), display var(--t-overlay) allow-discrete;   /* 背景淡入淡出（#29） */
     }
 
     .custom-assignment-overlay.open {
       display: flex;
+      background-color: rgba(20, 20, 19, 0.28);
+    }
+
+    @starting-style {
+      .custom-assignment-overlay.open {
+        background-color: transparent;
+      }
     }
 
     .custom-assignment-modal {
@@ -2326,7 +2658,10 @@
       line-height: 1.2;
     }
 
-    .custom-assignment-close {
+    /* ✕：關閉但保留草稿（N2；權重視窗也補一顆，滑鼠使用者才有「不丟掉已輸入內容」的關法） */
+    .custom-assignment-close,
+    .weight-edit-close {
+      flex-shrink: 0;
       width: 30px;
       height: 30px;
       border: 1px solid var(--border);
@@ -2338,6 +2673,16 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      transition: border-color var(--t-color), color var(--t-color), scale var(--spring-press);
+    }
+
+    /* 原本沒有 hover（#37）：比照其他外框鈕，橘框橘字 */
+    @media (hover: hover) and (pointer: fine) {
+      .custom-assignment-close:hover,
+      .weight-edit-close:hover {
+        border-color: var(--orange);
+        color: var(--orange);
+      }
     }
 
     .custom-assignment-form {
@@ -2372,7 +2717,7 @@
       font-size: 14px;
       padding: 10px 12px;
       outline: none;
-      transition: border-color 0.12s;
+      transition: border-color var(--t-color);
     }
 
     .custom-assignment-field textarea {
@@ -2381,16 +2726,26 @@
       line-height: 1.6;
     }
 
+    /* focus 邊框是唯一的焦點指示：第一幀就到位、不淡入（blur 時才淡回，#26） */
     .custom-assignment-field input:focus,
     .custom-assignment-field select:focus,
     .custom-assignment-field textarea:focus {
       border-color: var(--orange);
+      transition: none;
     }
 
     .custom-assignment-error {
       min-height: 18px;
       color: var(--orange);
       font-size: 12px;
+    }
+
+    /* 送出失敗（#38）：欄位轉紅（id 特異度蓋過上面的焦點橘框，焦點還在欄位上也看得出是錯的）；開始打字就清掉。
+       出錯的可能是名稱或截止日期（QA #161：日期打錯指向截止日期欄，見 showCustomFormError） */
+    #custom-assignment-name[aria-invalid="true"],
+    #custom-assignment-due[aria-invalid="true"] {
+      border-color: var(--overdue);
+      transition: border-color var(--t-color);
     }
 
     .custom-assignment-actions {
@@ -2409,6 +2764,7 @@
       text-transform: uppercase;
       letter-spacing: 0.05em;
       cursor: pointer;
+      transition: border-color var(--t-color), color var(--t-color), opacity var(--t-color), scale var(--spring-press);
     }
 
     .btn-custom-cancel {
@@ -2423,6 +2779,18 @@
       color: var(--bg);
     }
 
+    /* 取消／儲存原本沒有 hover（#37）：取消比照外框鈕橘框橘字，儲存（實心）比照確認鈕降一點不透明 */
+    @media (hover: hover) and (pointer: fine) {
+      .btn-custom-cancel:hover {
+        border-color: var(--orange);
+        color: var(--orange);
+      }
+
+      .btn-custom-save:hover {
+        opacity: 0.88;
+      }
+    }
+
     /* ── Card Grid ── */
     .course-card-grid {
       border: 1px solid var(--border);
@@ -2433,14 +2801,18 @@
       flex-direction: column;
       min-height: 0;
       cursor: pointer;
-      transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+      /* card recipe（#25，與週卡同一組）：框與陰影走 transition.color，上浮走 spring.highlight（原本 transform 0.2s ease
+         ＝顏色曲線），按下走 spring.press（#24）。上浮改寫在獨立的 translate 屬性：按下的 scale 疊上去，不會互相覆蓋 */
+      transition: border-color var(--t-color), box-shadow var(--t-color), translate var(--spring-highlight), scale var(--spring-press);
     }
 
 
-    .course-card-grid:hover {
-      border-color: var(--orange);
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-      transform: translateY(-2px);
+    @media (hover: hover) and (pointer: fine) {
+      .course-card-grid:hover {
+        border-color: var(--orange);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        translate: 0 var(--lift);
+      }
     }
 
 
@@ -2532,7 +2904,7 @@
         transparent 80%);
       background-size: 200% 100%;
       background-repeat: no-repeat;
-      animation: skel-shimmer 1.4s ease-in-out infinite;
+      animation: skel-shimmer 1.4s linear infinite;   /* 持續的 loader 用 linear（B2，#43） */
     }
 
 
@@ -2545,30 +2917,75 @@
     .skel-nav-row { padding: 9px 14px; }
     .skel-nav-row .skel { height: 12px; }
 
-    /* 週待辦版 skeleton：沿用 .week-panel／.wk-ring／.wk-sum-row／.week-task-card 的版面，內容換成佔位條 */
-    .skel-week { pointer-events: none; }
-    .skel-week .skel-ring-frac { width: 64px; height: 24px; }
-    .skel-week .wk-sum-row { align-items: center; }
-    .skel-week .skel-sum-num { flex: none; width: 22px; height: 18px; }
-    .skel-week .skel-sum-label { height: 11px; }
-    .skel-week .skel-group-title { width: 84px; height: 10px; margin-bottom: 12px; }
-    .skel-week .week-task-card .skel-code { height: 10px; }
-    .skel-week .week-task-card .skel-name { height: 14px; }
-    .skel-week .week-task-card .skel-row { width: 30%; height: 10px; }
-
-    /* skeleton → 真資料到位的一次性淡入上浮 */
-    @keyframes content-arrive {
-      from { opacity: 0; transform: translateY(4px); }
-      to   { opacity: 1; transform: translateY(0); }
+    /* 主區 skeleton 疊層（#43）：掛在 #main-section 的 parent（.main-content），對齊 #main-section 的位置與大小——
+       renderWeekSection／renderCardGrid 會覆寫 #main-section 的 innerHTML，疊層放在裡面會被一幀刪掉。
+       真內容在它底下畫好後，疊層用 transition.fade 淡出、內容同時從 blur.surface 清晰（兩者交疊，不留空白幀；
+       取代舊的 content-arrive 淡入上浮）。形狀跟著落地的那一頁（QA #195）：學期待辦＝下方 .skel-ring／.skel-sum／.skel-wcard，
+       其餘＝課程卡 grid（.skel-card），見 dashboard.js renderSyncSkeleton */
+    .main-content {
+      position: relative;
     }
 
-    #main-section.arrive > * {
-      animation: content-arrive .3s ease-out both;
+    .sync-skeleton {
+      position: absolute;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg);
+      pointer-events: none;
+      transition: opacity var(--t-fade);
     }
+
+    /* 週頁形狀：與真的週頁同一組版面 class（.week-panel／.week-left／.week-right…），換上來時圓環、摘要列、卡片條都在原位 */
+    .skel-ring {
+      width: 158px;
+      height: 158px;
+      border-radius: 50%;
+      -webkit-mask: radial-gradient(circle, transparent 58.5px, #000 59px);
+      mask: radial-gradient(circle, transparent 58.5px, #000 59px);
+    }
+
+    .skel-sum {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 12px;
+      height: 39px;
+    }
+
+    .skel-sum .skel-sum-n { width: 22px; height: 20px; }
+    .skel-sum .skel-sum-l { height: 12px; }
+
+    .skel-group-title {
+      width: 84px;
+      height: 11px;
+      margin-bottom: 12px;
+    }
+
+    .skel-wcard {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px 14px;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .skel-wcard .skel-wcard-a { width: 58%; height: 11px; }
+    .skel-wcard .skel-wcard-b { width: 86%; height: 14px; }
+    .skel-wcard .skel-wcard-c { width: 42%; height: 12px; }
 
     .card-rows-container {
       flex: 1;
       min-height: 0;
+    }
+
+    /* 有分頁的卡保留「3 列、兩行標題」的高度（#31）：每頁標題行數不同，換頁時卡片不變高變矮、同一排下面的卡不被推動
+       （每列 2 × 14px × 1.3 ＋ 20px padding，列間 2 條 1px 底線，最後一列無底線＝171.2px）。
+       用 calc 寫出完整算式、不取整數：寫成 171px 會比三列兩行的自然高度（171.125px）矮，換到列較矮的頁時卡片仍縮 0.1px、下面的卡跟著動 */
+    .card-bottom:has(.card-pager) .card-rows-container {
+      min-height: calc(3 * (2 * 14px * 1.3 + 20px) + 2px);
     }
 
     .card-row {
@@ -2635,12 +3052,14 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: all 0.1s;
+      transition: border-color var(--t-color), color var(--t-color), opacity var(--t-color), scale var(--spring-press);
     }
 
-    .card-pager-btn:hover:not(:disabled) {
-      border-color: var(--orange);
-      color: var(--orange);
+    @media (hover: hover) and (pointer: fine) {
+      .card-pager-btn:hover:not(:disabled) {
+        border-color: var(--orange);
+        color: var(--orange);
+      }
     }
 
     .card-pager-btn:disabled {
@@ -2693,11 +3112,13 @@
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      transition: color 0.12s;
+      transition: color var(--t-color);
     }
 
-    .detail-back:hover {
-      color: var(--orange);
+    @media (hover: hover) and (pointer: fine) {
+      .detail-back:hover {
+        color: var(--orange);
+      }
     }
 
     /* Detail Top — mirrors .card-top */
@@ -2747,15 +3168,30 @@
       padding: 2px 4px;
       border-radius: 4px;
       opacity: 0;
-      transition: opacity 0.15s, color 0.15s;
+      transition: opacity var(--t-color), color var(--t-color), scale var(--spring-press);
     }
 
-    .detail-name:hover .btn-rename-course {
+    @media (hover: hover) and (pointer: fine) {
+      .detail-name:hover .btn-rename-course {
+        opacity: 1;
+      }
+
+      .btn-rename-course:hover {
+        color: var(--dark);
+      }
+    }
+
+    /* 鉛筆平常隱形、只靠 hover 叫出 → 鍵盤 Tab 到它時第一幀就看得見（不淡入，#5）；
+       沒有可 hover 的指標（觸控）時以 0.6 常駐，不必先點課名才找得到（#11） */
+    .btn-rename-course:focus-visible {
       opacity: 1;
+      transition: none;
     }
 
-    .btn-rename-course:hover {
-      color: var(--dark);
+    @media not all and (hover: hover) and (pointer: fine) {
+      .btn-rename-course {
+        opacity: 0.6;
+      }
     }
 
     .course-rename-input {
@@ -2765,7 +3201,8 @@
       color: var(--dark);
       background: transparent;
       border: none;
-      border-bottom: 2px solid var(--orange);
+      /* 底線用不佔高度的 box-shadow（#34）：2px border-bottom 會讓標題長高 2px、下面的 meta 被推下去 */
+      box-shadow: 0 2px 0 var(--orange);
       outline: none;
       line-height: 1.25;
       field-sizing: content;
@@ -2806,10 +3243,14 @@
       display: flex;
       gap: 32px;
       overflow: hidden;
+      /* 矮視窗時左欄（圓餅＋圖例＋編輯）比這一區高，Tab 到「編輯」會把這層捲動：捲動定位留 6px，焦點框不貼底被裁（#4） */
+      scroll-padding-block: 6px;
     }
 
     .detail-left-panel {
       flex-shrink: 0;
+      /* 高度＝內容（不撐滿這一列）：內容超出時捲動範圍才含 .detail-card-bottom 的下 padding，「編輯」的焦點框捲得進來（#4） */
+      align-self: flex-start;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -2901,13 +3342,15 @@
       font-size: 11px;
       font-weight: 300;
       cursor: pointer;
-      transition: border-color 0.15s, color 0.15s;
+      transition: border-color var(--t-color), color var(--t-color), scale var(--spring-press);
       letter-spacing: 0.02em;
     }
 
-    .btn-edit-weights:hover {
-      border-color: var(--orange);
-      color: var(--orange);
+    @media (hover: hover) and (pointer: fine) {
+      .btn-edit-weights:hover {
+        border-color: var(--orange);
+        color: var(--orange);
+      }
     }
 
     .detail-right-panel {
@@ -2919,6 +3362,11 @@
          虛線 outline（offset 3px＋2px 寬）需要兩側留白才不會被切掉左緣 */
       padding-left: 8px;
       padding-right: 8px;
+      /* 下緣留 6px：最後一個停點（「已隱藏 N 項」開關或最後一列）捲到底時，外擴的焦點框還有地方畫（#4） */
+      padding-bottom: 6px;
+      /* Tab 把清單捲到剛好看得見時，焦點元素會貼齊捲動區上下緣、外擴的焦點框被裁掉（#4）→
+         捲動定位留 6px（2px ring＋2px offset＋餘裕）；settleClone 的 scrollIntoView 也一併留白 */
+      scroll-padding-block: 6px;
     }
 
     .detail-right-panel::-webkit-scrollbar {
@@ -2934,8 +3382,10 @@
       border-radius: 3px;
     }
 
-    .detail-right-panel::-webkit-scrollbar-thumb:hover {
-      background: var(--mid);
+    @media (hover: hover) and (pointer: fine) {
+      .detail-right-panel::-webkit-scrollbar-thumb:hover {
+        background: var(--mid);
+      }
     }
 
     .detail-assignments-label {
@@ -2958,6 +3408,13 @@
       color: var(--muted);
     }
 
+    /* 清單沒有作業時的提示（整段渲染與完成最後一項後的就地更新共用） */
+    .detail-list-empty {
+      padding: 12px 0;
+      color: var(--mid);
+      font-size: 13px;
+    }
+
     /* ── 已隱藏區（自動隱藏的考試・簽到＋手動拖進來的作業；跟隨完成過濾，見 spec 2026-10-23）── */
     .hidden-items {
       margin-top: 12px;
@@ -2978,17 +3435,20 @@
       letter-spacing: 0.03em;
       color: var(--muted);
       text-align: left;
-      transition: color 0.12s;
+      transition: color var(--t-color), scale var(--spring-press);
     }
 
-    .hidden-items-toggle:hover {
-      color: var(--orange);
+    @media (hover: hover) and (pointer: fine) {
+      .hidden-items-toggle:hover {
+        color: var(--orange);
+      }
     }
 
     /* 另一個完成桶的隱藏數短註（「另 M 項已完成，在『已繳交』中」）：接在數量後、較淡、以「·」隔開；
        與數量同一段行內文字，窄欄時自然換行並對齊在箭頭之後 */
     .hidden-items-note {
       color: var(--mid);
+      transition: color var(--t-color);   /* hover 時跟著開關轉橘：淡入，不是一幀切上去（#37） */
     }
 
     .hidden-items-note::before {
@@ -2996,8 +3456,10 @@
       margin: 0 6px;
     }
 
-    .hidden-items-toggle:hover .hidden-items-note {
-      color: inherit;
+    @media (hover: hover) and (pointer: fine) {
+      .hidden-items-toggle:hover .hidden-items-note {
+        color: inherit;
+      }
     }
 
     /* 箭頭固定對齊第一行（短註換行時不跑到兩行中間） */
@@ -3008,7 +3470,7 @@
       align-items: center;
       align-self: flex-start;
       height: 16px;
-      transition: transform 0.15s;
+      transition: transform var(--t-disclosure);   /* 與清單的開合同一個 timing（#28） */
     }
 
     .hidden-items-label {
@@ -3019,13 +3481,9 @@
       transform: rotate(90deg);
     }
 
-    .hidden-items-list {
-      display: none;
-      margin-top: 4px;
-    }
-
-    .hidden-items.open .hidden-items-list {
-      display: block;
+    /* 清單開合見「展開面板」共用規則（#28）；上方 4px 間距放內層，外層 height:0 才收得乾淨 */
+    .hidden-items-list-inner {
+      padding-top: 4px;
     }
 
     /* 隱藏列不整列降透明：淡化只靠較小字級＋標題改 --mid＋分組/時間標籤 0.75（見下），不疊乘到握把與操作鈕（QA #79） */
@@ -3055,21 +3513,52 @@
       align-items: center;
       padding: 3px;
       margin: -3px 0;
+      /* 是 <button>（#6，鍵盤可移動）：拿掉按鈕預設外框與底色，外觀維持原本的握把 */
+      border: 0;
+      border-radius: 4px;
+      background: none;
+      font: inherit;
       color: var(--mid);
       opacity: 0.75;
       cursor: grab;
       touch-action: none;
-      transition: opacity 0.12s, color 0.12s;
+      transition: opacity var(--t-color), color var(--t-color);
     }
 
-    .hidden-item-row:hover .drag-grip,
-    .assignment-item:hover .drag-grip {
+    @media (hover: hover) and (pointer: fine) {
+      /* 滑過該列握把全亮（靜止 0.75 之上，QA #79） */
+      .hidden-item-row:hover .drag-grip,
+      .assignment-item:hover .drag-grip {
+        opacity: 1;
+      }
+
+      .drag-grip:hover {
+        color: var(--orange);
+        opacity: 1;
+      }
+    }
+
+    /* 鍵盤焦點在該列（:has(:focus-visible)＝只算鍵盤）時握把跟 hover 一樣亮起；
+       握把本身拿到焦點時全亮、第一幀就到位（#6 會把它改成 button）；
+       觸控時以 0.85 常駐（#11） */
+    :is(.hidden-item-row, .assignment-item):has(:focus-visible) .drag-grip {
       opacity: 1;
     }
 
-    .drag-grip:hover {
-      color: var(--orange);
+    :is(.hidden-item-row, .assignment-item) .drag-grip:focus-visible {
       opacity: 1;
+      transition: none;
+    }
+
+    /* 握把拿到鍵盤焦點時整列維持不透明，焦點框才不會跟著被淡掉（#6；已隱藏列現已不整列降透明（QA #79），此條為保險） */
+    .hidden-item-row:has(.drag-grip:focus-visible) {
+      opacity: 1;
+    }
+
+    @media not all and (hover: hover) and (pointer: fine) {
+      .drag-grip {
+        opacity: 0.85;
+      }
     }
 
     .drag-grip:active {
@@ -3078,17 +3567,19 @@
 
     /* 拖曳中的浮動 clone：抬起（陰影＋微放大＋0.4° 微傾）跟隨游標 */
     /* 雙 class 提高特異度：蓋過 .assignment-item:last-child 的 border-bottom:none、.submitted 的降透明 */
+    /* 拿起時 clone 裡的字與原列完全重合（#41）：block 方向沿用列本身的 padding（作業列 12px、稽核列 8px），
+       只在左右各多 14px（makeDragClone 把 clone 往左挪 14px、加寬 28px 抵銷）；外框改成不佔位的 box-shadow 細線 */
     .drag-clone.drag-clone {
       position: fixed;
       z-index: 400;
       margin: 0;
-      padding: 6px 14px;
+      padding-inline: 14px;
       pointer-events: none;
       overflow: hidden;
       background: var(--bg);
-      border: 1px solid var(--border);
+      border: 0;
       border-radius: 8px;
-      box-shadow: 0 4px 10px rgba(20, 20, 19, 0.08), 0 14px 32px rgba(20, 20, 19, 0.16);
+      box-shadow: 0 0 0 1px var(--border), 0 4px 10px rgba(20, 20, 19, 0.08), 0 14px 32px rgba(20, 20, 19, 0.16);
       opacity: 1;
       will-change: transform;
     }
@@ -3100,13 +3591,23 @@
     }
 
     /* 放置目標：虛線框 + 淡橘底 + 提示文字（data-drophint）*/
+    /* 底色過渡寫在 base（#41）：只寫在 .drop-active 上的話淡入有、淡出卻是硬切 */
+    .detail-assignments-list,
+    .hidden-items {
+      transition: background-color var(--t-color);
+    }
+
+    /* 升級提示（::before）要絕對定位的基準 */
+    .detail-assignments-list {
+      position: relative;
+    }
+
     .detail-assignments-list.drop-active,
     .hidden-items.drop-active {
       outline: 2px dashed var(--orange);
       outline-offset: 3px;
       border-radius: 8px;
       background: rgba(217, 119, 87, 0.04);
-      transition: background 0.15s, padding-bottom 0.18s cubic-bezier(0.2, 0, 0, 1);
     }
 
     /* 游標真正在目標上方：實線＋加深，表示「放開即生效」 */
@@ -3128,19 +3629,22 @@
       letter-spacing: 0.04em;
       color: var(--orange);
     }
-    .detail-assignments-list.drop-active::before { padding: 2px 0 8px; }
+    /* 升級提示移出文件流（#41）：壓在清單頂端的虛線上（底色同詳情卡、把那段虛線遮掉），清單與殘影不被往下推 */
+    .detail-assignments-list.drop-active::before {
+      position: absolute;
+      left: 50%;
+      top: -3px;
+      translate: -50% -50%;
+      padding: 0 8px;
+      background: var(--surface);
+      line-height: 1.6;
+      white-space: nowrap;
+    }
     .hidden-items.drop-active::after { padding: 8px 0 2px; }
 
-    /* 降級拖曳中：即使稽核區收合，也強制顯示列表作為放置目標 */
-    .hidden-items.drop-active .hidden-items-list {
-      display: block;
-    }
+    /* 降級拖曳中：即使稽核區收合，也展開列表作為放置目標——走「展開面板」共用規則的開合（#28），不硬切 */
 
-    /* 落點動畫：clone 飛入期間目標列隱形，落地後淡橘閃一下 */
-    .drag-arriving {
-      opacity: 0 !important;
-    }
-
+    /* 落點：clone 飛入、快到時與落地列交叉淡換（settleClone 以 inline opacity 處理，#41），落地後淡橘閃一下 */
     .drag-arrived {
       animation: drag-arrived-flash 0.9s ease-out;
     }
@@ -3195,7 +3699,10 @@
       flex-shrink: 0;
     }
 
-    /* ── View Transitions — Card ↔ Detail Morph ── */
+    /* ── View Transitions — Card ↔ Detail Morph ──
+       具名 deviation（#39）：group 曲線保留 cubic-bezier(0.22,1,0.36,1)（≈ ease.out）、0.28s。
+       B2 對 morph 的角色曲線是 ease.inOut、recipe 是 spring.dialog 750ms，但這是高頻 drill-down，
+       起步慢的曲線看起來像延遲、750ms 又太長。減少動態時 JS 不命名共享元素（見 setMorphName），只剩 root crossfade。 */
     ::view-transition-group(course-shell),
     ::view-transition-group(course-code),
     ::view-transition-group(course-name),
@@ -3258,15 +3765,23 @@
     .weight-edit-overlay {
       position: fixed;
       inset: 0;
-      background: rgba(0,0,0,0.35);
+      background-color: transparent;
       display: none;
       align-items: center;
       justify-content: center;
       z-index: 1000;
+      transition: background-color var(--t-overlay), display var(--t-overlay) allow-discrete;   /* 背景淡入淡出（#29） */
     }
 
     .weight-edit-overlay.open {
       display: flex;
+      background-color: rgba(0, 0, 0, 0.35);
+    }
+
+    @starting-style {
+      .weight-edit-overlay.open {
+        background-color: transparent;
+      }
     }
 
     .weight-edit-modal {
@@ -3328,10 +3843,10 @@
       background: var(--bg);
       color: var(--dark);
       outline: none;
-      transition: border-color 0.12s;
+      transition: border-color var(--t-color);
     }
 
-    .weight-edit-name:focus { border-color: var(--orange); }
+    .weight-edit-name:focus { border-color: var(--orange); transition: none; }
 
     .weight-edit-pct {
       width: 64px;
@@ -3344,10 +3859,10 @@
       color: var(--dark);
       text-align: right;
       outline: none;
-      transition: border-color 0.12s;
+      transition: border-color var(--t-color);
     }
 
-    .weight-edit-pct:focus { border-color: var(--orange); }
+    .weight-edit-pct:focus { border-color: var(--orange); transition: none; }
 
     .weight-edit-del {
       border: none;
@@ -3357,14 +3872,16 @@
       cursor: pointer;
       padding: 2px 4px;
       border-radius: 4px;
-      transition: color 0.12s;
+      transition: color var(--t-color), scale var(--spring-press);
       flex-shrink: 0;
       display: inline-flex;
       align-items: center;
       justify-content: center;
     }
 
-    .weight-edit-del:hover { color: var(--orange); }
+    @media (hover: hover) and (pointer: fine) {
+      .weight-edit-del:hover { color: var(--orange); }
+    }
 
     .weight-edit-add {
       margin: 0 20px 12px;
@@ -3376,11 +3893,13 @@
       font-family: 'DM Sans', sans-serif;
       font-size: 12px;
       cursor: pointer;
-      transition: border-color 0.12s, color 0.12s;
+      transition: border-color var(--t-color), color var(--t-color), scale var(--spring-press);
       flex-shrink: 0;
     }
 
-    .weight-edit-add:hover { border-color: var(--orange); color: var(--orange); }
+    @media (hover: hover) and (pointer: fine) {
+      .weight-edit-add:hover { border-color: var(--orange); color: var(--orange); }
+    }
 
     .weight-edit-footer {
       display: flex;
@@ -3395,6 +3914,7 @@
       font-family: 'DM Mono', monospace;
       font-size: 13px;
       color: var(--muted);
+      transition: color var(--t-color);   /* 超過 100% 變色淡入（#38；數字同時由 aria-live 念出） */
     }
 
     .weight-edit-total.over { color: var(--orange); }
@@ -3599,11 +4119,13 @@
       padding: 4px 0;
       text-decoration: underline;
       text-underline-offset: 2px;
-      transition: color 0.12s;
+      transition: color var(--t-color), scale var(--spring-press);
       white-space: nowrap;
     }
 
-    .weight-edit-reset:hover { color: var(--orange); }
+    @media (hover: hover) and (pointer: fine) {
+      .weight-edit-reset:hover { color: var(--orange); }
+    }
 
     .weight-edit-cancel {
       padding: 7px 16px;
@@ -3616,10 +4138,12 @@
       text-transform: uppercase;
       letter-spacing: 0.05em;
       cursor: pointer;
-      transition: border-color 0.12s, color 0.12s;
+      transition: border-color var(--t-color), color var(--t-color), scale var(--spring-press);
     }
 
-    .weight-edit-cancel:hover { border-color: var(--orange); color: var(--orange); }
+    @media (hover: hover) and (pointer: fine) {
+      .weight-edit-cancel:hover { border-color: var(--orange); color: var(--orange); }
+    }
 
     .weight-edit-save {
       padding: 7px 20px;
@@ -3632,10 +4156,12 @@
       text-transform: uppercase;
       letter-spacing: 0.05em;
       cursor: pointer;
-      transition: opacity 0.12s;
+      transition: opacity var(--t-color), scale var(--spring-press);
     }
 
-    .weight-edit-save:hover { opacity: 0.8; }
+    @media (hover: hover) and (pointer: fine) {
+      .weight-edit-save:hover { opacity: 0.8; }
+    }
 
     /* ── AI 分析設定 modal（spec 2026-09-03；視覺語言與權重編輯器一致）── */
     .ai-settings-overlay {
@@ -3955,7 +4481,7 @@
       visibility: hidden;
       pointer-events: none;
       z-index: 3000;
-      transition: opacity 0.16s ease, transform 0.16s ease, visibility 0.16s ease;
+      transition: opacity var(--t-fade), transform var(--t-fade), visibility var(--t-fade);
     }
 
     .due-toast.show {
@@ -3972,10 +4498,28 @@
       outline: 2px solid var(--orange);
       outline-offset: 2px;
     }
-    .course-card-grid:focus-visible,
-    .week-task-card:focus-visible {
+    .course-card-grid:focus-visible {
       outline: 2px solid var(--orange);
       outline-offset: 2px;
+    }
+    /* 週卡用 inset ring（#4）：.week-right 是捲動容器，外擴的 ring 在卡片貼著捲動區底緣
+       （Tab 捲到看得見的那一刻、或最後一列）時會被裁掉下緣；畫在卡片內側就不會被任何容器裁到 */
+    .week-task-card:focus-visible {
+      outline: 2px solid var(--orange);
+      outline-offset: -2px;
+    }
+
+    /* 視覺隱藏、仍在 accessibility tree（螢幕閱讀器播報區 #a11y-status 等用，見 dashboard.js announce） */
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      margin: -1px;
+      padding: 0;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+      border: 0;
     }
 
     /* ── 自訂作業「編輯」鈕（與刪除✕並排；風格比照刪除鈕）── */
@@ -3996,29 +4540,39 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      transition: all 0.12s;
+      transition: border-color var(--t-color), color var(--t-color), background-color var(--t-color), scale var(--spring-press);
     }
 
-    .btn-edit-custom-assignment:hover {
-      border-color: var(--orange);
-      color: var(--orange);
-      background: rgba(217, 119, 87, 0.08);
+    @media (hover: hover) and (pointer: fine) {
+      .btn-edit-custom-assignment:hover {
+        border-color: var(--orange);
+        color: var(--orange);
+        background: rgba(217, 119, 87, 0.08);
+      }
     }
 
     /* ── 自製確認對話框（取代 window.confirm；風格比照其他 modal）── */
     .confirm-overlay {
       position: fixed;
       inset: 0;
-      background: rgba(20, 20, 19, 0.35);
+      background-color: transparent;
       display: none;
       align-items: center;
       justify-content: center;
       padding: 24px;
       z-index: 3000;
+      transition: background-color var(--t-overlay), display var(--t-overlay) allow-discrete;   /* 背景淡入淡出（#29） */
     }
 
     .confirm-overlay.open {
       display: flex;
+      background-color: rgba(20, 20, 19, 0.35);
+    }
+
+    @starting-style {
+      .confirm-overlay.open {
+        background-color: transparent;
+      }
     }
 
     .confirm-modal {
@@ -4062,6 +4616,8 @@
       text-transform: uppercase;
       letter-spacing: 0.05em;
       cursor: pointer;
+      /* 兩顆的 hover（橘框橘字／降不透明）原本沒有過渡、一幀切上去（#37）；scale＝按壓（#24） */
+      transition: border-color var(--t-color), color var(--t-color), opacity var(--t-color), scale var(--spring-press);
     }
 
     .btn-confirm-cancel {
@@ -4070,9 +4626,11 @@
       color: var(--muted);
     }
 
-    .btn-confirm-cancel:hover {
-      border-color: var(--orange);
-      color: var(--orange);
+    @media (hover: hover) and (pointer: fine) {
+      .btn-confirm-cancel:hover {
+        border-color: var(--orange);
+        color: var(--orange);
+      }
     }
 
     .btn-confirm-ok {
@@ -4081,33 +4639,9 @@
       color: #fff;
     }
 
-    .btn-confirm-ok:hover {
-      opacity: 0.88;
-    }
-
-    /* ── 系統「減少動態效果」（QA #138）：所有過渡／動畫壓成瞬間，hover 不位移、課程 morph 不播 ──
-       JS 端另外略過頁面滑動、View Transition、碎點爆、進度環慶祝（WAAPI 不受 CSS 影響）與拖曳落點飛入（見 prefersReducedMotion）。
-       撤銷倒數條例外：它是撤銷窗口的計時資訊，JS 以 inline !important 保留其動畫 */
-    @media (prefers-reduced-motion: reduce) {
-      *,
-      *::before,
-      *::after {
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-        animation-delay: 0s !important;
-        transition-duration: 0.01ms !important;
-        transition-delay: 0s !important;
-        scroll-behavior: auto !important;
-      }
-
-      ::view-transition-group(*),
-      ::view-transition-old(*),
-      ::view-transition-new(*) {
-        animation: none !important;
-      }
-
-      .course-card-grid:hover {
-        transform: none;
+    @media (hover: hover) and (pointer: fine) {
+      .btn-confirm-ok:hover {
+        opacity: 0.88;
       }
     }
 
@@ -4182,7 +4716,10 @@
       .detail-card-bottom {
         flex-direction: column;
         gap: 18px;
-        overflow-y: auto;
+        overflow-y: auto;   /* 窄版面捲動容器換成這層（scroll-padding 見上方 .detail-card-bottom，#4） */
+      }
+      .detail-left-panel {
+        align-self: stretch;   /* 上下堆疊時交叉軸是水平：維持撐滿寬度（上方 flex-start 只為並排時的高度） */
       }
       .detail-weight-pie-container {
         max-width: none;
@@ -4190,12 +4727,152 @@
       }
       .detail-right-panel {
         overflow-y: visible;
+        /* 高度＝內容：flex:1＋min-height:0 會把它壓扁、內容溢出盒外，捲動範圍就不含 .detail-card-bottom 的下 padding，
+           捲到底時最後一個停點的焦點框被裁（#4） */
+        flex: none;
+        padding-bottom: 0;
+      }
+    }
+
+    /* ── 按壓回饋（#24，press recipe）──
+       :active 在 pointerdown 那一幀就生效，是放開之前唯一的「收到了」訊號（A5）。按鈕縮到 scale.press 0.97、
+       整張卡片／整列縮到 scale.choice 0.985，都走 spring.press（各元件 transition 清單裡的 scale）；hover 只換色／框／陰影，
+       不縮放（B4）。用獨立的 scale 屬性：不蓋掉 .btn-rename-course 的 translateY(-50%)、卡片 hover 的 translate、
+       FLIP 補位與出場層的 WAAPI transform。勾選圈不縮（用填色回應）、拖曳握把不縮（用 grabbing 游標回應）、
+       設定選單項目不縮（用 highlight 回應）。卡片／列用 :has 擋掉「按的是裡面的按鈕卻整張一起縮」。
+       鍵盤 Enter／Space 走 click()，不觸發 :active——動作本身（morph、展開）就是回饋。減少動態：兩個 scale token 為 1（檔尾） */
+    :is(.btn-sync, .btn-theme-toggle, .btn-add-assignment, .detail-back-tab, .canvas-candidate-btn, .state-msg-action,
+      .card-pager-btn, .btn-edit-weights, .btn-rename-course, .hidden-items-toggle,
+      .btn-delete-custom-assignment, .btn-edit-custom-assignment,
+      .welcome-btn, .welcome-close,
+      .custom-assignment-close, .weight-edit-close, .custom-assignment-actions button, .confirm-actions button,
+      .weight-edit-add, .weight-edit-del, .weight-edit-reset, .weight-edit-cancel, .weight-edit-save):active:not(:disabled) {
+      scale: var(--scale-press);
+    }
+
+    /* 分頁鈕另擋 :disabled:hover：觸控 tap 時 :active 會在 click 之後還留一小段（最短 active 時間），翻到最後／第一頁那顆
+       在 click 裡變 disabled、不再算 :active，祖先卡片卻還在 active 鏈上 → 整張卡空縮一下（卡片並不會開）。tap 的點仍是 :hover */
+    .course-card-grid:active:not(:has(.card-pager-btn:active, .card-pager-btn:disabled:hover)),
+    .week-task-card:active:not(.bursting):not(:has(.assignment-check:active)),
+    .wk-sum-row:active,
+    .side-nav-item:active:not(:disabled),
+    .nav-course-item:active,
+    .assignment-item:active:not(.bursting):not(:has(:is(button, .assignment-title-link):active)) {
+      scale: var(--scale-choice);
+    }
+
+    /* 按下的是 active 的學期待辦／課程：底色在 indicator 上（#47），跟著項目一起縮，整列看起來是同一塊 */
+    .side-nav:has(> .side-nav-item[data-page].active:active:not(:disabled)) > .side-nav-indicator {
+      scale: var(--scale-choice);
+    }
+
+    /* ── 減少動態（prefers-reduced-motion，見 docs/motion-review-2026-10-22.md #0）──
+       保留：淡入淡出、顏色、撤銷倒數條（期限 meter，不算位移）、完成項目離場的 opacity、due／撤銷淡換、勾號畫出、drag-arrived 閃色、
+             View Transition 的 root crossfade、:focus-visible 外框。
+       拿掉：位移、縮放、旋轉、尺寸動畫；無限循環改成只閃透明度或停止。
+       CSS 管不到的（WAAPI、scrollTo、View Transition 共享元素命名、拖曳 clone 的 inline transform）
+       由 dashboard.js 的 reduceMotion() 處理，兩邊必須一起改：只在這裡把 .wk-ring-bar 設 transition:none
+       會讓 transitionend 永遠不觸發，落點迸發與「全部完成」會一起消失。
+       放在檔尾：與各規則同特異度時靠順序勝出。
+       QA #138（dashboard 無 prefers-reduced-motion）由本區塊涵蓋；不再用「* 全部壓成 0.01ms !important」的全域規則——
+       它會把上面要保留的淡入淡出、撤銷倒數條與展開面板的透明度一起抹掉。 */
+    @keyframes rm-fade {
+      from { opacity: 0; }
+    }
+
+    @keyframes dot-pulse {
+      0%, 80%, 100% { opacity: 0.4; }
+      40% { opacity: 1; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      :root {
+        --lift: 0px;
+        --scale-press: 1;
+        --scale-choice: 1;
+        --modal-from: none;
+        --scale-menu: 1;   /* 設定選單／子選單只淡入淡出、不縮放（#50） */
+      }
+
+      /* 進場位移 → 只淡入（modal 卡片的縮放由上面 --modal-from: none 拿掉，#29） */
+      .wk-ring-frac b.tick {
+        animation-name: rm-fade;
+      }
+
+      /* 碎點／慶祝粒子是位移：不顯示（JS 也不產生，見 spawnBurstDots／celebrateRingArrival） */
+      .complete-burst-dot,
+      .wk-celebrate-dot {
+        display: none;
+      }
+
+      /* 弧直接到位（JS 不等 transitionend）、chevron 不轉、教學頁直接換 */
+      .wk-ring-bar,
+      .hidden-items-arrow,
+      .grade-calc-arrow,
+      .welcome-track {
+        transition: none;
+      }
+
+      /* 展開面板（#28）：高度直接到位，只留淡入淡出、模糊清晰與 visibility */
+      :is(.assignment-desc, .grade-calc-body, .hidden-items-list) {
+        transition: opacity var(--t-disclosure), filter var(--t-disclosure), visibility var(--t-disclosure);
+      }
+
+      :is(.assignment-desc.open, .grade-calc.open .grade-calc-body, .hidden-items.open .hidden-items-list, .hidden-items.drop-active .hidden-items-list) {
+        transition: opacity var(--t-disclosure), filter var(--t-disclosure), visibility 0s;
+      }
+
+      /* 教學換頁不滑（上面 .welcome-track transition:none）→ 改成淡入：畫面外的 step 是 inert（#9），
+         離場頁立刻透明、進場頁淡入 */
+      .welcome-step {
+        transition: opacity var(--t-fade);
+      }
+
+      .welcome-step[inert] {
+        opacity: 0;
+      }
+
+      /* 尺寸動畫拿掉，只留換色 */
+      .welcome-dot {
+        transition: background-color var(--t-color);
+      }
+
+      /* 側欄 indicator（#47）：不滑，位置直接到位；淡出／淡入（is-off）保留 */
+      .side-nav-indicator {
+        transition: opacity var(--t-color);
+      }
+
+      /* toast 只淡入淡出、不上滑 6px */
+      .due-toast,
+      .due-toast.show {
+        transform: translate(-50%, 0);
+        transition: opacity var(--t-fade), visibility var(--t-fade);
+      }
+
+      /* loop（A4）：同步中的點保留 1.2s 節奏但只閃不跳；skeleton 掃光停止 */
+      .sync-dots span {
+        animation-name: dot-pulse;
+      }
+
+      .skel {
+        animation: none;
       }
     }
   </style>
 </head>
 
 <body>
+  <!-- 螢幕閱讀器播報區：頁面一開始就掛好（live region 要先存在，之後寫入的文字才會被念出）；寫入一律走 dashboard.js 的 announce() -->
+  <div id="a11y-status" class="sr-only" role="status" aria-live="polite"></div>
+  <!-- 語言子選單：放在 <body> 層，position:fixed 不受任何祖先的 transform／opacity 影響；
+       只建這一份、換語言時就地改文字（舊版每換一次語言重建一份、舊的變孤兒，#10）。開合見 dashboard.js bindLanguageMenuActions -->
+  <div class="settings-submenu" id="menu-language-submenu" role="menu" aria-labelledby="menu-language-label">
+    <button type="button" role="menuitemradio" aria-checked="true" id="menu-language-zh-tw" data-lang="zh-TW">繁體中文</button>
+    <button type="button" role="menuitemradio" aria-checked="false" id="menu-language-zh-cn" data-lang="zh-CN">简体中文</button>
+    <button type="button" role="menuitemradio" aria-checked="false" id="menu-language-en" data-lang="en">English</button>
+  </div>
+  <!-- 出場層：完成時的碎點與離場殘影（純裝飾，見 dashboard.js burstLayer） -->
+  <div id="burst-layer" aria-hidden="true"></div>
   <div class="layout">
 
     <!-- ── Left Sidebar ── -->
@@ -4208,6 +4885,7 @@
         </div>
 
         <nav class="side-nav" id="side-nav">
+          <span class="side-nav-indicator is-off" id="side-nav-indicator" aria-hidden="true"></span>
           <button class="side-nav-item active" data-page="week" id="nav-week">
             <span class="side-nav-name" id="nav-week-label">學期待辦</span>
             <span class="side-nav-count" id="nav-week-count"></span>
@@ -4243,7 +4921,8 @@
             <div class="canvas-candidate-error" id="canvas-candidate-error" hidden></div>
           </div>
           <div class="footer-row">
-            <button class="btn-sync" id="sync-btn">同步</button>
+            <!-- 四個狀態先放好、疊在同一格，換狀態只改 data-status（#30，見 .sync-swap） -->
+            <button class="btn-sync" id="sync-btn" data-status="idle"><span class="sync-swap"><span class="s-idle" id="sync-label-idle">同步</span><span class="s-loading" id="sync-label-loading"><span class="sync-dots" aria-hidden="true"><span></span><span></span><span></span></span><span class="sr-only" id="sync-label-loading-text">同步中...</span></span><span class="s-done" id="sync-label-done">✓ 已同步</span><span class="s-error" id="sync-label-error">同步失敗</span></span></button>
             <div class="settings-menu-wrap">
               <button class="btn-theme-toggle" id="settings-menu-btn" title="設定" aria-label="設定"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
               <div class="settings-menu" id="settings-menu">
@@ -4251,13 +4930,8 @@
                 <div class="settings-menu-divider"></div>
                 <button class="settings-menu-item" id="menu-claude-usage-toggle">Claude 用量</button>
                 <button class="settings-menu-item" id="menu-ai-settings">AI 分析設定</button>
-                <div class="settings-menu-item has-submenu" id="menu-language-label">語言
-                  <div class="settings-submenu">
-                    <button id="menu-language-zh-tw">繁體中文</button>
-                    <button id="menu-language-zh-cn">简体中文</button>
-                    <button id="menu-language-en">English</button>
-                  </div>
-                </div>
+                <!-- 語言（#10／N1）：真的 <button>，點擊／Enter／Space／→ 開關子選單；子選單直接放在 <body> 層（見下方 #menu-language-submenu） -->
+                <button type="button" class="settings-menu-item has-submenu" id="menu-language-label" aria-haspopup="menu" aria-expanded="false" aria-controls="menu-language-submenu"><span id="menu-language-text">語言</span></button>
                 <button class="settings-menu-item" id="menu-open-tutorial">使用教學 <span>↗</span></button>
               </div>
             </div>
@@ -4271,7 +4945,7 @@
     <main class="main-content" id="main-content">
       <div class="page-tabs" id="page-tabs">
         <button class="detail-back-tab" id="detail-back-btn" style="display: none;"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg><span class="detail-back-label">返回</span></button>
-        <h2 class="page-title" id="page-title">學期待辦</h2>
+        <h2 class="page-title" id="page-title" tabindex="-1">學期待辦</h2>
         <button class="btn-add-assignment" id="btn-add-assignment">+ 新增作業</button>
       </div>
       <div id="main-section"></div>
@@ -4554,7 +5228,7 @@
     <div class="custom-assignment-modal">
       <div class="custom-assignment-header">
         <div class="custom-assignment-title" id="custom-assignment-modal-title">新增作業</div>
-        <button class="custom-assignment-close" id="custom-assignment-close"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+        <button type="button" class="custom-assignment-close" id="custom-assignment-close" aria-label="關閉"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
       </div>
       <form class="custom-assignment-form" id="custom-assignment-form">
         <div class="custom-assignment-field">
@@ -4563,7 +5237,7 @@
         </div>
         <div class="custom-assignment-field">
           <label for="custom-assignment-name" id="custom-assignment-name-label">作業名稱</label>
-          <input id="custom-assignment-name" type="text" required />
+          <input id="custom-assignment-name" type="text" required aria-describedby="custom-assignment-error" />
         </div>
         <div class="custom-assignment-field">
           <label for="custom-assignment-description" id="custom-assignment-description-label">作業描述</label>
@@ -4571,9 +5245,10 @@
         </div>
         <div class="custom-assignment-field">
           <label for="custom-assignment-due" id="custom-assignment-due-label">截止日期</label>
-          <input id="custom-assignment-due" type="datetime-local" min="2000-01-01T00:00" max="9999-12-31T23:59" />
+          <input id="custom-assignment-due" type="datetime-local" min="2000-01-01T00:00" max="9999-12-31T23:59" aria-describedby="custom-assignment-error" />
         </div>
-        <div class="custom-assignment-error" id="custom-assignment-error"></div>
+        <!-- 錯誤訊息（#38）：role=alert 一寫入就念出；名稱與截止日期欄都以 aria-describedby 綁到這裡，回到出錯的欄位時一起念 -->
+        <div class="custom-assignment-error" id="custom-assignment-error" role="alert"></div>
         <div class="custom-assignment-actions">
           <button type="button" class="btn-custom-cancel" id="custom-assignment-cancel">取消</button>
           <button type="submit" class="btn-custom-save" id="custom-assignment-save">儲存</button>
@@ -4587,6 +5262,7 @@
     <div class="weight-edit-modal">
       <div class="weight-edit-header">
         <span class="weight-edit-title" id="weight-edit-title">編輯評分權重</span>
+        <button type="button" class="weight-edit-close" id="weight-edit-close" aria-label="關閉"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
       </div>
       <div class="weight-edit-list" id="weight-edit-list"></div>
       <button class="weight-edit-add" id="weight-edit-add">+ 新增項目</button>
@@ -4594,7 +5270,7 @@
       <div class="weight-edit-footer">
         <div class="weight-edit-footer-left">
           <button class="weight-edit-reset" id="weight-edit-reset" style="display:none">還原 Canvas 權重</button>
-          <span class="weight-edit-total" id="weight-edit-total">總計：0%</span>
+          <span class="weight-edit-total" id="weight-edit-total" aria-live="polite">總計：0%</span>
         </div>
         <div class="weight-edit-actions">
           <button class="weight-edit-cancel" id="weight-edit-cancel">取消</button>

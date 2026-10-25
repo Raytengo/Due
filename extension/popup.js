@@ -70,8 +70,19 @@ const I18N = {
 };
 
 let _claudeRefreshBusy = false;
+let _claudeSwapPending = false;   // 手動 ↻ 進行中：用量落地時 chip 文字 blur 交換一次，數字沒變也看得出刷新過（#49）
 let _currentClaudeUsage = null;
-const COMPLETE_DELAY_MS = 1500;   // 勾選後撤銷窗口（毫秒，對齊 dashboard）
+const COMPLETE_DELAY_MS = 1500;   // 勾選後撤銷窗口（毫秒，對齊 dashboard）；倒數條長度同值
+const COLLAPSE_FALLBACK_MS = 350; // 列收合移除的保底：--reflow 300ms＋餘裕（transitionend 沒到時才用）
+const FADE_FALLBACK_MS = 250;     // 減少動態時只淡出（--t-fade 200ms）的移除保底
+const SWAP_FALLBACK_MS = 250;     // 標籤交換（--t-swap 150ms）收尾的保底
+
+// 減少動態：CSS media query 管不到 JS 驅動的收合高度、碎點與 badge 寬度過渡，JS 自己檢查（#0）
+const _rmq = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : null;
+const reduceMotion = () => !!(_rmq && _rmq.matches);
+
+// 今天到期 badge 的白色單色火焰（#21 C1）：一筆實心路徑、fill 吃 currentColor，跳動由 CSS flame-hop 負責
+const FLAME_SVG = '<svg class="flame" viewBox="0 0 9 11" aria-hidden="true" focusable="false"><path d="M4.6.2c.2 1.6 1.2 2.5 2.1 3.5C7.6 4.7 8.4 5.9 8.4 7.3c0 2-1.7 3.5-3.9 3.5S.6 9.3.6 7.3c0-1.2.5-2.2 1.3-2.9.1.9.6 1.5 1.3 1.7C2.8 4.3 3.4 2 4.6.2z"/></svg>';
 
 // ── 完成標記寫入（read-modify-write，QA P1-2／P1-4）──
 // 讀 storage 最新的 manualDone/manualUndone → DueCompletion.setDone 套用目標狀態（依當下外部事實決定寫哪張、
@@ -207,16 +218,19 @@ function buildClaudeSummary(usage) {
   return parts.join(' / ') || '--';
 }
 
+// 忙碌狀態（#49）：同一顆 ↻ 原地轉圈（減少動態改明暗呼吸），不再一幀換成「...」。
+// 不用 disabled：鍵盤按下時 disabled 會把焦點丟到 body；改 aria-disabled＋trigger 開頭 early return
 function setClaudeRefreshBusy(busy) {
   _claudeRefreshBusy = busy;
   const btn = document.getElementById('claude-usage-refresh');
   if (!btn) return;
-  btn.disabled = busy;
-  btn.textContent = busy ? '...' : '\u21bb';
+  btn.setAttribute('aria-disabled', busy ? 'true' : 'false');
+  btn.setAttribute('aria-busy', busy ? 'true' : 'false');
+  btn.classList.toggle('is-busy', busy);
 }
 
 // 回傳兩組：overdue（30 天內逾期未完成，最近錯過在最上）＋ upcoming（7 天內，最快到期在最上）
-// assignments 為 Canvas ∪ 自訂作業（loadData 以 DueCustomAssignments.mergeAssignmentMaps 合併，同 dashboard render）
+// assignments 為 Canvas ∪ 自訂作業（renderPopup 以 DueCustomAssignments.mergeAssignmentMaps 合併，同 dashboard render）
 function getTasks(assignments, courseMap, manualDone, manualUndone, manualShown, manualHidden) {
   const now = new Date();
   const nowMs = now.getTime();
@@ -319,25 +333,31 @@ function makeTaskItem(task, courseNames, group) {
   const li = document.createElement('li');
   li.className = 'task-item' + (canOpen ? ' openable' : '');
   li.dataset.group = group;
+  // badge 內放兩個標籤供交叉淡換（#36）：到期文字（今天到期帶白色火焰）與疊在上面的「↩ 撤銷」
   li.innerHTML = `
     <button class="task-check" type="button" aria-label="${esc(tr('markDone'))}"></button>
     <div class="task-body">
       <div class="task-name${canOpen ? ' clickable' : ''}"${canOpen ? ' role="button" tabindex="0"' : ''}>${esc(task.name)}</div>
       <div class="task-meta">${esc(displayName)}</div>
     </div>
-    <span class="task-due ${cls}">${esc(dueStr)}</span>
+    <span class="task-due ${cls}"><span class="lbl lbl-due">${cls === 'today' ? FLAME_SVG : ''}${esc(dueStr)}</span><span class="lbl lbl-undo" aria-hidden="true">↩ ${esc(tr('undoComplete'))}</span></span>
   `;
 
   const check = li.querySelector('.task-check');
   const nameEl = li.querySelector('.task-name');
   const badge = li.querySelector('.task-due');
+  const lblDue = badge.querySelector('.lbl-due');
+  const lblUndo = badge.querySelector('.lbl-undo');
   let undoTimer = null;
   let inUndo = false;
+  let leaving = false;      // 撤銷窗已結束、列正在離場：點擊與按鍵一律不再改狀態（#14）
+  let countdown = null;     // 撤銷倒數條（#23）
+  let settleTimer = null;   // badge 換回後清掉 inline width 的保底計時器
 
   // 作業名稱點擊 → 開 Canvas 分頁（自訂作業開 dashboard）；撤銷窗口內則不開，讓事件冒泡到整列 → 取消
   if (canOpen) {
     const openCanvas = (e) => {
-      if (inUndo) return;
+      if (inUndo || leaving) return;
       e.stopPropagation();
       openItem();
     };
@@ -346,18 +366,56 @@ function makeTaskItem(task, courseNames, group) {
     nameEl.addEventListener('keydown', (e) => {
       if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return;
       e.preventDefault();
+      if (leaving) return;
       if (inUndo) { cancelUndo(); return; }  // 撤銷窗口內：等同滑鼠點列 → 取消
       openCanvas(e);
     });
   }
 
+  // badge 換回自然寬度：寬度過渡結束（或保底到期）才清掉 inline width；撤銷窗內維持釘住
+  function releaseBadgeWidth() {
+    clearTimeout(settleTimer);
+    settleTimer = null;
+    if (badge.classList.contains('undo')) return;
+    badge.style.width = '';
+    badge.classList.remove('pinned');
+  }
+  badge.addEventListener('transitionend', (e) => {
+    if (e.target === badge && e.propertyName === 'width') releaseBadgeWidth();
+  });
+
+  // 到期文字 ⇄「↩ 撤銷」（#36）：標籤由 CSS 交叉淡換（opacity＋blur 2px）；
+  // 寬度先釘住目前 px → forced reflow → 設成目標標籤量到的寬度，150ms 滑過去，名稱截斷點不再一幀跳動。
+  // 減少動態時 CSS 不過渡 width：寬度直接到位（仍要釘，撤銷標籤才不會疊到名稱上），換回時立刻放開。
+  function swapBadge(toUndo) {
+    clearTimeout(settleTimer);
+    settleTimer = null;
+    const animate = !reduceMotion();
+    badge.style.width = badge.getBoundingClientRect().width + 'px';   // 釘住目前寬度（含換到一半的過渡值）
+    badge.getBoundingClientRect();                                     // forced reflow：起點生效
+    badge.className = 'task-due ' + (toUndo ? 'undo' : cls) + ' pinned';
+    (toUndo ? lblDue : lblUndo).setAttribute('aria-hidden', 'true');
+    (toUndo ? lblUndo : lblDue).removeAttribute('aria-hidden');
+    const cs = getComputedStyle(badge);
+    const chromeW = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight)
+      + parseFloat(cs.borderLeftWidth) + parseFloat(cs.borderRightWidth);
+    badge.style.width = ((toUndo ? lblUndo : lblDue).getBoundingClientRect().width + chromeW) + 'px';
+    if (toUndo) return;
+    if (animate) settleTimer = setTimeout(releaseBadgeWidth, SWAP_FALLBACK_MS);
+    else releaseBadgeWidth();
+  }
+
   function enterUndo() {
     inUndo = true;
     li.classList.add('completing');
-    check.classList.add('done');                         // 空心圈 → 綠底白勾
+    check.classList.add('done');                         // 空心圈 → 綠底，勾號隨後畫出
     check.setAttribute('aria-label', tr('undoComplete'));
-    badge.className = 'task-due undo';
-    badge.textContent = '↩ ' + tr('undoComplete');  // ↩ 撤銷
+    swapBadge(true);                                     // → ↩ 撤銷
+    // 撤銷倒數條：列底部 3px 橘條線性縮到 0，看得出撤銷窗還剩多久；absolute 疊在列內，不改列尺寸（#23）
+    countdown = document.createElement('div');
+    countdown.className = 'complete-countdown';
+    countdown.style.animationDuration = COMPLETE_DELAY_MS + 'ms';
+    li.appendChild(countdown);
     // 立即持久化（與 dashboard 同一入口；已繳但被標回未完成者會清 manualUndone 而非寫 manualDone）
     writeDone(task.assignment, true);
     undoTimer = setTimeout(finalize, COMPLETE_DELAY_MS);
@@ -369,27 +427,26 @@ function makeTaskItem(task, courseNames, group) {
     li.classList.remove('completing');
     check.classList.remove('done');                      // 還原空心圈
     check.setAttribute('aria-label', tr('markDone'));
-    badge.className = 'task-due ' + cls;
-    badge.textContent = dueStr;
+    swapBadge(false);                                    // → 到期文字
+    if (countdown) { countdown.remove(); countdown = null; }
     writeDone(task.assignment, false);
   }
 
+  // 撤銷窗結束：收合一開始就關閉撤銷窗（#14）。先把焦點交給鄰居（#1），再設 inert
+  // （擋掉點擊與 Tab/Space；離場中的列不可再被操作），接著碎點＋收合（#23、#35）
   function finalize() {
     undoTimer = null;
-    // 高度收合動畫（~200ms）後從 DOM 移除
-    li.style.maxHeight = li.offsetHeight + 'px';
-    li.classList.add('collapsing');
-    void li.offsetHeight;                                // 強制 reflow 讓起始高度生效
-    li.style.maxHeight = '0px';
-    li.style.opacity = '0';
-    li.style.paddingTop = '0';
-    li.style.paddingBottom = '0';
-    setTimeout(() => { li.remove(); maybeShowEmpty(); }, 200);
+    inUndo = false;
+    leaving = true;
+    handOffFocus(li);
+    li.inert = true;
+    collapseRow(li, check);
   }
 
   // 勾選鈕：stopPropagation；未完成→進撤銷窗口，窗口內再點→取消
   check.addEventListener('click', (e) => {
     e.stopPropagation();
+    if (leaving) return;
     if (inUndo) cancelUndo();
     else enterUndo();
   });
@@ -397,6 +454,7 @@ function makeTaskItem(task, courseNames, group) {
   // 整列點擊（勾選圈已 stopPropagation 排除）：
   //   撤銷窗口內 → 取消；否則若有有效連結 → 開該作業的 Canvas 頁、自訂作業開 dashboard（名稱點擊會先 stopPropagation，不重複開）
   li.addEventListener('click', () => {
+    if (leaving) return;
     if (inUndo) { cancelUndo(); return; }
     if (canOpen) openItem();
   });
@@ -404,28 +462,162 @@ function makeTaskItem(task, courseNames, group) {
   return li;
 }
 
-// 移除某列後：兩組皆空 → 顯示 emptyState；逾期組清空 → 回單一平列表（移除子標題）
+// 離場列持有焦點時（鍵盤勾完一項），交給下一列（沒有就上一列）的勾選圈，整份清單都沒了就交給「開啟 Dashboard」，
+// 不讓焦點跟著被移除的列掉到 <body>（#1）。在撤銷窗結束時才移：窗內在同一顆勾選圈按 Enter/Space 是鍵盤的撤銷路徑
+function handOffFocus(li) {
+  if (!li.contains(document.activeElement)) return;
+  const sib = (dir) => {
+    let n = li[dir];
+    while (n && !n.matches('.task-item:not(.collapsing)')) n = n[dir];
+    return n;
+  };
+  const next = sib('nextElementSibling') || sib('previousElementSibling');
+  const target = next ? next.querySelector('.task-check') : document.getElementById('dashboard-btn');
+  if (target) target.focus({ preventScroll: true });
+}
+
+// 列離場（#35）：淡出走 --t-fade、高度與 padding 走 --reflow，兩條曲線分開。
+// 這列帶走某一組的最後一筆時，該組標題在同一幀一起收合（不再等列收完才一幀消失、讓下面的列再跳約 50px）。
+// 移除跟著 transitionend(max-height)，另有保底計時器。減少動態：只淡出、不壓高度，淡完移除；碎點略過（#0）。
+function collapseRow(li, check) {
+  const list = li.parentElement;
+  const rm = reduceMotion();
+  if (!rm) spawnBurstDots(check);
+  li.classList.add('collapsing');
+
+  const left = (g) => list.querySelectorAll(`.task-item[data-group="${g}"]:not(.collapsing)`).length;
+  let heads = [];
+  if (li.dataset.group === 'overdue' && left('overdue') === 0) {
+    // 逾期組清空 → 回單一平列表：兩個組標題一起收
+    heads = [...list.querySelectorAll('.task-group-label')];
+  } else if (li.dataset.group === 'upcoming' && left('upcoming') === 0 && left('overdue') > 0) {
+    // 7 天內清空但逾期還在 → 收掉沒有內容的「7 天內」標題（同 renderTasks：空組不加標題）
+    heads = [...list.querySelectorAll('.task-group-label[data-group="upcoming"]')];
+  }
+  heads = heads.filter((h) => !h.classList.contains('collapsing'));
+
+  const els = [li, ...heads];
+  els.forEach((el) => {
+    el.style.maxHeight = el.offsetHeight + 'px';
+    el.classList.add('collapsing');
+  });
+  li.getBoundingClientRect();                            // forced reflow 讓起始高度生效（不用 rAF：隱藏時 rAF 會暫停）
+  els.forEach((el) => {
+    el.style.opacity = '0';
+    if (rm) return;
+    el.style.maxHeight = '0px';
+    el.style.paddingTop = '0';
+    el.style.paddingBottom = '0';
+  });
+
+  const prop = rm ? 'opacity' : 'max-height';
+  let fallback = null;
+  let finished = false;
+  const onEnd = (e) => { if (e.target === li && e.propertyName === prop) done(); };
+  function done() {
+    if (finished) return;
+    finished = true;
+    clearTimeout(fallback);
+    li.removeEventListener('transitionend', onEnd);
+    els.forEach((el) => el.remove());
+    maybeShowEmpty();
+  }
+  li.addEventListener('transitionend', onEnd);
+  fallback = setTimeout(done, rm ? FADE_FALLBACK_MS : COLLAPSE_FALLBACK_MS);
+}
+
+// 撤銷倒數歸零時從勾選圈中心迸出 10 顆碎點（與 dashboard 同一個完成概念；popup 列較矮，距離 16–24px）。
+// 掛在 body 下的 fixed 圖層，不放進列：列的 overflow:hidden 與淡出會把碎點裁掉/一起淡掉
+function spawnBurstDots(check) {
+  const r = check.getBoundingClientRect();
+  if (!r.width) return;
+  let layer = document.getElementById('burst-layer');
+  if (!layer) {
+    layer = document.createElement('div');
+    layer.id = 'burst-layer';
+    layer.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(layer);
+  }
+  const cx = r.left + r.width / 2;
+  const cy = r.top + r.height / 2;
+  const n = 10;
+  const dots = [];
+  for (let i = 0; i < n; i++) {
+    const dot = document.createElement('span');
+    const ang = (Math.PI * 2 * i) / n;
+    const dist = 16 + ((i * 13) % 9);
+    dot.className = 'complete-burst-dot';
+    dot.style.left = cx + 'px';
+    dot.style.top = cy + 'px';
+    dot.style.setProperty('--dx', `${Math.round(Math.cos(ang) * dist)}px`);
+    dot.style.setProperty('--dy', `${Math.round(Math.sin(ang) * dist)}px`);
+    dot.style.background = i % 2 ? 'var(--green)' : 'var(--orange)';
+    dot.addEventListener('animationend', () => dot.remove(), { once: true });
+    layer.appendChild(dot);
+    dots.push(dot);
+  }
+  setTimeout(() => dots.forEach((d) => d.remove()), 700);  // 保底（complete-dot 0.5s）
+}
+
+// 移除某列後：兩組皆空 → 顯示 emptyState；組標題正常已跟著最後一筆一起收合（collapseRow），殘留的才在這裡移除
 function maybeShowEmpty() {
   const list = document.getElementById('task-list');
   const overdueItems = list.querySelectorAll('.task-item[data-group="overdue"]');
   const upcomingItems = list.querySelectorAll('.task-item[data-group="upcoming"]');
 
   if (overdueItems.length === 0 && upcomingItems.length === 0) {
-    list.innerHTML = `<li class="empty-state">${tr('emptyState')}</li>`;
+    // 清單在使用中變空：空狀態淡入（.is-entering + @starting-style），不再硬切（#35）
+    list.innerHTML = `<li class="empty-state is-entering">${tr('emptyState')}</li>`;
     return;
   }
   if (overdueItems.length === 0) {
-    list.querySelectorAll('.task-group-label').forEach((h) => h.remove());
+    list.querySelectorAll('.task-group-label:not(.collapsing)').forEach((h) => h.remove());
+  } else if (upcomingItems.length === 0) {
+    list.querySelectorAll('.task-group-label[data-group="upcoming"]:not(.collapsing)').forEach((h) => h.remove());
   }
 }
 
-function renderClaudeUsage(usage) {
+// chip 文字（#49）：平常直接換字（30 秒倒數刷新不閃）；手動刷新成功時新舊兩層交叉淡換（--t-swap＋blur 2px）
+function setChipText(chip, text, swap) {
+  const cur = chip.querySelector('.chip-txt:not(.out)');
+  if (!cur) {
+    chip.innerHTML = '';
+    const span = document.createElement('span');
+    span.className = 'chip-txt';
+    span.textContent = text;
+    chip.appendChild(span);
+    return;
+  }
+  if (!swap) {
+    cur.textContent = text;
+    return;
+  }
+  const next = document.createElement('span');
+  next.className = 'chip-txt in';
+  next.textContent = text;
+  chip.appendChild(next);
+  next.getBoundingClientRect();                          // forced reflow：進來的從 opacity 0＋blur 起跳
+  cur.classList.add('out');
+  cur.setAttribute('aria-hidden', 'true');
+  next.classList.remove('in');
+  cur.addEventListener('transitionend', () => cur.remove(), { once: true });
+  setTimeout(() => cur.remove(), SWAP_FALLBACK_MS);
+}
+
+// 手動刷新的交換只用一次：storage.onChanged 與 sendMessage 回應誰先到誰用，後到的只是同值重畫
+function takeClaudeSwap() {
+  const swap = _claudeSwapPending;
+  _claudeSwapPending = false;
+  return swap;
+}
+
+function renderClaudeUsage(usage, { swap = false } = {}) {
   _currentClaudeUsage = usage;
   const chip = document.getElementById('claude-usage-chip');
   if (!chip) return;
 
   if (!usage) {
-    chip.textContent = tr('claudeUnknown');
+    setChipText(chip, tr('claudeUnknown'), false);
     chip.title = tr('claudeNeverSynced');
     chip.className = 'usage-chip is-empty';
     return;
@@ -445,7 +637,7 @@ function renderClaudeUsage(usage) {
     summary = buildClaudeSummary(usage);
   }
 
-  chip.textContent = `CLAUDE ${summary}`;
+  setChipText(chip, `CLAUDE ${summary}`, swap);
 
   // Apply colors based on usage percent
   chip.className = 'usage-chip'; // Reset
@@ -477,18 +669,22 @@ setInterval(() => {
 function applyClaudeRefreshCopy() {
   const btn = document.getElementById('claude-usage-refresh');
   if (!btn) return;
-  btn.title = _claudeRefreshBusy ? tr('claudeRefreshing') : tr('claudeRefresh');
+  const label = _claudeRefreshBusy ? tr('claudeRefreshing') : tr('claudeRefresh');
+  btn.title = label;
+  btn.setAttribute('aria-label', label);   // 內容只剩 ↻ 圖示（aria-hidden），名稱由這裡給
 }
 
-function loadData() {
-  chrome.storage.local.get(['courses', 'assignments', 'customAssignments', 'courseNames', 'claudeUsage', 'manualDone', 'manualUndone', 'manualShown', 'manualHidden'], (data) => {
-    const courseMap = buildCourseMap(data.courses);
-    // Canvas ∪ 自訂作業（與 dashboard render 同一合併；自訂作業同套隱藏／完成／7 天與逾期窗規則）
-    const assignments = DueCustomAssignments.mergeAssignmentMaps(data.assignments || {}, data.customAssignments || {});
-    const groups = getTasks(assignments, courseMap, data.manualDone || {}, data.manualUndone || {}, data.manualShown || {}, data.manualHidden || {});
-    renderTasks(groups, data.courseNames || {});
-    renderClaudeUsage(data.claudeUsage || null);
-  });
+// 打開 popup 時要的全部 key：一次讀完（#51）；含自訂作業（QA：popup 顯示自訂作業）
+const POPUP_KEYS = ['uiLanguage', 'showClaudeUsageInPopup', 'courses', 'assignments', 'customAssignments', 'courseNames', 'claudeUsage', 'manualDone', 'manualUndone', 'manualShown', 'manualHidden'];
+
+// 完成標記不在這裡快取：勾選/撤銷走 writeDone 的 read-modify-write（讀 storage 最新值），不拿開啟當下的快照覆寫
+function renderPopup(data) {
+  const courseMap = buildCourseMap(data.courses);
+  // Canvas ∪ 自訂作業（與 dashboard render 同一合併；自訂作業同套隱藏／完成／7 天與逾期窗規則）
+  const assignments = DueCustomAssignments.mergeAssignmentMaps(data.assignments || {}, data.customAssignments || {});
+  const groups = getTasks(assignments, courseMap, data.manualDone || {}, data.manualUndone || {}, data.manualShown || {}, data.manualHidden || {});
+  renderTasks(groups, data.courseNames || {});
+  renderClaudeUsage(data.claudeUsage || null);
 }
 
 function openDashboard() {
@@ -515,22 +711,29 @@ function showClaudeRefreshNote(key) {
 
 async function triggerClaudeRefreshSilently() {
   if (_claudeRefreshBusy) return;
+  _claudeSwapPending = true;
   setClaudeRefreshBusy(true);
   applyClaudeRefreshCopy();
   showClaudeRefreshNote(null);   // 重按 ↻ 先清掉上一次的提示
   try {
     const response = await chrome.runtime.sendMessage({ type: 'SYNC_CLAUDE_USAGE', force: true });
-    // 抓不到（background 回 success:false＋reason）→ 保留舊用量，短暫提示原因
-    if (!response || !response.success) {
+    if (response && response.success) {
+      // 成功：background 已把新用量寫進 storage（onChanged 也會到）；回應先到就由這裡做那一次交換
+      if (response.usage && _claudeSwapPending) {
+        renderClaudeUsage(response.usage, { swap: takeClaudeSwap() });
+      }
+    } else {
+      // 抓不到（background 回 success:false＋reason）→ 保留舊用量，短暫提示原因
       showClaudeRefreshNote(response && response.reason === 'no-tab' ? 'claudeRefreshMissing' : 'claudeRefreshFailed');
     }
   } catch (err) {
     console.warn('[Due] Claude usage refresh failed:', err.message);
     showClaudeRefreshNote('claudeRefreshFailed');
   } finally {
+    _claudeSwapPending = false;
     setClaudeRefreshBusy(false);
     applyClaudeRefreshCopy();
-    loadData();
+    // 不再 loadData()：重新整理用量沒有理由重建任務清單，會把進行中的撤銷窗砍掉（#40）
   }
 }
 
@@ -538,10 +741,15 @@ document.getElementById('claude-usage-refresh').addEventListener('click', trigge
 
 chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName !== 'local') return;
-  if (changes.claudeUsage) renderClaudeUsage(changes.claudeUsage.newValue || null);
+  if (changes.claudeUsage) {
+    const usage = changes.claudeUsage.newValue || null;
+    renderClaudeUsage(usage, { swap: !!usage && takeClaudeSwap() });
+  }
 });
 
-chrome.storage.local.get(['uiLanguage', 'showClaudeUsageInPopup'], (data) => {
+// 打開 popup 只讀一次 storage：語言、用量顯示設定與清單在同一個 callback 一起套上，
+// 不再先換語言／收 chip、再等第二次讀取才出現清單（#51）。維持沒有進場動畫。
+chrome.storage.local.get(POPUP_KEYS, (data) => {
   _uiLanguage = data.uiLanguage || 'zh-TW';
   applyUILanguage();
   applyClaudeRefreshCopy();
@@ -550,5 +758,5 @@ chrome.storage.local.get(['uiLanguage', 'showClaudeUsageInPopup'], (data) => {
   const usageActions = document.querySelector('.usage-actions');
   if (usageActions) usageActions.style.display = showUsage ? '' : 'none';
 
-  loadData();
+  renderPopup(data);
 });
