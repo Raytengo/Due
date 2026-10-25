@@ -208,9 +208,7 @@ const I18N = {
     weightResetReanalyze: '清除並重新分析',
     weightResetClear: '清除權重',
     weightSourceAi: 'AI 分析',
-    weightSourceAiTitle: '由 AI 從課程大綱推估，請以大綱為準；在「編輯」改過就不再標示',
     weightSourceCanvas: 'Canvas 設定',
-    weightSourceCanvasTitle: '老師在 Canvas 設定的評分比重',
     weightAddItem: '+ 新增項目',
     weightTotal: '總計：',
     unnamedWeight: '未命名',
@@ -374,9 +372,7 @@ const I18N = {
     weightResetReanalyze: '清除并重新分析',
     weightResetClear: '清除权重',
     weightSourceAi: 'AI 分析',
-    weightSourceAiTitle: '由 AI 从课程大纲推估，请以大纲为准；在「编辑」改过就不再标示',
     weightSourceCanvas: 'Canvas 设定',
-    weightSourceCanvasTitle: '老师在 Canvas 设定的评分比重',
     weightAddItem: '+ 新增项目',
     weightTotal: '总计：',
     unnamedWeight: '未命名',
@@ -538,9 +534,7 @@ const I18N = {
     weightResetReanalyze: 'Clear and re-analyze',
     weightResetClear: 'Clear weights',
     weightSourceAi: 'AI analysis',
-    weightSourceAiTitle: 'Estimated by AI from the syllabus. Check it against the syllabus; the label goes away once you edit the weights.',
     weightSourceCanvas: 'Set in Canvas',
-    weightSourceCanvasTitle: 'Grading weights your instructor set in Canvas',
     weightAddItem: '+ Add Item',
     weightTotal: 'Total:',
     unnamedWeight: 'Unnamed',
@@ -4296,13 +4290,6 @@ function isAiConfigured(aiConfig) {
   return typeof DueGradingRules !== 'undefined' && DueGradingRules.resolveConfig(aiConfig).configured;
 }
 
-// 圓餅下的權重來源小字（D2，只有三種情況）：'ai'＝AI 寫的、使用者沒改過；'canvas'＝老師在 Canvas 設的；
-// 其餘（自己填的、改過的、沒有權重）不標。是不是 AI 的看 gradingAnalysis 紀錄（規則在 DueGradingRules.isAiWeights）
-function weightSourceHtml(source) {
-  if (source === 'ai') return `<div class="detail-weight-source" title="${esc(tr('weightSourceAiTitle'))}">${esc(tr('weightSourceAi'))}</div>`;
-  if (source === 'canvas') return `<div class="detail-weight-source" title="${esc(tr('weightSourceCanvasTitle'))}">${esc(tr('weightSourceCanvas'))}</div>`;
-  return '';
-}
 
 function isAiCustomWeights(courseId, weights) {
   if (typeof DueGradingRules === 'undefined') return false;
@@ -4333,7 +4320,7 @@ function renderWeightPie(groups, courseId) {
       return `
         <div class="detail-weight-pie-container">
           <div class="detail-pie" role="img" aria-label="${esc(customWeights.map((c) => `${weightItemLabel(c)} ${c.weight}%`).join(', '))}" style="background: conic-gradient(${gradientParts});"></div>
-          <div class="detail-pie-legend">${legend}${weightSourceHtml(isAiCustomWeights(courseId, customWeights) ? 'ai' : null)}</div>
+          <div class="detail-pie-legend">${legend}</div>
           ${courseId ? EDIT_WEIGHT_BTN(courseId) : ''}
         </div>`;
     }
@@ -4363,7 +4350,7 @@ function renderWeightPie(groups, courseId) {
     return `
       <div class="detail-weight-pie-container">
         <div class="detail-pie" role="img" aria-label="${esc(groups.map((g) => `${g.name} ${g.group_weight || 0}%`).join(', '))}" style="background: conic-gradient(${gradientParts});"></div>
-        <div class="detail-pie-legend">${legend}${weightSourceHtml('canvas')}</div>
+        <div class="detail-pie-legend">${legend}</div>
         ${courseId ? EDIT_WEIGHT_BTN(courseId) : ''}
       </div>`;
   }

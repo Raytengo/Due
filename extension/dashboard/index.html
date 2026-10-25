@@ -328,6 +328,11 @@
       opacity: 0;
     }
 
+    /* 改名中：輸入框自己有橘框，indicator 的底色與左側橘線退場，不疊成兩個框 */
+    .course-nav:has(> .nav-rename-input) > .course-nav-indicator {
+      opacity: 0;
+    }
+
     .nav-course-item {
       display: flex;
       align-items: center;
@@ -3552,9 +3557,13 @@
       padding: 0;
     }
 
-    /* 側欄行內重命名輸入框：取代整個 .nav-course-item 按鈕，尺寸與其對齊 */
+    /* 側欄行內重命名輸入框：取代整個 .nav-course-item 按鈕，尺寸與其對齊——高度釘在課程項的 38px
+       （7px×2 padding＋24px badge），改名時下面的課不會往上跳。
+       position:relative 讓它疊在課程列的滑動 indicator（absolute）之上，不然 indicator 會蓋住輸入框 */
     .nav-rename-input {
+      position: relative;
       width: 100%;
+      height: 38px;
       box-sizing: border-box;
       padding: 6px 9px;
       border: 1px solid var(--orange);
@@ -3658,16 +3667,6 @@
       font-size: 11px;
       color: var(--muted);
       font-weight: 500;
-    }
-
-    /* 權重來源小字（AI 分析／Canvas 設定）：圖例最後一行的註腳，與圖例文字左緣對齊（圓點 12px＋間距 8px），不搶圖例 */
-    .detail-weight-source {
-      padding-left: 20px;
-      font-family: 'DM Mono', monospace;
-      font-size: 10.5px;
-      letter-spacing: 0.02em;
-      color: var(--mid);
-      cursor: default;
     }
 
     .btn-edit-weights {
