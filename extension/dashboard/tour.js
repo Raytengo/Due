@@ -1,9 +1,11 @@
 // ═══════════════════════════════════════════════════════════════
 // Due 互動導覽（product tour）
-// - 畫面變暗、只亮出這一步要看／要點的地方，旁邊一個說明框；「下一步」前進、右上角 ✕ 結束、Esc 也結束
-// - 有些步驟可以直接點亮起來的元素前進（advanceOn）；按「下一步」時由導覽代點（next），使用者不必自己找
+// - 畫面變暗、只亮出這一步要點的地方，旁邊一個說明框叫使用者「點這裡」；照著做完就自動到下一步
+//   （點擊類看 advanceOn；改名／勾完成／拖曳這種要等結果的，聽 dashboard.js 的 due:action 事件）
+// - 「下一步」跳過這一步（需要換畫面的由導覽代點，next）；右上角 ✕ 與 Esc 結束
 // - 有些步驟要先到某個畫面（before：例如先打開一門課），導覽代點側欄後等目標出現才顯示
-// - 亮框以外擋住點擊（四塊透明 blocker 圍住目標）；interactive:false 的步驟連亮框本身也擋（例如 ⚙：點了會開選單蓋在遮罩下）
+// - 變暗用 SVG mask 挖洞：主亮框之外可以再挖一個「指給你看」的洞（point），配一條手繪繞圈箭頭
+// - 亮框以外擋住點擊（四塊透明 blocker 圍住主亮框）；interactive:false 的步驟連亮框本身也擋
 // - 目標每幀重新查詢、重新量位置（側欄、詳情會整段重建，active 底色會滑），不快取節點
 // - 自帶三語字串；依賴（執行期才用到）：_uiLanguage、announce、reduceMotion（dashboard.js 全域，皆有 typeof 守衛）
 // ═══════════════════════════════════════════════════════════════
@@ -16,144 +18,165 @@
       next: '下一步',
       done: '開始使用',
       close: '結束導覽',
-      orClick: '或直接點亮起來的地方',
-      tryIt: '可以直接試試看',
-      syncTitle: '先同步一次',
-      syncBody: 'Due 會從 Canvas 拉課程與作業。之後只要打開 Canvas 就會自動同步，想立刻更新就按這裡。',
-      homeTitle: '這是學期待辦',
-      homeBody: '左邊是近期完成度與各時段的件數；右邊所有課程的作業依截止日期排好，逾期的置頂。',
+      autoNext: '做完會自動到下一步',
       courseTitle: '打開一門課',
-      courseBody: '側欄列出你這學期的課，數字是還沒做完的件數。點一門課看裡面的東西。',
-      renameTitle: '改成你習慣的課名',
-      renameBody: '點課名旁的鉛筆，就能改成你習慣的名字（例如中文課名），按 Enter 儲存。側欄、待辦卡片和 popup 都會跟著換。',
+      courseBody: '點這門課，看看裡面有什麼。',
+      renameTitle: '幫課取個好認的名字',
+      renameBody: '點鉛筆，改成你習慣的叫法，按 Enter 儲存。',
       checkTitle: '做完就勾掉',
-      checkBody: '點左邊的圓圈標記完成，1.5 秒內再點一次可以撤銷。完成的作業會收進下方「已完成」。',
+      checkBody: '點最左邊的圓圈，把這項標成完成。1.5 秒內再點一次可以反悔。',
+      dragBackTitle: '拖曳整理',
+      dragBackBody: '剛勾掉的在「已完成」裡。按住名稱後的 ⋮⋮，把它拖回上面的清單。',
       dragTitle: '拖曳整理',
-      dragBody: '按住名稱後的 ⋮⋮，可以拖到下方「已完成」或「已隱藏」。考試與簽到預設就收在「已隱藏」。',
-      weightTitle: '評分比重',
-      weightBody: 'Canvas 有設定就直接用；沒有的話可以按「編輯」自己填，成績計算器會跟著算。',
-      aiTitle: '讓 AI 自動填權重',
-      aiBody: '在設定 →「AI 分析設定」填入你自己的 API key（Gemini、Qwen、DeepSeek…），Due 會在同步後讀課程大綱，自動填入還沒有權重的課。',
-      backTitle: '回到學期待辦',
-      backBody: '導覽到這裡結束。之後想再看一次，在設定 →「使用教學」。',
+      dragBody: '按住名稱後的 ⋮⋮，拖到下方「已完成」或「已隱藏」。',
+      aiTitle: '讓 AI 幫你填評分比重',
+      aiBody: '在 ⚙ 的「AI 分析設定」貼上你的 API key。',
+      aiPoint: '會自動填在這裡',
     },
     'zh-CN': {
       counter: '{n} / {total}',
       next: '下一步',
       done: '开始使用',
       close: '结束导览',
-      orClick: '或直接点亮起来的地方',
-      tryIt: '可以直接试试看',
-      syncTitle: '先同步一次',
-      syncBody: 'Due 会从 Canvas 拉课程和作业。之后只要打开 Canvas 就会自动同步，想立刻更新就按这里。',
-      homeTitle: '这是学期待办',
-      homeBody: '左边是近期完成度和各时段的件数；右边所有课程的作业按截止日期排好，逾期的置顶。',
+      autoNext: '做完会自动到下一步',
       courseTitle: '打开一门课',
-      courseBody: '侧栏列出你这学期的课，数字是还没做完的件数。点一门课看里面的东西。',
-      renameTitle: '改成你习惯的课名',
-      renameBody: '点课名旁的铅笔，就能改成你习惯的名字（例如中文课名），按 Enter 保存。侧栏、待办卡片和 popup 都会跟着换。',
+      courseBody: '点这门课，看看里面有什么。',
+      renameTitle: '给课取个好认的名字',
+      renameBody: '点铅笔，改成你习惯的叫法，按 Enter 保存。',
       checkTitle: '做完就勾掉',
-      checkBody: '点左边的圆圈标记完成，1.5 秒内再点一次可以撤销。完成的作业会收进下方「已完成」。',
+      checkBody: '点最左边的圆圈，把这项标成完成。1.5 秒内再点一次可以反悔。',
+      dragBackTitle: '拖动整理',
+      dragBackBody: '刚勾掉的在「已完成」里。按住名称后的 ⋮⋮，把它拖回上面的清单。',
       dragTitle: '拖动整理',
-      dragBody: '按住名称后的 ⋮⋮，可以拖到下方「已完成」或「已隐藏」。考试和签到默认就收在「已隐藏」。',
-      weightTitle: '评分比重',
-      weightBody: 'Canvas 有设置就直接用；没有的话可以按「编辑」自己填，成绩计算器会跟着算。',
-      aiTitle: '让 AI 自动填权重',
-      aiBody: '在设置 →「AI 分析设置」填入你自己的 API key（Gemini、Qwen、DeepSeek…），Due 会在同步后读课程大纲，自动填入还没有权重的课。',
-      backTitle: '回到学期待办',
-      backBody: '导览到这里结束。之后想再看一次，在设置 →「使用教程」。',
+      dragBody: '按住名称后的 ⋮⋮，拖到下方「已完成」或「已隐藏」。',
+      aiTitle: '让 AI 帮你填评分比重',
+      aiBody: '在 ⚙ 的「AI 分析设置」贴上你的 API key。',
+      aiPoint: '会自动填在这里',
     },
     en: {
       counter: '{n} / {total}',
       next: 'Next',
       done: 'Get started',
       close: 'End tour',
-      orClick: 'or click the highlighted spot',
-      tryIt: 'Go ahead and try it',
-      syncTitle: 'Sync first',
-      syncBody: 'Due pulls your courses and assignments from Canvas. It syncs automatically whenever you open Canvas; click here to update right now.',
-      homeTitle: 'Your to-dos',
-      homeBody: 'On the left, how much of your near-term work is done and how many items fall in each window. On the right, every course’s assignments sorted by due date, overdue on top.',
+      autoNext: 'Do it and we’ll move on',
       courseTitle: 'Open a course',
-      courseBody: 'The sidebar lists this term’s courses; the number is what’s still to do. Click one to look inside.',
-      renameTitle: 'Rename a course',
-      renameBody: 'Click the pencil next to the course name to give it a name you recognize; press Enter to save. The sidebar, to-do cards and popup all follow.',
+      courseBody: 'Click this course to see what’s inside.',
+      renameTitle: 'Give it a name you know',
+      renameBody: 'Click the pencil, type the name you use, and press Enter.',
       checkTitle: 'Check it off',
-      checkBody: 'Click the circle to mark an item done; click again within 1.5 seconds to undo. Done items move to “Done” below.',
+      checkBody: 'Click the circle on the left to mark this done. Click again within 1.5 seconds to undo.',
+      dragBackTitle: 'Drag to organize',
+      dragBackBody: 'What you just checked off is under “Done”. Grab the ⋮⋮ after its name and drag it back up to the list.',
       dragTitle: 'Drag to organize',
-      dragBody: 'Grab the ⋮⋮ after a name and drop it on “Done” or “Hidden” below. Exams and attendance start out in “Hidden”.',
-      weightTitle: 'Grade weights',
-      weightBody: 'If Canvas has weights, Due uses them. If not, click “Edit” to fill them in; the grade calculator follows along.',
-      aiTitle: 'Let AI fill in weights',
-      aiBody: 'In Settings → “AI analysis settings”, add your own API key (Gemini, Qwen, DeepSeek…). After each sync Due reads the syllabus and fills in weights for courses that have none.',
-      backTitle: 'Back to your to-dos',
-      backBody: 'That’s the tour. You can replay it anytime from Settings → “Tutorial”.',
+      dragBody: 'Grab the ⋮⋮ after a name and drop it on “Done” or “Hidden” below.',
+      aiTitle: 'Let AI fill in grade weights',
+      aiBody: 'Paste your API key in ⚙ → “AI analysis settings”.',
+      aiPoint: 'filled in here',
     },
   };
 
   // ── 畫面操作（導覽代點，與使用者自己點走同一條路）──
   const q = (sel) => (typeof sel === 'function' ? sel() : document.querySelector(sel));
   const visible = (n) => !!n && n.getClientRects().length > 0;
-  const inCourseDetail = () => visible(q('#course-detail-container .course-detail-view'));
+  const DETAIL = '#course-detail-container';
+  const inCourseDetail = () => visible(q(`${DETAIL} .course-detail-view`));
   // 優先挑還有待辦的課（課程詳情裡才有可以勾、可以拖的列）
   function pickCourse() {
     const items = [...document.querySelectorAll('#course-nav .nav-course-item')];
     return items.find((b) => !b.querySelector('.nav-course-badge.is-placeholder')) || items[0] || null;
-  }
-  function goHome() {
-    const week = q('#nav-week');
-    if (week && !week.classList.contains('active')) week.click();
   }
   function openCourse() {
     if (inCourseDetail()) return;
     const c = pickCourse();
     if (c) c.click();
   }
-  // 詳情裡第一列「待辦」作業（勾選圈＋握把都在列上）；最後一列的握把（清單裡還有別的子元素，不能用 :last-child）
-  const FIRST_ROW = '#course-detail-container .detail-assignments-list .assignment-item';
-  const lastRowGrip = () => {
+  const FIRST_ROW = `${DETAIL} .detail-assignments-list .assignment-item`;
+  const lastRow = () => {
     const rows = document.querySelectorAll(FIRST_ROW);
-    return rows.length ? rows[rows.length - 1].querySelector('.drag-grip') : null;
+    return rows.length ? rows[rows.length - 1] : null;
   };
+  const lastRowGrip = () => {
+    const r = lastRow();
+    return r ? r.querySelector('.drag-grip') : null;
+  };
+  const doneHasRows = () => !!q(`${DETAIL} .done-items .assignment-item`);
+  // 「已完成」區預設收著：要從裡面拖東西出來得先打開
+  function openDoneFold() {
+    openCourse();
+    const sec = q(`${DETAIL} .done-items`);
+    if (sec && !sec.classList.contains('open')) {
+      const btn = sec.querySelector('.fold-toggle');
+      if (btn) btn.click();
+    }
+  }
 
-  // target：亮起來的元素（選擇器或回傳元素的函式；陣列＝取聯集）；advanceOn：使用者點到它就前進；next：按「下一步」時導覽代做的事；
-  // before：顯示這一步前要先到的畫面；interactive：亮框內可不可以點（預設可以）；tryIt：可以在亮框裡試、但不會自動前進；
-  // scrollTo：要捲進可視範圍的元素（預設是第一個 target）；reveal：這一步期間加在 <html> 上的 class（把平常藏著的控制項亮出來）
+  // 每一步：
+  //   target：亮起來的元素（選擇器或回傳元素的函式；陣列＝取聯集）；scrollTo：要捲進可視範圍的（預設第一個 target）
+  //   advanceOn：使用者點到它（closest）就前進；advanceEvent：收到這個 due:action 就前進
+  //   next：按「下一步」時導覽代做的事；before：顯示這一步前要先到的畫面
+  //   interactive：亮框內可不可以點（預設可以）；reveal：這一步期間加在 <html> 上的 class（亮出平常藏著的控制項）
+  //   point：另外挖一個洞「指給你看」，配手繪箭頭與 pointLabel；settle：before 之後先等多久再捲動（等展開動畫）
+  //   resolve(state)：依這一趟的狀況換文案／目標（例：剛勾過一項 → 拖曳那步改成「把它拖回來」）
   const STEPS = [
-    { key: 'sync', target: '#sync-btn', advanceOn: '#sync-btn', before: goHome },
-    { key: 'home', target: '#main-section', interactive: false, before: goHome },
-    { key: 'course', target: '#course-nav', advanceOn: '#course-nav .nav-course-item', next: openCourse },
     {
-      // 鉛筆平常要 hover 才出現：這一步把它亮出來（reveal 加在 <html> 上，換步／結束時拿掉）
+      key: 'course',
+      target: pickCourse,
+      advanceOn: '#course-nav .nav-course-item',
+      next: openCourse,
+    },
+    {
       key: 'rename',
-      target: ['#course-detail-container .detail-name-text', '#course-detail-container .btn-rename-course'],
+      target: [`${DETAIL} .detail-name-text`, `${DETAIL} .btn-rename-course`],
       before: openCourse,
       reveal: 'tour-reveal-rename',
-      tryIt: true,
+      advanceEvent: 'rename',
     },
-    { key: 'check', target: FIRST_ROW, before: openCourse, tryIt: true },
+    {
+      key: 'check',
+      target: FIRST_ROW,
+      before: openCourse,
+      advanceEvent: 'complete',
+    },
     {
       key: 'drag',
-      // 最後一列的握把緊鄰下方兩區：握把與放置目標在同一個亮框裡，捲到底就一起看得到
-      target: [lastRowGrip, '#course-detail-container .done-items', '#course-detail-container .hidden-items'],
-      scrollTo: '#course-detail-container .hidden-items',
       before: openCourse,
-      tryIt: true,
+      advanceEvent: 'drag',
+      resolve(state) {
+        if (state.didComplete && doneHasRows()) {
+          return {
+            textKey: 'dragBack',
+            before: openDoneFold,
+            settle: 400,   // 等「已完成」展開完（--t-disclosure）再捲，不然捲到的是展開前的位置
+            target: [`${DETAIL} .done-items`, lastRow],
+            scrollTo: `${DETAIL} .done-items`,
+          };
+        }
+        // 最後一列的握把緊鄰下方兩區：握把與放置目標在同一個亮框裡
+        return {
+          textKey: 'drag',
+          target: [lastRowGrip, `${DETAIL} .done-items`, `${DETAIL} .hidden-items`],
+          scrollTo: `${DETAIL} .hidden-items`,
+        };
+      },
     },
-    { key: 'weight', target: '#course-detail-container .detail-left-panel', before: openCourse, interactive: false },
-    { key: 'ai', target: '#settings-menu-btn', interactive: false },
-    { key: 'back', target: '#nav-week', advanceOn: '#nav-week', next: goHome },
+    {
+      key: 'ai',
+      target: '#settings-menu-btn',
+      before: openCourse,
+      interactive: false,
+      point: `${DETAIL} .detail-left-panel`,
+      pointLabel: 'aiPoint',
+    },
   ];
-
-  // 預設只走這 5 步（2026-10-26 依挑選頁拍板：只教自己找不到的東西）；其餘步驟留著給 dev/tour-review.html 比較
-  const DEFAULT_STEPS = ['course', 'rename', 'check', 'drag', 'ai'];
 
   const PAD = 6;              // 亮框比目標大一圈
   const GAP = 18;             // 說明框與亮框的距離
   const EDGE = 14;            // 說明框離視窗邊緣的最小距離
   const SETTLE_MS = 380;      // 點了／代點之後等頁面換完（頁面切換淡入、課程 morph）
+  const EVENT_SETTLE_MS = 650; // 勾完成／拖曳落地後，讓離場與飛回的動畫演完再換步
   const WAIT_MAX_MS = 2000;   // before 之後等目標出現的上限
   const FADE_MS = 400;        // 與 --t-overlay 同長
+  const SVG_NS = 'http://www.w3.org/2000/svg';
 
   let _state = null;
 
@@ -169,17 +192,37 @@
   }
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-  // 目標的聯集矩形；第一個選擇器必須存在、看得到、沒停用，其餘找得到才併進來
-  function targetRect(step) {
-    const sels = Array.isArray(step.target) ? step.target : [step.target];
+  // 這一步實際用的設定（resolve 換掉的欄位蓋在原本的上面）
+  function spec(step) {
+    return step.resolve ? { ...step, ...step.resolve(_state) } : step;
+  }
+
+  // 裁到所有會裁切的祖先（捲動容器）的可見範圍內：亮框不會框到捲出去、看不到的地方
+  function clipRect(n, b) {
+    let r = { left: b.left, top: b.top, right: b.right, bottom: b.bottom };
+    for (let p = n.parentElement; p && p !== document.body; p = p.parentElement) {
+      const cs = getComputedStyle(p);
+      if (!/(auto|scroll|hidden|clip)/.test(cs.overflowY + cs.overflowX)) continue;
+      const c = p.getBoundingClientRect();
+      r = { left: Math.max(r.left, c.left), top: Math.max(r.top, c.top), right: Math.min(r.right, c.right), bottom: Math.min(r.bottom, c.bottom) };
+    }
+    return r.right > r.left && r.bottom > r.top ? r : null;
+  }
+
+  // 目標的聯集矩形；第一個必須存在、看得到、沒停用，其餘找得到才併進來。
+  // clip（預設）：裁到捲動容器的可見範圍；等目標出現時不裁（還沒捲進來的目標也算「出現了」）
+  function rectOf(target, { clip = true } = {}) {
+    const sels = Array.isArray(target) ? target : [target];
     const first = q(sels[0]);
     if (!first || first.disabled || !visible(first)) return null;
     let r = null;
     sels.forEach((sel) => {
       const n = q(sel);
       if (!visible(n)) return;
-      const b = n.getBoundingClientRect();
-      if (!b.width || !b.height) return;
+      const raw = n.getBoundingClientRect();
+      if (!raw.width || !raw.height) return;
+      const b = clip ? clipRect(n, raw) : raw;
+      if (!b) return;
       r = r
         ? { left: Math.min(r.left, b.left), top: Math.min(r.top, b.top), right: Math.max(r.right, b.right), bottom: Math.max(r.bottom, b.bottom) }
         : { left: b.left, top: b.top, right: b.right, bottom: b.bottom };
@@ -190,9 +233,30 @@
   const CLOSE_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>';
   const NEXT_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
 
+  function svgEl(tag, attrs = {}) {
+    const n = document.createElementNS(SVG_NS, tag);
+    Object.entries(attrs).forEach(([k, v]) => n.setAttribute(k, v));
+    return n;
+  }
+
   function build() {
     const root = document.createElement('div');
     root.className = 'tour-root';
+
+    // 變暗層：整片半透明，mask 挖掉主亮框（hole）與「指給你看」的洞（hole2）
+    const dim = svgEl('svg', { class: 'tour-dim', 'aria-hidden': 'true' });
+    const mask = svgEl('mask', { id: 'tour-dim-mask', maskUnits: 'userSpaceOnUse' });
+    mask.appendChild(svgEl('rect', { x: 0, y: 0, width: '100%', height: '100%', fill: '#fff' }));
+    const hole = svgEl('rect', { class: 'tour-hole', rx: 10, fill: '#000' });
+    const hole2 = svgEl('rect', { class: 'tour-hole', rx: 10, fill: '#000' });
+    mask.appendChild(hole);
+    mask.appendChild(hole2);
+    const defs = svgEl('defs');
+    defs.appendChild(mask);
+    dim.appendChild(defs);
+    dim.appendChild(svgEl('rect', { class: 'tour-dim-fill', x: 0, y: 0, width: '100%', height: '100%', mask: 'url(#tour-dim-mask)' }));
+    root.appendChild(dim);
+
     const blockers = [0, 1, 2, 3].map(() => {
       const b = document.createElement('div');
       b.className = 'tour-block';
@@ -202,6 +266,23 @@
     const ring = document.createElement('div');
     ring.className = 'tour-ring';
     root.appendChild(ring);
+    const ring2 = document.createElement('div');
+    ring2.className = 'tour-ring2';
+    root.appendChild(ring2);
+
+    // 手繪繞圈箭頭（point 用）：路徑＋箭頭兩撇＋旁邊一行手寫感的小字
+    const sketch = svgEl('svg', { class: 'tour-sketch', 'aria-hidden': 'true' });
+    // 線下面墊一條米白淡底（halo），壓在變暗的介面文字上也看得清楚
+    const sketchHalo = svgEl('path', { class: 'tour-sketch-halo' });
+    const sketchPath = svgEl('path', { class: 'tour-sketch-line' });
+    const sketchHead = svgEl('path', { class: 'tour-sketch-line' });
+    const sketchLabel = svgEl('text', { class: 'tour-sketch-label' });
+    sketch.appendChild(sketchHalo);
+    sketch.appendChild(sketchPath);
+    sketch.appendChild(sketchHead);
+    sketch.appendChild(sketchLabel);
+    root.appendChild(sketch);
+
     const pop = document.createElement('div');
     pop.className = 'tour-pop';
     pop.setAttribute('role', 'dialog');
@@ -229,7 +310,7 @@
     ring.addEventListener('click', nudge);   // 只有 interactive:false 時 ring 才吃得到點擊
     pop.querySelector('.tour-close').addEventListener('click', () => end());
     pop.querySelector('.tour-next').addEventListener('click', () => next());
-    return { root, ring, pop, blockers };
+    return { root, hole, hole2, ring, ring2, pop, blockers, sketch, sketchHalo, sketchPath, sketchHead, sketchLabel };
   }
 
   // 點到被擋住的地方：說明框輕推一下（減少動態：不動，只把焦點拉回說明框）
@@ -253,42 +334,133 @@
   }
 
   function fillPop() {
-    const { pop, i } = _state;
+    const { pop, i, cur } = _state;
     const steps = _state.steps;
-    const step = steps[i];
     const last = i === steps.length - 1;
+    const textKey = cur.textKey || cur.key;
+    const actionable = !!(cur.advanceOn || cur.advanceEvent);
     pop.querySelector('.tour-counter').textContent = t('counter').replace('{n}', String(i + 1)).replace('{total}', String(steps.length));
     pop.querySelector('.tour-close').setAttribute('aria-label', t('close'));
     pop.querySelector('.tour-close').title = t('close');
-    pop.querySelector('#tour-title').textContent = t(`${step.key}Title`);
-    pop.querySelector('#tour-body').textContent = t(`${step.key}Body`);
-    const hint = pop.querySelector('.tour-hint');
-    hint.hidden = !step.advanceOn && !step.tryIt;
-    pop.querySelector('.tour-hint-text').textContent = step.advanceOn ? t('orClick') : t('tryIt');
+    pop.querySelector('#tour-title').textContent = t(`${textKey}Title`);
+    pop.querySelector('#tour-body').textContent = t(`${textKey}Body`);
+    pop.querySelector('.tour-hint').hidden = !actionable;
+    pop.querySelector('.tour-hint-text').textContent = t('autoNext');
     pop.querySelector('.tour-next-label').textContent = last ? t('done') : t('next');
     pop.querySelector('.tour-progress-bar').style.width = `${((i + 1) / steps.length) * 100}%`;
-    setReveal(step.reveal);
-    _state.root.classList.toggle('is-blocking', step.interactive === false);
-    _state.root.classList.toggle('is-actionable', !!step.advanceOn);
+    _state.sketchLabel.textContent = cur.pointLabel ? t(cur.pointLabel) : '';
+    setReveal(cur.reveal);
+    _state.root.classList.toggle('is-blocking', cur.interactive === false);
+    _state.root.classList.toggle('is-actionable', actionable);
+    _state.root.classList.toggle('has-point', !!cur.point);
   }
 
-  // 依目標位置擺亮框、四塊 blocker、說明框與箭頭（每幀量；位置沒變就不寫 DOM）
-  function place(r) {
-    const { ring, pop, blockers } = _state;
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    // 亮框夾在視窗內（主畫面這種大目標貼著視窗邊時，框線才看得到）
+  function setRect(el, x, y, w, h) {
+    el.style.setProperty('x', `${x}px`);
+    el.style.setProperty('y', `${y}px`);
+    el.style.setProperty('width', `${Math.max(0, w)}px`);
+    el.style.setProperty('height', `${Math.max(0, h)}px`);
+  }
+
+  // 亮框：比目標大一圈、夾在視窗內（大目標貼著視窗邊時框線才看得到）
+  function padded(r, vw, vh) {
     const x = Math.max(2, r.left - PAD);
     const y = Math.max(2, r.top - PAD);
-    const w = Math.min(vw - 2, r.right + PAD) - x;
-    const h = Math.min(vh - 2, r.bottom + PAD) - y;
+    return { x, y, w: Math.min(vw - 2, r.right + PAD) - x, h: Math.min(vh - 2, r.bottom + PAD) - y };
+  }
+
+  const clampN = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
+
+  // 手繪繞圈箭頭：從說明框邊緣出發，途中繞一個小圈，落在「指給你看」的框邊；箭頭兩撇順著最後的切線
+  function drawSketch(popBox, b) {
+    const { sketchHalo, sketchPath, sketchHead, sketchLabel } = _state;
+    const pcx = popBox.x + popBox.w / 2;
+    const pcy = popBox.y + popBox.h / 2;
+    const bcx = b.x + b.w / 2;
+    const bcy = b.y + b.h / 2;
+    // 起點：說明框上離目標中心最近的點；終點：目標框上離說明框中心最近的點，各往外退一點
+    let sx = clampN(bcx, popBox.x + 24, popBox.x + popBox.w - 24);
+    let sy = clampN(bcy, popBox.y, popBox.y + popBox.h);
+    let ex = clampN(pcx, b.x + 16, b.x + b.w - 16);
+    let ey = clampN(pcy, b.y, b.y + b.h);
+    const len0 = Math.hypot(ex - sx, ey - sy) || 1;
+    const ux0 = (ex - sx) / len0;
+    const uy0 = (ey - sy) / len0;
+    sx += ux0 * 10; sy += uy0 * 10; ex -= ux0 * 12; ey -= uy0 * 12;
+    const L = Math.hypot(ex - sx, ey - sy) || 1;
+    const ux = (ex - sx) / L;
+    const uy = (ey - sy) / L;
+    const px = -uy;   // 垂直方向（圈往這邊鼓）
+    const py = ux;
+    const r = clampN(L * 0.13, 10, 22);
+    const P = { x: sx + ux * L * 0.45, y: sy + uy * L * 0.45 };
+    const pt = (o, a, b2) => `${(o.x + ux * a + px * b2).toFixed(1)} ${(o.y + uy * a + py * b2).toFixed(1)}`;
+    const S = { x: sx, y: sy };
+    const c2 = { x: ex - ux * L * 0.2 + px * L * 0.07, y: ey - uy * L * 0.2 + py * L * 0.07 };
+    const d = [
+      `M ${sx.toFixed(1)} ${sy.toFixed(1)}`,
+      `C ${pt(S, L * 0.18, L * 0.1)} ${pt(P, -r * 1.3, r * 0.3)} ${pt(P, 0, 0)}`,
+      // 圈：兩個控制點交叉、往側邊鼓出去，畫回到前進方向稍前一點
+      `C ${pt(P, r * 1.7, r * 2.5)} ${pt(P, -r * 1.7, r * 2.5)} ${pt(P, r * 0.35, 0)}`,
+      `C ${pt(P, r * 2.2, -r * 0.5)} ${c2.x.toFixed(1)} ${c2.y.toFixed(1)} ${ex.toFixed(1)} ${ey.toFixed(1)}`,
+    ].join(' ');
+    sketchPath.setAttribute('d', d);
+    sketchHalo.setAttribute('d', d);
+    // 箭頭兩撇：沿最後一段的切線（c2 → E）往回、左右各張 28°
+    const tl = Math.hypot(ex - c2.x, ey - c2.y) || 1;
+    const tx = (ex - c2.x) / tl;
+    const ty = (ey - c2.y) / tl;
+    const wing = (deg) => {
+      const a = (deg * Math.PI) / 180;
+      const wx = -(tx * Math.cos(a) - ty * Math.sin(a)) * 11;
+      const wy = -(tx * Math.sin(a) + ty * Math.cos(a)) * 11;
+      return `${(ex + wx).toFixed(1)} ${(ey + wy).toFixed(1)}`;
+    };
+    sketchHead.setAttribute('d', `M ${wing(28)} L ${ex.toFixed(1)} ${ey.toFixed(1)} L ${wing(-28)}`);
+    // 小字擺在箭頭尖旁邊、往目標框外側退開（緊貼著框，讀起來就是在說這一格）
+    const side = ux >= 0 ? -1 : 1;   // 箭頭往右走就把字放在尖端左邊，反之右邊，不壓在線上
+    sketchLabel.setAttribute('x', (ex + side * 14).toFixed(1));
+    sketchLabel.setAttribute('y', (ey - uy * 16).toFixed(1));
+    sketchLabel.setAttribute('text-anchor', side > 0 ? 'start' : 'end');
+  }
+
+  // 每次換步：箭頭從起點畫到終點，小字隨後淡入（減少動態：直接出現）
+  function playSketch() {
+    const { sketchHalo, sketchPath, sketchHead, sketchLabel } = _state;
+    [sketchHalo, sketchPath, sketchHead, sketchLabel].forEach((n) => n.getAnimations().forEach((a) => a.cancel()));
+    if (reduced()) return;
+    const len = sketchPath.getTotalLength();
+    [sketchHalo, sketchPath].forEach((n) => n.animate(
+      [{ strokeDasharray: `${len}`, strokeDashoffset: `${len}` }, { strokeDasharray: `${len}`, strokeDashoffset: '0' }],
+      { duration: 700, delay: 150, easing: 'cubic-bezier(0.65, 0, 0.35, 1)', fill: 'backwards' },
+    ));
+    sketchHead.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 150, delay: 820, fill: 'backwards' });
+    sketchLabel.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 300, delay: 850, fill: 'backwards' });
+  }
+
+  // 依目標位置擺挖洞、亮框、四塊 blocker、說明框、箭頭（每幀量；位置沒變就不寫 DOM）
+  function place(r) {
+    const { ring, ring2, hole, hole2, pop, blockers, cur } = _state;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const { x, y, w, h } = padded(r, vw, vh);
+    const pr = cur.point ? rectOf(cur.point) : null;
+    const b = pr ? padded(pr, vw, vh) : null;
     const pw = pop.offsetWidth;
     const ph = pop.offsetHeight;
-    const key = [x, y, w, h, vw, vh, pw, ph].map(Math.round).join(',');
+    const key = [x, y, w, h, vw, vh, pw, ph, ...(b ? [b.x, b.y, b.w, b.h] : [])].map(Math.round).join(',');
     if (key === _state.lastKey) return;
     _state.lastKey = key;
 
+    setRect(hole, x, y, w, h);
     Object.assign(ring.style, { left: `${x}px`, top: `${y}px`, width: `${w}px`, height: `${h}px` });
+    if (b) {
+      setRect(hole2, b.x, b.y, b.w, b.h);
+      Object.assign(ring2.style, { left: `${b.x}px`, top: `${b.y}px`, width: `${b.w}px`, height: `${b.h}px` });
+    } else {
+      // 沒有第二個洞：縮成主亮框中心的一點（下次出現時從那裡長出來，而不是從左上角飛來）
+      setRect(hole2, x + w / 2, y + h / 2, 0, 0);
+    }
     const [top, right, bottom, left] = blockers;
     Object.assign(top.style, { left: '0px', top: '0px', width: `${vw}px`, height: `${Math.max(0, y)}px` });
     Object.assign(bottom.style, { left: '0px', top: `${y + h}px`, width: `${vw}px`, height: `${Math.max(0, vh - y - h)}px` });
@@ -296,8 +468,8 @@
     Object.assign(right.style, { left: `${x + w}px`, top: `${y}px`, width: `${Math.max(0, vw - x - w)}px`, height: `${h}px` });
 
     // 說明框：右 → 左 → 下 → 上，都放不下（目標幾乎佔滿畫面）就放在目標內的右下角、不畫箭頭
-    const clampX = (v) => Math.min(Math.max(EDGE, v), vw - pw - EDGE);
-    const clampY = (v) => Math.min(Math.max(EDGE, v), vh - ph - EDGE);
+    const clampX = (v) => clampN(v, EDGE, vw - pw - EDGE);
+    const clampY = (v) => clampN(v, EDGE, vh - ph - EDGE);
     let side;
     let px;
     let py;
@@ -310,28 +482,29 @@
     pop.style.left = `${px}px`;
     pop.style.top = `${py}px`;
     if (side === 'left' || side === 'right') {
-      pop.style.setProperty('--arrow-y', `${Math.min(Math.max(20, y + h / 2 - py), ph - 20)}px`);
+      pop.style.setProperty('--arrow-y', `${clampN(y + h / 2 - py, 20, ph - 20)}px`);
     } else if (side === 'top' || side === 'bottom') {
-      pop.style.setProperty('--arrow-x', `${Math.min(Math.max(20, x + w / 2 - px), pw - 20)}px`);
+      pop.style.setProperty('--arrow-x', `${clampN(x + w / 2 - px, 20, pw - 20)}px`);
     }
+    if (b) drawSketch({ x: px, y: py, w: pw, h: ph }, b);
   }
 
   function frame() {
     if (!_state) return;
-    if (!_state.moving) {
-      const r = targetRect(_state.steps[_state.i]);
+    if (!_state.moving && _state.cur) {
+      const r = rectOf(_state.cur.target);
       if (r) place(r);
     }
     _state.raf = requestAnimationFrame(frame);
   }
 
-  async function waitForTarget(step) {
+  async function waitForTarget(getSpec) {
     const t0 = Date.now();
     while (_state && Date.now() - t0 < WAIT_MAX_MS) {
-      if (targetRect(step)) return true;
+      if (rectOf(getSpec().target, { clip: false })) return true;
       await sleep(60);
     }
-    return !!(_state && targetRect(step));
+    return !!(_state && rectOf(getSpec().target, { clip: false }));
   }
 
   // 導覽代點：期間不算使用者點擊（不觸發 advanceOn）
@@ -349,61 +522,82 @@
     _state.moving = true;
     _state.root.classList.add('is-moving');
     const steps = _state.steps;
+    let cur = null;
     for (; i < steps.length; i++) {
-      const step = steps[i];
-      act(step.before);
-      if (await waitForTarget(step)) break;
+      act(spec(steps[i]).before);
+      const idx = i;
+      if (await waitForTarget(() => spec(steps[idx]))) { cur = spec(steps[i]); break; }
       if (!_state || token !== _state.token) return;
     }
     if (!_state || token !== _state.token) return;
     if (i >= steps.length) { end(); return; }
     _state.i = i;
-    const step = steps[i];
-    const n = q(step.scrollTo || (Array.isArray(step.target) ? step.target[0] : step.target));
+    _state.cur = cur;
+    if (cur.settle) await sleep(reduced() ? 0 : cur.settle);
+    if (!_state || token !== _state.token) return;
+    const n = q(cur.scrollTo || (Array.isArray(cur.target) ? cur.target[0] : cur.target));
     if (n && n.scrollIntoView) n.scrollIntoView({ block: 'nearest', behavior: reduced() ? 'auto' : 'smooth' });
     await sleep(reduced() ? 0 : 280);   // 等平滑捲動差不多停了再擺說明框
     if (!_state || token !== _state.token) return;
+    _state.cur = spec(steps[i]);         // 捲動、展開之後再定一次（resolve 看的是當下畫面）
     fillPop();
     _state.lastKey = '';
     _state.moving = false;
-    const r = targetRect(step);
+    const r = rectOf(_state.cur.target);
     if (r) place(r);
+    if (_state.cur.point) playSketch();
     _state.root.classList.remove('is-moving');
     _state.pop.focus({ preventScroll: true });
-    if (typeof announce === 'function') announce(`${t(`${step.key}Title`)}。${t(`${step.key}Body`)}`);
+    const textKey = _state.cur.textKey || _state.cur.key;
+    if (typeof announce === 'function') announce(`${t(`${textKey}Title`)}。${t(`${textKey}Body`)}`);
   }
 
-  // 「下一步」：這一步有代做的事（打開課程、回學期待辦）就先做，等畫面換完再前進；最後一步＝結束
-  async function next() {
+  // 前進到下一步（最後一步＝結束）；wait：先等多久再換（讓頁面或動畫演完）
+  function advance(wait) {
     if (!_state || _state.moving) return;
-    _state.moving = true;   // 代點換畫面那段等待也要擋住：連點兩下不能連跳兩步
-    _state.root.classList.add('is-moving');
-    const step = _state.steps[_state.i];
-    if (step.next) {
-      act(step.next);
-      await sleep(SETTLE_MS);
-      if (!_state) return;
-    }
-    if (_state.i >= _state.steps.length - 1) end();
-    else go(_state.i + 1);
-  }
-
-  // 使用者自己點了亮起來的元素：讓點擊照常生效（不 preventDefault），等頁面換完再前進
-  function onClick(e) {
-    if (!_state || _state.programmatic || _state.moving) return;
-    const step = _state.steps[_state.i];
-    if (!step.advanceOn || !e.target.closest || !e.target.closest(step.advanceOn)) return;
     _state.moving = true;
     _state.root.classList.add('is-moving');
     setTimeout(() => {
       if (!_state) return;
       if (_state.i >= _state.steps.length - 1) end();
       else go(_state.i + 1);
-    }, SETTLE_MS);
+    }, wait);
+  }
+
+  // 「下一步」：這一步有代做的事（打開課程）就先做，等畫面換完再前進
+  async function next() {
+    if (!_state || _state.moving) return;
+    const step = _state.cur;
+    if (step && step.next) {
+      _state.moving = true;   // 代點換畫面那段等待也要擋住：連點兩下不能連跳兩步
+      _state.root.classList.add('is-moving');
+      act(step.next);
+      await sleep(SETTLE_MS);
+      if (!_state) return;
+      _state.moving = false;
+    }
+    advance(0);
+  }
+
+  // 使用者自己點了亮起來的元素：讓點擊照常生效（不 preventDefault），等頁面換完再前進
+  function onClick(e) {
+    if (!_state || _state.programmatic || _state.moving || !_state.cur) return;
+    const sel = _state.cur.advanceOn;
+    if (!sel || !e.target.closest || !e.target.closest(sel)) return;
+    advance(SETTLE_MS);
+  }
+
+  // dashboard.js 的 due:action：使用者照著做完（改名提交、勾完成落地、拖曳落地）→ 自動下一步
+  function onAction(e) {
+    if (!_state || !_state.cur) return;
+    const type = e.detail && e.detail.type;
+    if (type === 'complete') _state.didComplete = true;   // 拖曳那步據此改成「把它拖回來」
+    if (_state.moving || type !== _state.cur.advanceEvent) return;
+    advance(type === 'rename' ? SETTLE_MS : EVENT_SETTLE_MS);
   }
 
   // Esc 結束導覽；在 capture 階段攔下，不讓 dashboard 的 Esc 另外去關別的東西。
-  // 焦點在輸入框（導覽中試著改課名）時 Esc 是「取消編輯」，交給輸入框，不結束導覽
+  // 焦點在輸入框（導覽中改課名）時 Esc 是「取消編輯」，交給輸入框，不結束導覽
   function onKey(e) {
     if (!_state || e.key !== 'Escape' || e.isComposing) return;
     const tgt = e.target;
@@ -413,19 +607,21 @@
     end();
   }
 
-  // opts.only：只走這些步驟（key 陣列，照 STEPS 的順序；'all'＝全部；省略＝DEFAULT_STEPS）；
-  // opts.from：從這一步開始（挑選頁預覽單步用）
+  // opts.only：只走這些步驟（key 陣列，照 STEPS 的順序；省略＝全部）；opts.from：從這一步開始（挑選頁預覽單步用）
   function start(opts = {}) {
     if (_state) end(true);
-    const only = opts.only === 'all' ? null
-      : (Array.isArray(opts.only) && opts.only.length ? opts.only : DEFAULT_STEPS);
+    const only = Array.isArray(opts.only) && opts.only.length ? opts.only : null;
     const steps = only ? STEPS.filter((s) => only.includes(s.key)) : STEPS.slice();
     if (!steps.length) return;
     const from = Math.max(0, steps.findIndex((s) => s.key === opts.from));
     const parts = build();
-    _state = { i: from, raf: 0, token: 0, lastKey: '', moving: false, programmatic: false, reveal: null, steps, ...parts };
+    _state = {
+      i: from, cur: null, raf: 0, token: 0, lastKey: '', moving: false, programmatic: false,
+      reveal: null, didComplete: false, steps, ...parts,
+    };
     document.addEventListener('click', onClick, true);
     document.addEventListener('keydown', onKey, true);
+    document.addEventListener('due:action', onAction);
     // 第一步直接到位、不從 (0,0) 滑進來：先關過渡，第一次擺好、forced reflow 後再打開
     parts.root.classList.add('no-anim');
     _state.raf = requestAnimationFrame(frame);
@@ -445,6 +641,7 @@
     setReveal(null);
     document.removeEventListener('click', onClick, true);
     document.removeEventListener('keydown', onKey, true);
+    document.removeEventListener('due:action', onAction);
     _state = null;
     root.classList.remove('is-open');
     root.classList.add('is-closing');   // 遮罩淡出期間就不再擋點擊
@@ -454,7 +651,7 @@
 
   // 換語言時說明框跟著換
   function applyLanguage() {
-    if (_state && !_state.moving) fillPop();
+    if (_state && !_state.moving && _state.cur) fillPop();
   }
 
   window.DueTour = { start, end, applyLanguage, isActive: () => !!_state, steps: () => STEPS.map((s) => s.key) };

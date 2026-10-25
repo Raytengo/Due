@@ -473,16 +473,94 @@
       pointer-events: none;
     }
 
-    /* 亮框：外面一圈超大陰影就是變暗的背景，框內透明、看得到底下真的介面；外加一圈淡橘光暈 */
+    /* 變暗層：SVG mask 挖洞（主亮框＋「指給你看」的第二個洞），洞跟著亮框一起滑 */
+    .tour-dim {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    .tour-dim-fill {
+      fill: rgba(20, 20, 19, 0.5);
+    }
+
+    .tour-hole {
+      transition: x var(--t-disclosure), y var(--t-disclosure), width var(--t-disclosure), height var(--t-disclosure);
+    }
+
+    /* 亮框：框內透明、看得到底下真的介面；細橘線外加一圈淡橘光暈 */
     .tour-ring {
       position: fixed;
       border-radius: 10px;
-      box-shadow:
-        0 0 0 1.5px var(--orange),
-        0 0 0 6px rgba(217, 119, 87, 0.16),
-        0 0 0 200vmax rgba(20, 20, 19, 0.5);
+      box-shadow: 0 0 0 1.5px var(--orange), 0 0 0 6px rgba(217, 119, 87, 0.16);
       pointer-events: none;
       transition: left var(--t-disclosure), top var(--t-disclosure), width var(--t-disclosure), height var(--t-disclosure);
+    }
+
+    /* 「指給你看」的第二個洞：虛線框，不是要點的地方 */
+    .tour-ring2 {
+      position: fixed;
+      border: 1.5px dashed var(--orange);
+      border-radius: 10px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity var(--t-fade);
+    }
+
+    .tour-root.has-point .tour-ring2 {
+      opacity: 1;
+    }
+
+    /* 手繪繞圈箭頭＋小字（從說明框指到第二個洞） */
+    .tour-sketch {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+      pointer-events: none;
+      opacity: 0;
+    }
+
+    .tour-root.has-point .tour-sketch {
+      opacity: 1;
+    }
+
+    .tour-root.is-moving .tour-sketch {
+      opacity: 0;
+      transition: opacity var(--t-fade);
+    }
+
+    .tour-sketch-line {
+      fill: none;
+      stroke: var(--orange);
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .tour-sketch-halo {
+      fill: none;
+      stroke: var(--bg);
+      stroke-opacity: 0.55;
+      stroke-width: 6;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    /* 小字：米白描邊墊在字後面（paint-order），壓在變暗的介面上也讀得到 */
+    .tour-sketch-label {
+      fill: var(--orange);
+      stroke: var(--bg);
+      stroke-width: 4px;
+      stroke-linejoin: round;
+      paint-order: stroke;
+      font-family: 'Source Serif 4', Georgia, serif;
+      font-style: italic;
+      font-size: 15px;
+      dominant-baseline: middle;
     }
 
     /* 這一步看就好（主畫面、圓餅、⚙）：亮框裡也不給點 */
@@ -528,6 +606,7 @@
     }
 
     .tour-root.no-anim .tour-ring,
+    .tour-root.no-anim .tour-hole,
     .tour-root.no-anim .tour-pop {
       transition: none;
     }
@@ -5052,6 +5131,10 @@
       .tour-ring,
       .tour-pop {
         transition: opacity var(--t-fade);
+      }
+
+      .tour-hole {
+        transition: none;
       }
 
       .tour-root.is-moving .tour-pop {

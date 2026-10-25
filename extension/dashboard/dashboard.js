@@ -2870,6 +2870,12 @@ function showGridView() {
 }
 
 // ── 課程重命名（inline edit）──
+// 使用者完成了某個操作 → 發 due:action（互動導覽 tour.js 聽這個「做完就自動到下一步」；沒人聽就沒事）
+// type：'rename'（詳情改課名提交）｜'complete'（詳情列勾完成落地）｜'drag'（拖曳／鍵盤移動落地，detail.to＝落到哪一區）
+function emitDueAction(type, extra = {}) {
+  document.dispatchEvent(new CustomEvent('due:action', { detail: { type, ...extra } }));
+}
+
 function startCourseRename(courseId) {
   const textSpan = document.querySelector('.detail-name .detail-name-text');
   const renameBtn = document.querySelector('.btn-rename-course');
@@ -2912,6 +2918,7 @@ function startCourseRename(courseId) {
     if (refocus) refocusPencil();
 
     persistCourseName(courseId, newName, course);
+    emitDueAction('rename');
     // 側欄只就地換這一課的名字，不整段 renderNav：失焦提交發生在側欄按鈕的 mousedown，
     // 整段重建會讓隨後的 click 落到新按鈕上而被吞掉、切不了課（QA #166）；Tab 到側欄項的焦點也因此不會被拆掉（#8）
     setNavCourseNameText(courseId, displayName);
@@ -3125,6 +3132,7 @@ function finishComplete(item, id, cid) {
   const list = item.closest('.detail-assignments-list');
   const view = item.closest('.course-detail-view');
   if (!item.isConnected || !list || !view) return;  // 撤銷窗內整段重繪過（換課等）→ 節點已不在畫面上
+  emitDueAction('complete');
   const scroller = scrollParentOf(item);
 
   // ① 焦點交接：下一列，沒有就上一列，再沒有就清單標題（#1）
@@ -3986,6 +3994,7 @@ function commitDrag(ctx, { viaKeyboard = false } = {}) {
   const said = { list: 'a11yMovedToList', done: 'a11yMovedToDone', hidden: 'a11yMovedToHidden' }[lands || to];
   announce(tr(said).replace('{name}', name));
   settleClone(ctx, landed, { flash: true });
+  emitDueAction('drag', { to: lands || to });
 }
 
 // 移動後的焦點落點：落地列的握把 → 同區最近一列有握把的（找不到落地列時，QA #178）→ 該區的標題／開關
@@ -5149,13 +5158,13 @@ if (menuOpenTutorial) {
   });
 }
 
-// ?tour=1：直接開互動導覽（預設步驟）；?tour=all：全部步驟；?tour=sync,course,check：只走這幾步；&tourFrom=check：從這一步開始
+// ?tour=1：直接開互動導覽；?tour=course,check：只走這幾步；&tourFrom=check：從這一步開始
 // （dev harness 與挑選頁 dev/tour-review.html 用）。tour.js 在 dashboard.js 之後才載入：到 timer 裡才查得到 DueTour
 (() => {
   const params = new URLSearchParams(location.search);
   const tour = params.get('tour');
   if (!tour) return;
-  const only = tour === '1' ? null : tour === 'all' ? 'all' : tour.split(',').filter(Boolean);
+  const only = tour === '1' ? null : tour.split(',').filter(Boolean);
   setTimeout(() => {   // 也等第一次 render 把側欄課程列畫出來
     if (typeof DueTour !== 'undefined') DueTour.start({ only, from: params.get('tourFrom') });
   }, 600);
