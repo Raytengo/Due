@@ -2596,17 +2596,73 @@ function startSidebarRename(courseId) {
   input.addEventListener('blur', () => commitOnBlur(input, () => committed, () => { committed = true; }, commit));
 }
 
-// ── 完成過渡動畫：3 秒撤銷窗口 → 碎點爆 ──
-function rerenderDetailAndNav(cid) {
+// ── 完成後的補位滑動（FLIP）──
+// 爆開的那筆移除後，其餘的列／卡從原位置滑到新位置，不是一格跳上去。做法：重繪前記下每個葉元素的位置（key 對應新舊節點），
+// 重繪後量新位置，有位移的用 WAAPI 從舊位置滑回（id 'reflow'，isUiIdle 據此等它跑完）。
+// 只動葉元素（列、描述、已隱藏區／週卡、分組標題），不動它們的容器，避免父子位移疊加
+const REFLOW_MS = 420;                                  // owner 2026-10-25：原本是瞬間跳位，要長一點看起來才順
+const REFLOW_EASING = 'cubic-bezier(0.2, 0, 0, 1)';      // 快出慢收，尾段輕輕落位
+const DETAIL_REFLOW_SEL = '.detail-assignments-list > .assignment-item, .detail-assignments-list > .assignment-desc, .hidden-items';
+const WEEK_REFLOW_SEL = '.week-task-card[data-assignment-id], .week-group-title';
+
+function detailReflowKey(el) {
+  if (el.classList.contains('hidden-items')) return 'hidden';
+  if (el.classList.contains('assignment-desc')) {
+    const row = el.previousElementSibling;
+    return row && row.dataset.hideableId ? `d:${row.dataset.hideableId}` : null;
+  }
+  return el.dataset.hideableId ? `a:${el.dataset.hideableId}` : null;
+}
+
+function weekReflowKey(el) {
+  if (el.classList.contains('week-group-title')) {
+    const g = el.closest('.week-group');
+    return g ? `g:${g.dataset.group}` : null;
+  }
+  return `w:${el.dataset.assignmentId}`;
+}
+
+function flipSnapshot(root, selector, keyOf) {
+  if (!root || prefersReducedMotion()) return null;
+  const first = new Map();
+  root.querySelectorAll(selector).forEach((el) => {
+    const k = keyOf(el);
+    if (k && el.getClientRects().length) first.set(k, el.getBoundingClientRect());
+  });
+  return first;
+}
+
+function flipPlay(root, selector, keyOf, first) {
+  if (!root || !first || !first.size) return;
+  root.querySelectorAll(selector).forEach((el) => {
+    const old = first.get(keyOf(el));
+    if (!old || typeof el.animate !== 'function') return;
+    const now = el.getBoundingClientRect();
+    const dx = old.left - now.left;
+    const dy = old.top - now.top;
+    if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;   // 次像素的漂移（標題計數換字）不值得播
+    el.animate(
+      [{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }],
+      { duration: REFLOW_MS, easing: REFLOW_EASING, id: 'reflow' }
+    );
+  });
+}
+
+// ── 完成過渡動畫：撤銷窗口 → 碎點爆 → 補位滑動 ──
+// flip：完成收尾的重繪才滑動（拖曳等其他呼叫端有自己的落點動畫）
+function rerenderDetailAndNav(cid, { flip = false } = {}) {
   const { courses = [], assignments = {}, assignmentGroups = {}, scores = {} } = _currentData;
   const course = courses.find((c) => c.id === cid);
   // 只在仍停留於該課詳情時重繪詳情：延遲 callback（碎點爆後重繪等）觸發時使用者可能已換課／離開，
   // 不能把舊課程畫回容器（QA #113）
   if (course && currentView === 'course' && currentCourseId === cid) {
+    const root = document.getElementById('course-detail-container');
+    const first = flip ? flipSnapshot(root, DETAIL_REFLOW_SEL, detailReflowKey) : null;
     // 保留成績計算器、已隱藏區、展開的描述與捲動（勾選完成、拖曳都走這裡，整段重繪會把它們收起）
     const st = captureViewState();
     renderCourseDetailSection(course, assignments[cid] || [], assignmentGroups[cid] || [], scores);
     restoreViewState(st);
+    flipPlay(root, DETAIL_REFLOW_SEL, detailReflowKey, first);   // 量的是還原捲動之後的位置
   }
   renderNav(courses, assignments);
   updateSideNav();   // 升級/降級、完成勾選後同步刷新側欄頂部計數（待辦/已完成）
@@ -2663,7 +2719,7 @@ function finishComplete(item, id, cid) {
   const key = `${id}:burst`;
   _completeTimers[key] = setTimeout(() => {
     delete _completeTimers[key];
-    settleCompletion(() => rerenderDetailAndNav(cid));
+    settleCompletion(() => rerenderDetailAndNav(cid, { flip: true }));
   }, COMPLETE_BURST_MS);
 }
 
@@ -2682,11 +2738,14 @@ function cancelComplete(item, id, cid) {
 
 // ── 週卡片完成過渡（平行於 assignment-item 版；共用 COMPLETE_* 常數與 spawnBurstDots）──
 // fromCommit：由週卡完成 commit 觸發的重繪（renderWeekSection 據此判斷要不要播「全部完成」慶祝）
-function rerenderWeekAndNav(fromCommit = false) {
+function rerenderWeekAndNav(fromCommit = false, { flip = false } = {}) {
   const { courses = [], assignments = {} } = _currentData;
   // 只在仍停留於週待辦版面時重繪週 section（延遲 callback 觸發時可能已切頁／進詳情，QA #113）
   if (currentView === 'grid' && currentPage === 'week' && !showSubmitted) {
+    const root = document.getElementById('main-section');
+    const first = flip ? flipSnapshot(root, WEEK_REFLOW_SEL, weekReflowKey) : null;
     renderWeekSection(courses, assignments, fromCommit);
+    flipPlay(root, WEEK_REFLOW_SEL, weekReflowKey, first);
   }
   updateSideNav();
   renderNav(courses, assignments);
@@ -2718,7 +2777,7 @@ function finishCompleteWeek(card, id, cid) {
   const key = `${id}:burst`;
   _completeTimers[key] = setTimeout(() => {
     delete _completeTimers[key];
-    settleCompletion(() => rerenderWeekAndNav(true));
+    settleCompletion(() => rerenderWeekAndNav(true, { flip: true }));
   }, COMPLETE_BURST_MS);
 }
 
@@ -4357,6 +4416,8 @@ function isUiIdle() {
   // 下次重繪才被換掉——不能讓這種殘留一直擋住即時刷新
   const busy = document.querySelectorAll('.completing, .bursting, .drag-clone, .page-slider');
   if ([...busy].some((el) => el.getClientRects().length)) return false;
+  // 完成後的補位滑動還在跑：這時整段重繪會讓列一格跳到終點
+  if (document.getAnimations && document.getAnimations().some((a) => a.id === 'reflow' && a.playState === 'running')) return false;
   // 課程 morph（0.28s）期間共享元素帶 view-transition-name，finished 後清掉；
   // transition 中斷沒清到的殘留不能永遠擋住刷新 → 同一段連續看到超過 2 秒就不再算進行中
   if (document.querySelector('[style*="view-transition-name"]')) {
