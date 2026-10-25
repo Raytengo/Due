@@ -2612,17 +2612,35 @@ function rerenderDetailAndNav(cid) {
   updateSideNav();   // 升級/降級、完成勾選後同步刷新側欄頂部計數（待辦/已完成）
 }
 
+// 撤銷窗口的「↩ 撤銷」：疊在 due 標籤的原位，due 只設 visibility:hidden（保留原本的空間）。
+// 不可把 hint 插進版面：詳情列的右欄是直排 flex，多一行會把列撐高約 30px、下面的列整排被推開；
+// 週卡把 due 換成較高的 hint 也會長高約 6px。host 必須是定位元素（.completing 的列／週卡皆是）。
+// align：'right'＝貼齊 due 的右緣（詳情列右欄靠右對齊）、'left'＝貼齊左緣（週卡）
+function showUndoHint(host, due, align) {
+  if (!due || host.querySelector('.complete-undo-hint')) return;
+  const hb = host.getBoundingClientRect();
+  const db = due.getBoundingClientRect();
+  const hint = document.createElement('div');
+  hint.className = 'complete-undo-hint';
+  hint.textContent = '↩ ' + tr('undoComplete');
+  hint.style.top = `${db.top - hb.top - host.clientTop + db.height / 2}px`;
+  if (align === 'right') hint.style.right = `${hb.right - db.right - (hb.width - host.clientWidth - host.clientLeft)}px`;
+  else hint.style.left = `${db.left - hb.left - host.clientLeft}px`;
+  due.style.visibility = 'hidden';
+  host.appendChild(hint);
+}
+
+function hideUndoHint(host, due) {
+  const hint = host.querySelector('.complete-undo-hint');
+  if (hint) hint.remove();
+  if (due) due.style.visibility = '';
+}
+
 function beginComplete(item, id, cid) {
   const chk = item.querySelector('.assignment-check');
   if (chk) { chk.dataset.done = 'true'; chk.setAttribute('aria-label', tr('markUndone')); } // 不重繪，手動點綠
   item.classList.add('completing');
-  const right = item.querySelector('.assignment-right');
-  if (right && !right.querySelector('.complete-undo-hint')) {
-    const hint = document.createElement('div');
-    hint.className = 'complete-undo-hint';
-    hint.textContent = '↩ ' + tr('undoComplete');
-    right.insertBefore(hint, right.firstChild);
-  }
+  showUndoHint(item, item.querySelector('.assignment-right .due-label'), 'right');
   // 底部撤銷倒數條：3 秒縮短歸零 → 觸發爆開（時長依 COMPLETE_DELAY_MS）
   if (!item.querySelector('.complete-countdown')) {
     const bar = document.createElement('div');
@@ -2655,8 +2673,7 @@ function cancelComplete(item, id, cid) {
   revertCompletion(id, cid);
   // 就地還原（不整段重繪，避免影響其他進行中的動畫）
   item.classList.remove('completing');
-  const hint = item.querySelector('.complete-undo-hint');
-  if (hint) hint.remove();
+  hideUndoHint(item, item.querySelector('.assignment-right .due-label'));
   const bar = item.querySelector('.complete-countdown');
   if (bar) bar.remove();
   if (chk) { chk.dataset.done = 'false'; chk.setAttribute('aria-label', tr('markDone')); }
@@ -2679,15 +2696,7 @@ function beginCompleteWeek(card, id, cid) {
   const chk = card.querySelector('.assignment-check');
   if (chk) { chk.dataset.done = 'true'; chk.setAttribute('aria-label', tr('markUndone')); }
   card.classList.add('completing');
-  // due 文字位置換成「↩ 撤銷」hint（沿用 .complete-undo-hint 樣式）
-  const due = card.querySelector('.week-task-due');
-  if (due && !card.querySelector('.complete-undo-hint')) {
-    due.style.display = 'none';
-    const hint = document.createElement('div');
-    hint.className = 'complete-undo-hint';
-    hint.textContent = '↩ ' + tr('undoComplete');
-    due.parentNode.insertBefore(hint, due);
-  }
+  showUndoHint(card, card.querySelector('.week-task-due'), 'left');   // 疊在 due 原位，卡片高度不變
   if (!card.querySelector('.complete-countdown')) {
     const bar = document.createElement('div');
     bar.className = 'complete-countdown';
@@ -2718,10 +2727,7 @@ function cancelCompleteWeek(card, id, cid) {
   const chk = card.querySelector('.assignment-check');
   revertCompletion(id, cid);
   card.classList.remove('completing');
-  const hint = card.querySelector('.complete-undo-hint');
-  if (hint) hint.remove();
-  const due = card.querySelector('.week-task-due');
-  if (due) due.style.display = '';
+  hideUndoHint(card, card.querySelector('.week-task-due'));
   const bar = card.querySelector('.complete-countdown');
   if (bar) bar.remove();
   if (chk) { chk.dataset.done = 'false'; chk.setAttribute('aria-label', tr('markDone')); }

@@ -1128,14 +1128,18 @@
       background: var(--orange);
       transform-origin: left;
     }
+    /* 疊在 due 標籤原位（showUndoHint 算 top／left／right），不佔版面：撤銷窗口期間列／卡的高度不變 */
     .complete-undo-hint {
+      position: absolute;
+      z-index: 1;
+      transform: translateY(-50%);
+      white-space: nowrap;
       font-family: 'DM Mono', monospace;
       font-size: 12px;
       color: var(--orange);
       background: var(--surface);
       border-radius: 999px;
       padding: 2px 10px;
-      margin-bottom: 4px;
     }
     .complete-burst-dot {
       position: absolute;
