@@ -1669,7 +1669,7 @@
        內容從 2px 模糊清晰（blur.disclosure），三者與 chevron 同一個 transition.disclosure，讀起來是同一個動作。
        收合時 visibility:hidden（面板裡的連結、輸入框不在 Tab 順序裡，A17）：
        打開那一邊 visibility 立刻生效（0s，鍵盤移動後焦點要能馬上落進去，#6）；收合等淡出跑完才藏。
-       拖曳降級時（.drop-active）稽核清單也走同一個開合，不再硬切 */
+       拖曳中收合區維持收合（只亮起外框當放置目標，展開一長串已完成會很亂，spec 2026-10-25） */
     .detail-right-panel {
       interpolate-size: allow-keywords;
     }
@@ -1684,7 +1684,7 @@
       transition: height var(--t-disclosure), opacity var(--t-disclosure), filter var(--t-disclosure), visibility var(--t-disclosure);
     }
 
-    :is(.assignment-desc.open, .grade-calc.open .grade-calc-body, .detail-fold.open .fold-list, .detail-fold.drop-active .fold-list) {
+    :is(.assignment-desc.open, .grade-calc.open .grade-calc-body, .detail-fold.open .fold-list) {
       height: auto;
       opacity: 1;
       filter: none;
@@ -3615,7 +3615,6 @@
     }
     .detail-fold.drop-active::after { padding: 8px 0 2px; }
 
-    /* 降級拖曳中：即使稽核區收合，也展開列表作為放置目標——走「展開面板」共用規則的開合（#28），不硬切 */
 
     /* 落點：clone 飛入、快到時與落地列交叉淡換（settleClone 以 inline opacity 處理，#41），落地後淡橘閃一下 */
     .drag-arrived {
@@ -4811,7 +4810,7 @@
         transition: opacity var(--t-disclosure), filter var(--t-disclosure), visibility var(--t-disclosure);
       }
 
-      :is(.assignment-desc.open, .grade-calc.open .grade-calc-body, .detail-fold.open .fold-list, .detail-fold.drop-active .fold-list) {
+      :is(.assignment-desc.open, .grade-calc.open .grade-calc-body, .detail-fold.open .fold-list) {
         transition: opacity var(--t-disclosure), filter var(--t-disclosure), visibility 0s;
       }
 

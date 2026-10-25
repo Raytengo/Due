@@ -3962,14 +3962,12 @@ function commitDrag(ctx, { viaKeyboard = false } = {}) {
   const scroller = container.querySelector('.detail-right-panel');
   // 落點以寫入後的實際狀態為準（拖曳期間考試可能剛結束，QA #178）
   const lands = !item ? null : isHidden(item) ? 'hidden' : isDone(item) ? 'done' : 'list';
-  // 收合區開合：落點那一區強制展開（讓使用者看到落點），其餘維持拖曳前狀態。
-  // 新節點直接到位、不重播展開（instant）：重繪前畫面上它本來就開著（拖曳前開著，或拖曳中 .drop-active 已把它展開）；
-  // 鍵盤移動、原本收著的情況也直接打開——落點列要在這一幀就有最終位置，scrollIntoView 與 clone 的飛行才量得對
-  // （高度還在 0 時，清單裡的列被 overflow:clip 裁掉、不算進捲動範圍，捲不到落點）
+  // 收合區維持拖曳前的開合（拖曳中、落地後都不自動展開：已完成很多項時展開一長串很亂，spec 2026-10-25）。
+  // 重繪後的新節點從 height 0 起算 → 本來開著的以 instant 還原，不重播展開
   const hidden = container.querySelector('.hidden-items');
-  if (hidden && (hiddenWasOpen || lands === 'hidden')) setFoldOpen(hidden, true, { instant: true });
+  if (hidden && hiddenWasOpen) setFoldOpen(hidden, true, { instant: true });
   const doneZone = container.querySelector('.done-items');
-  if (doneZone && (doneWasOpen || lands === 'done')) setFoldOpen(doneZone, true, { instant: true });
+  if (doneZone && doneWasOpen) setFoldOpen(doneZone, true, { instant: true });
   // 重繪會重置捲動位置 → 還原；在展開之後：先還原的話，收著的新清單會把 scrollTop 夾小
   if (scroller) scroller.scrollTop = savedScroll;
 
@@ -3981,10 +3979,31 @@ function commitDrag(ctx, { viaKeyboard = false } = {}) {
     const chk = container.querySelector(`${lands === 'done' ? '.done-items' : '.detail-assignments-list'} .assignment-check[data-assignment-id="${cssId}"]`);
     landed = chk && chk.closest('.assignment-item');
   }
-  if (keepFocus) focusAfterMove(container, landed, lands || to);
+  // 落進收著的區：列看不到 → clone 原地淡出，改閃那一區的標題（計數已更新），焦點交給標題（收著的列 visibility:hidden，聚焦不上）
+  const fold = landed && landed.closest('.detail-fold');
+  const collapsed = !!fold && !fold.classList.contains('open');
+  if (keepFocus) {
+    if (collapsed) fold.querySelector('.fold-toggle').focus({ preventScroll: true });
+    else focusAfterMove(container, landed, lands || to);
+  }
   const said = { list: 'a11yMovedToList', done: 'a11yMovedToDone', hidden: 'a11yMovedToHidden' }[lands || to];
   announce(tr(said).replace('{name}', name));
-  settleClone(ctx, landed, { flash: true });
+  if (collapsed) {
+    settleClone(ctx, null, { flash: false });
+    flashFoldHead(fold);
+  } else {
+    settleClone(ctx, landed, { flash: true });
+  }
+}
+
+// 落點在收著的區：那一區的標題閃一下（同 drag-arrived 的淡橘），看得出東西放進去了
+function flashFoldHead(fold) {
+  const head = fold.querySelector('.fold-toggle');
+  if (!head) return;
+  head.classList.remove('drag-arrived');
+  head.getBoundingClientRect();   // forced reflow：連續放進同一區時重播閃示
+  head.classList.add('drag-arrived');
+  setTimeout(() => head.classList.remove('drag-arrived'), 900);
 }
 
 // 移動後的焦點落點：落地列的握把 → 同區最近一列有握把的（找不到落地列時，QA #178）→ 該區的標題／開關
@@ -4073,7 +4092,7 @@ function abortActiveDrag() {
 
 // 「已完成」「已隱藏」區開合（按鈕點擊與拖曳／鍵盤移動後強制展開共用）：切 .open 並同步開關的 aria-expanded——
 // 鍵盤使用者要靠它知道裡面的列現在 Tab 得到（#6）。
-// instant：重繪後還原「畫面上本來就開著」的清單（拖曳中 .drop-active 已把它展開、或拖曳前就開著）——
+// instant：重繪後還原「畫面上本來就開著」的清單（拖曳前就開著、即時刷新前開著）——
 // 新節點從 height 0 起算，不跳過過渡的話整段清單會在落點前重新長一次，落點也會量在展開途中（#28／#41）
 function setFoldOpen(wrap, open, { instant = false } = {}) {
   const list = instant ? wrap.querySelector('.fold-list') : null;
