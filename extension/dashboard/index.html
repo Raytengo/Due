@@ -3621,31 +3621,47 @@
        具名 deviation（#39）：group 曲線保留 cubic-bezier(0.22,1,0.36,1)（≈ ease.out）、0.28s。
        B2 對 morph 的角色曲線是 ease.inOut、recipe 是 spring.dialog 750ms，但這是高頻 drill-down，
        起步慢的曲線看起來像延遲、750ms 又太長。減少動態時 JS 不命名共享元素（見 setMorphName），只剩 root crossfade。 */
-    ::view-transition-group(course-shell),
-    ::view-transition-group(course-code),
-    ::view-transition-group(course-name),
-    ::view-transition-group(course-badge),
-    ::view-transition-group(course-meta) {
-      animation-duration: 0.28s;
-      animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+    ::view-transition-group(course-shell) {
+      /* 具名 deviation：Apple 系統動畫常用的 cubic-bezier(0.32,0.72,0,1)（起步快、收尾長而柔），0.36s */
+      animation-duration: 0.36s;
+      animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+      /* 外框：快照不縮放（object-fit:none，貼左上），只有 group 的框在長大／縮小，內容在框裡被裁切。
+         框線（1px 的 box-shadow 環）、陰影、底色畫在 group 上；dashboard.js startMorph 會用 WAAPI 讓它們
+         從出發那一端的實際樣子連續變到抵達那一端（hover 的橘框 → 詳情的灰框＋陰影）。這裡是動畫沒接上時的後備 */
+      overflow: clip;
+      border-radius: 8px;
+      background: var(--surface);
+      box-shadow: 0 0 0 1px var(--border);
     }
 
+    /* 不閃（2026-10-25，比照 macOS）：框裡墊著實心的 --surface（卡片與詳情同色），舊內容很快淡出、新內容稍後淡入，
+       中間露出的是同色的卡片底，不是頁面底色，也不會兩種版面的字疊在一起。VT 預設的 plus-lighter 混合會在
+       兩層交疊時變亮，一律改成 normal。文字全程原尺寸、不縮放（#16） */
     ::view-transition-old(course-shell),
     ::view-transition-new(course-shell) {
-      animation-duration: 0.22s;
+      /* 快照維持自己的原尺寸、貼在框的左上角（不縮放），框長大時多出來的部分露出 group 的實心底 */
+      width: auto;
+      height: auto;
+      mix-blend-mode: normal;
+      /* 快照自己的 1px 框線（與 hover 的陰影）裁掉：不然卡片的框會變成大框裡面的第二個小框；
+         框線只由 group 畫（見上方，會從出發端的樣子連續變到抵達端） */
+      clip-path: inset(1px round 7px);
     }
 
-    ::view-transition-old(course-code),
-    ::view-transition-old(course-name),
-    ::view-transition-old(course-badge),
-    ::view-transition-old(course-meta),
-    ::view-transition-new(course-code),
-    ::view-transition-new(course-name),
-    ::view-transition-new(course-badge),
-    ::view-transition-new(course-meta) {
-      animation-duration: 0.18s;
-      height: 100%;
-      overflow: hidden;
+    ::view-transition-old(course-shell) {
+      animation: vt-fade-away 0.1s ease-out both;
+    }
+
+    ::view-transition-new(course-shell) {
+      animation: vt-fade-over 0.2s cubic-bezier(0.32, 0.72, 0, 1) 0.06s both;
+    }
+
+    @keyframes vt-fade-away {
+      to { opacity: 0; }
+    }
+
+    @keyframes vt-fade-over {
+      from { opacity: 0; }
     }
 
     /* Sidebar: 不参与动画，保持静止 */
@@ -3658,25 +3674,18 @@
       animation: none;
     }
 
-    /* 页面其余部分：快速切换，不干扰 morph 动画 */
+    /* 頁面其餘部分：同一個原則——舊的不淡出、新的淡入蓋上去（normal 混合），整頁不會先變空再出現 */
+    ::view-transition-old(root),
+    ::view-transition-new(root) {
+      mix-blend-mode: normal;
+    }
+
     ::view-transition-old(root) {
-      animation: vt-root-out 0.08s ease forwards;
+      animation: none;
     }
 
     ::view-transition-new(root) {
-      animation: vt-root-in 0.1s ease 0.05s both;
-    }
-
-    @keyframes vt-root-out {
-      to {
-        opacity: 0;
-      }
-    }
-
-    @keyframes vt-root-in {
-      from {
-        opacity: 0;
-      }
+      animation: vt-fade-over 0.24s cubic-bezier(0.32, 0.72, 0, 1) both;
     }
 
     /* ── Weight Edit Modal ── */

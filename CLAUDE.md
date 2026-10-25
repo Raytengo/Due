@@ -174,7 +174,7 @@ GET /api/v1/accounts/self、/api/v1/accounts/:account_id
 
 ### 動效規範（2026-10-23 動效審查）
 
-來源：`docs/motion-review-2026-10-22.md`（52 條，依 Animate UI skill 規則）＋實作 spec `docs/superpowers/specs/2026-10-23-motion-review-implementation-design.md`。除 #16（卡片↔詳情 morph 的文字拉扯）外全做；#7 只做作業描述；#21 重新設計；N1（語言子選單點擊開關）、N2（modal 不吃背景點擊＋草稿）為新增。
+來源：`docs/motion-review-2026-10-22.md`（52 條，依 Animate UI skill 規則）＋實作 spec `docs/superpowers/specs/2026-10-23-motion-review-implementation-design.md`。全做（#16 卡片↔詳情 morph 的文字拉扯原本暫緩，2026-10-25 補做：改成只 morph 外框、文字不縮放，見「頁面切換動畫」）；#7 只做作業描述；#21 重新設計；N1（語言子選單點擊開關）、N2（modal 不吃背景點擊＋草稿）為新增。
 
 - **Token（#39）**：`index.html`／`popup.html` 的 `:root` 定義 `--ease-*`（color／out／soft／in-out／ring／draw／away）、`--t-*`（color 200、fade 200、swap 150、reveal 300、menu 220、disclosure 350、check 300、overlay 400、dialog-fade 400、dismiss 200 ms）、`--spring-press`／`--spring-highlight`／`--reflow`／`--spring-selection`／`--spring-dialog`（spring 轉好的 CSS `linear()`）、`--ring`／`--ring-tick`（進度環，使用者拍板的 0.8s `cubic-bezier(0.16,1,0.3,1)`，只命名不改值）、`--lift`（-2px）、`--scale-press` 0.97／`--scale-choice` 0.985／`--scale-menu` 0.9（popup 只帶用得到的子集，同名同值）。`dashboard.js` 的 `MOTION` 是 JS 鏡像（每個 token 為 `{duration, easing}`，WAAPI 直接當 options；`cssTransition(prop, token)` 產 inline transition 字串；setTimeout 讀 `.duration`）——**改一邊要改另一邊**，呼叫端不另寫時長
 - **減少動態**：JS 一律問 `reduceMotion()`（每次即時讀 media query，系統設定中途切換也跟得上）；CSS 在 `index.html` 檔尾一個 `prefers-reduced-motion` 區塊。詳見下方 Dashboard「減少動態效果」
@@ -282,7 +282,7 @@ sidebar（300px）+ main-content（flex:1）
 - 右側：2 欄 task cards，依緊急度分區塊顯示（`.week-group[data-group]`）；分組委派 `taskRules.urgency`
 - **置頂「已逾期 (N)」區**（紅橘 `color-overdue`）：只收 30 天窗內逾期未繳（`taskRules.isWithinOverdueWindow`），排序最近錯過的在最上；窗外逾期不進待辦（只在課程詳情可見），側欄待辦數（`updateSideNav` weekCount）＝未來三組＋窗內逾期，與列表一致
 - 每張週卡片右上角有完成勾選圈（含逾期卡）：勾選走 1.5 秒撤銷窗口 → 就地離場（`beginCompleteWeek`／`cancelCompleteWeek`／`finishCompleteWeek`，與課程詳情列共用撤銷窗視覺、出場層、FLIP 補位與碎點，見下方「完成標記」），窗口內點卡片任意處可取消
-- 點擊 task card（非勾選圈、非撤銷窗口）→ View Transitions API morph 展開對應課程詳情（課名對課名配對，作業名不命名，#17）
+- 點擊 task card（非勾選圈、非撤銷窗口）→ View Transitions API morph 展開對應課程詳情（只有外框 morph，內容原地交叉淡換）
 
 **課程頁（Courses）：**
 - 3 欄課程卡片 grid，依最近截止日期排序
@@ -421,7 +421,7 @@ sidebar（300px）+ main-content（flex:1）
 
 **頁面切換動畫：**
 - 學期待辦 ↔ 課程（#15）：`switchPage` 直接畫出目標頁，新頁以 WAAPI 淡入＋12px 水平位移（`MOTION.panelIn` 300ms，方向依頁序，無 fill）——**沒有 slider、沒有 innerHTML 字串複製、沒有收尾 timer、不用 rAF**，切換期間點擊不會失效；再按一次直接取消進行中的動畫（`_pageAnim`）。`settlePageSwitch()`（goToPage／進詳情／popstate）讓進行中的淡入立即落定。原本 470ms 的 `.page-slider` 連同 QA 對它的修正（巢狀 slider、收尾 timer 晚到重畫，QA #192／#199）一起移除——那些問題在這版不存在
-- 課程卡片 ↔ 詳情：View Transitions API morph（0.28s，命名元素：`course-shell`、`course-code`、`course-name`、`course-badge`、`course-meta`）。從週卡開詳情時課名對課名配對、作業名不命名（#17）
+- 課程卡片 ↔ 詳情：View Transitions API morph（0.36s，`cubic-bezier(0.32,0.72,0,1)`，比照 macOS 系統動畫）。**只命名外框 `course-shell`**（2026-10-25，#16）：快照 `object-fit:none` 貼左上、文字全程原尺寸不縮放；group 墊實心 `--surface`（卡片與詳情同色）、裁切內容；**框線、陰影、底色只由 group 畫**：`startMorph` 量出發端（例如 hover 中的橘框＋陰影）與抵達端（詳情的灰框＋陰影）的實際樣子，以 WAAPI（`pseudoElement: '::view-transition-group(course-shell)'`，`MORPH_SHELL` 與 CSS 的 0.36s 同步）連續變過去，轉場結束即 cancel；快照維持原尺寸貼左上（`width/height:auto`），並以 `clip-path: inset(1px round 7px)` 裁掉自己的框線與陰影——否則卡片的框會變成大框裡的第二個小框、淡出時框線消失、詳情出現時才突然冒出來；舊內容 0.1s 淡出、新內容延遲 60ms 淡入，中間露出的是同色卡片底。**不閃**：所有 old/new 一律 `mix-blend-mode: normal`（VT 預設的 plus-lighter 在兩層交疊時會變亮）；root 的舊畫面不淡出、新畫面淡入蓋上去（不會兩層同時半透明露出頁面底色——舊版 root 80ms 淡出＋延遲淡入正是閃一下的來源）。課名、課號、badge、件數不再各自命名（點陣圖放大會糊、卡）
 - **焦點與返回（#2／#27）**：開詳情時焦點在 VT update 裡移到詳情標題 `.detail-name-text`（tabindex=-1，`focusDetailHeading`，preventScroll 不打斷 morph）；回清單時還給來源週卡／課程卡／側欄課程項（`_detailOrigin.focusSel`，找不到落在 `#page-title`）。從週卡開的詳情按 Back：`.week-right` 捲回開詳情前的位置，該卡在可視範圍內才 morph 回它，否則詳情原地淡出（`returnMorphTarget`）
 - **導覽狀態同步設定**：`showCourseDetail`／`showGridView` 在呼叫當下就設好 `currentView`／`currentCourseId`，VT callback 只負責畫，晚到時若狀態已被後來的導覽改掉就略過（連點兩門課、morph 中途 Back／點側欄）。進行中的那一段記在 `_morph`（`startMorph`，#42）：舊 transition 的 finished 清理只清自己命名的元素，不會把下一段剛設好的名字清掉；開新 morph 前 `clearStaleMorphNames()` 清掉進行中那段殘留的名字（同名殘留會讓新 transition 以 InvalidStateError 中止）；不走 VT 的導覽（goToPage、fallback、popstate）先 `_skipMorph()`；`transition.ready` 的 rejection 一律吞掉
 - 課程卡分頁索引 `cardPages`（`cardPageKey` → courseId），`renderCardBottom` 把夾過的頁寫回（清單縮短後第一下「‹」就有反應）

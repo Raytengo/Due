@@ -2603,26 +2603,16 @@ function setMorphName(el, name) {
   if (el && !reduceMotion()) el.style.viewTransitionName = name;
 }
 
-// 卡片端命名（開詳情的 FIRST、回清單的 LAST 共用）。
-// 課程卡：外框＋課號／課名／badge／meta 各自對到詳情的同一個東西。
-// 週卡（#17）：卡片本身＝course-shell，課名 .week-task-course＝course-name（課名對課名）；
-// 作業名不命名，跟著 course-shell 快照一起 crossfade；週卡沒有課號／badge／meta，詳情那幾個只有 new 端，自然淡入
+// 卡片端命名（開詳情的 FIRST、回清單的 LAST 共用）：只命名外框 course-shell。
+// 課名、課號、badge、件數不再各自命名（#16）：文字快照是點陣圖，從卡片的 17px 放大到詳情的 26px 一路都是被放大的圖，
+// 邊縮放邊交叉淡換看起來卡、糊。改成外框長大、裡面舊內容原地淡出、新內容原地淡入，文字全程不縮放
 function nameCardForMorph(cardEl) {
   setMorphName(cardEl, 'course-shell');
-  setMorphName(cardEl.querySelector(isWeek ? '.week-task-course' : '.card-name'), 'course-name');
-  if (isWeek) return;
-  setMorphName(cardEl.querySelector('.card-code'), 'course-code');
-  setMorphName(cardEl.querySelector('.card-badge-urgent'), 'course-badge');
-  setMorphName(cardEl.querySelector('.card-meta'), 'course-meta');
 }
 
 // 詳情端命名（開詳情的 LAST、回清單的 FIRST 共用）
 function nameDetailForMorph(container) {
   setMorphName(container.querySelector('.course-detail-view'), 'course-shell');
-  setMorphName(container.querySelector('.detail-code'), 'course-code');
-  setMorphName(container.querySelector('.detail-name'), 'course-name');
-  setMorphName(container.querySelector('.card-badge-urgent'), 'course-badge');
-  setMorphName(container.querySelector('.detail-meta'), 'course-meta');
 }
 
 // ── 卡片 ↔ 詳情 morph 的啟動與清理（#42）──
@@ -2642,10 +2632,32 @@ function clearMorphNames() {
 function clearStaleMorphNames() {
   clearMorphNames();
 }
+// 外框的長相（框線色、陰影、底色）：轉場中由 group 畫，從出發那一端（hover 中的卡片是橘框＋陰影）連續變到抵達那一端，
+// 不會在舊快照淡出時框線消失、到最後真的詳情出現才突然冒出來。時長／曲線與 index.html 的 ::view-transition-group(course-shell) 同步
+const MORPH_SHELL = { duration: 360, easing: 'cubic-bezier(0.32, 0.72, 0, 1)' };
+function morphShellEl() {
+  return [...document.querySelectorAll('[style*="view-transition-name"]')]
+    .find((el) => el.style.viewTransitionName === 'course-shell') || null;
+}
+function morphShellLook(el) {
+  if (!el) return null;
+  const cs = getComputedStyle(el);
+  const shadow = cs.boxShadow && cs.boxShadow !== 'none' ? cs.boxShadow : '0 0 0 0 rgba(0, 0, 0, 0)';
+  return { boxShadow: `0 0 0 1px ${cs.borderTopColor}, ${shadow}`, backgroundColor: cs.backgroundColor };
+}
+
 function startMorph(update) {
+  const from = morphShellLook(morphShellEl());   // 命名（FIRST）已在呼叫前完成
   const t = document.startViewTransition(update);
   _morph = t;
-  t.ready.catch(() => {});   // 被下一段 skip 時 ready 會 reject（AbortError），屬預期，不要變成未處理的 rejection
+  t.ready.then(() => {
+    const to = morphShellLook(morphShellEl());
+    if (!from || !to) return;
+    const look = document.documentElement.animate([from, to], {
+      ...MORPH_SHELL, fill: 'both', pseudoElement: '::view-transition-group(course-shell)',
+    });
+    t.finished.finally(() => look.cancel());   // 偽元素隨轉場消失，fill 住的動畫不留著
+  }).catch(() => {});   // 被下一段 skip 時 ready 會 reject（AbortError），屬預期，不要變成未處理的 rejection
   const cleanup = () => {
     if (_morph !== t) return;   // 已被下一段接手，名字交給它管
     _morph = null;
