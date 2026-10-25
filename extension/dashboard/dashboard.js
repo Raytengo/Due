@@ -2917,7 +2917,7 @@ function showGridView() {
 
 // ── 課程重命名（inline edit）──
 // 使用者完成了某個操作 → 發 due:action（互動導覽 tour.js 聽這個「做完就自動到下一步」；沒人聽就沒事）
-// type：'rename'（詳情改課名提交）｜'complete'（詳情列勾完成落地，detail.id）｜'drag'（拖曳／鍵盤移動落地，detail.to＝落到哪一區）
+// type：'rename'（詳情或側欄改課名提交）｜'complete'（詳情列勾完成落地，detail.id）｜'drag'（拖曳／鍵盤移動落地，detail.to＝落到哪一區）
 function emitDueAction(type, extra = {}) {
   document.dispatchEvent(new CustomEvent('due:action', { detail: { type, ...extra } }));
 }
@@ -3086,6 +3086,7 @@ function startSidebarRename(courseId) {
     const newName = input.value.trim();
     const displayName = newName || (course ? course.name : '');
     persistCourseName(courseId, newName, course);
+    emitDueAction('rename');
     restoreItem(refocus);
     // 若右側正顯示同一課，順手同步詳情標題（只改文字、不整段重繪，避免打斷成績計算器/捲動）
     if (currentView === 'course' && currentCourseId === courseId) {

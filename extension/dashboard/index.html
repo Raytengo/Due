@@ -480,7 +480,7 @@
       color: var(--overdue);
     }
 
-    /* ── 互動導覽（tour.js）：變暗＋亮框＋說明框；亮框以外由四塊透明 blocker 擋點擊 ── */
+    /* ── 互動導覽（tour.js）：變暗＋亮框＋說明框；亮處以外的點擊由 tour.js 在 capture 階段擋下 ── */
     .tour-root {
       position: fixed;
       inset: 0;
@@ -494,14 +494,7 @@
       opacity: 1;
     }
 
-    .tour-block {
-      position: fixed;
-      pointer-events: auto;
-    }
-
-    .tour-root.is-closing .tour-block,
-    .tour-root.is-closing .tour-pop,
-    .tour-root.is-closing .tour-ring {
+    .tour-root.is-closing .tour-pop {
       pointer-events: none;
     }
 
@@ -583,10 +576,12 @@
       opacity: 1;
     }
 
-    /* 這一步看就好（主畫面、圓餅、⚙）：亮框裡也不給點 */
-    .tour-root.is-blocking .tour-ring {
-      pointer-events: auto;
+    /* 第二個亮處也是可以操作的地方（改課名時的側欄）：跟主亮框一樣的實線框 */
+    .tour-root.point-live .tour-ring2 {
+      border: none;
+      box-shadow: 0 0 0 1.5px var(--orange), 0 0 0 6px rgba(217, 119, 87, 0.16);
     }
+
 
 
 

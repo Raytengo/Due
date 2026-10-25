@@ -7,7 +7,8 @@
 // - 要點／要拖的地方（spot）：亮框貼著那個元素的形狀（driver.js／react-joyride 的 spotlight 做法），
 //   角落再放一個會脈動的小信標（hotspot beacon）提示「點這裡」；只看不點的步驟（⚙）沒有信標
 // - 變暗用 SVG mask 挖洞：主亮處之外可以再挖一個虛線框（point：拖曳的目的地、AI 權重會填的地方）
-// - 亮框以外擋住點擊（四塊透明 blocker 圍住主亮框）；interactive:false 的步驟連亮框本身也擋
+// - 亮處以外擋住點擊：window capture 階段攔 pointerdown／mousedown／click…，點在亮處（主亮框、pointLive 的第二個亮處）
+//   或說明框裡才放行；interactive:false 的步驟連亮框本身也擋。導覽代點與鍵盤觸發的 click 不擋
 // - 目標每幀重新查詢、重新量位置（側欄、詳情會整段重建，active 底色會滑），不快取節點
 // - 自帶三語字串；依賴（執行期才用到）：_uiLanguage、announce、reduceMotion（dashboard.js 全域，皆有 typeof 守衛）
 // ═══════════════════════════════════════════════════════════════
@@ -24,7 +25,7 @@
       courseTitle: '打開一門課',
       courseBody: '點這門課，看看裡面有什麼。',
       renameTitle: '幫課取個好認的名字',
-      renameBody: '點鉛筆，改成你習慣的叫法，按 Enter 儲存。',
+      renameBody: '點鉛筆，或在左邊側欄連點兩下課名，改成你習慣的叫法，按 Enter 儲存。',
       checkTitle: '做完就勾掉',
       checkBody: '點最左邊的圓圈，把這項標成完成。1.5 秒內再點一次可以反悔。',
       dragTitle: '拖曳整理',
@@ -41,7 +42,7 @@
       courseTitle: '打开一门课',
       courseBody: '点这门课，看看里面有什么。',
       renameTitle: '给课取个好认的名字',
-      renameBody: '点铅笔，改成你习惯的叫法，按 Enter 保存。',
+      renameBody: '点铅笔，或在左边侧栏连点两下课名，改成你习惯的叫法，按 Enter 保存。',
       checkTitle: '做完就勾掉',
       checkBody: '点最左边的圆圈，把这项标成完成。1.5 秒内再点一次可以反悔。',
       dragTitle: '拖动整理',
@@ -58,7 +59,7 @@
       courseTitle: 'Open a course',
       courseBody: 'Click this course to see what’s inside.',
       renameTitle: 'Give it a name you know',
-      renameBody: 'Click the pencil, type the name you use, and press Enter.',
+      renameBody: 'Click the pencil, or double-click the course in the sidebar, type the name you use, and press Enter.',
       checkTitle: 'Check it off',
       checkBody: 'Click the circle on the left to mark this done. Click again within 1.5 seconds to undo.',
       dragTitle: 'Drag to organize',
@@ -103,7 +104,7 @@
   //   next：按「下一步」時導覽代做的事；before：顯示這一步前要先到的畫面
   //   interactive：亮框內可不可以點（預設可以）；reveal：這一步期間加在 <html> 上的 class（亮出平常藏著的控制項）
   //   spot：使用者要點／要拖的那個小東西 → 主亮處改成圍著它的小圓（target 只用來等畫面、捲動）
-  //   point：另外挖一個虛線框「指給你看」
+  //   point：另外挖一個虛線框「指給你看」；pointLive：這個洞也是可以操作的地方（實線亮框、點擊放行）
   //   resolve(state)：依這一趟的狀況換文案／目標
   const STEPS = [
     {
@@ -118,6 +119,9 @@
       // 點了鉛筆，課名換成輸入框 → 亮處改成整個輸入框（不然正在打的字在暗處）
       target: [() => q(`${DETAIL} .course-rename-input`) || q(`${DETAIL} .detail-name-text`), `${DETAIL} .btn-rename-course`],
       spot: () => (q(`${DETAIL} .course-rename-input`) ? null : q(`${DETAIL} .btn-rename-course`)),
+      // 左邊側欄的這門課也亮起來、可以點（連點兩下就地改名；改名中換成輸入框）
+      point: () => q('#course-nav .nav-rename-input') || q('#course-nav .nav-course-item.active'),
+      pointLive: true,
       before: openCourse,
       reveal: 'tour-reveal-rename',
       advanceEvent: 'rename',
@@ -237,12 +241,6 @@
     dim.appendChild(svgEl('rect', { class: 'tour-dim-fill', x: 0, y: 0, width: '100%', height: '100%', mask: 'url(#tour-dim-mask)' }));
     root.appendChild(dim);
 
-    const blockers = [0, 1, 2, 3].map(() => {
-      const b = document.createElement('div');
-      b.className = 'tour-block';
-      root.appendChild(b);
-      return b;
-    });
     const ring = document.createElement('div');
     ring.className = 'tour-ring';
     root.appendChild(ring);
@@ -279,11 +277,9 @@
     root.appendChild(pop);
     document.body.appendChild(root);
 
-    blockers.forEach((b) => b.addEventListener('click', nudge));
-    ring.addEventListener('click', nudge);   // 只有 interactive:false 時 ring 才吃得到點擊
     pop.querySelector('.tour-close').addEventListener('click', () => end());
     pop.querySelector('.tour-next').addEventListener('click', () => next());
-    return { root, hole, hole2, ring, ring2, beacon, pop, blockers };
+    return { root, hole, hole2, ring, ring2, beacon, pop };
   }
 
   // 點到被擋住的地方：說明框輕推一下（減少動態：不動，只把焦點拉回說明框）
@@ -321,9 +317,9 @@
     pop.querySelector('.tour-hint-text').textContent = t('autoNext');
     pop.querySelector('.tour-next-label').textContent = last ? t('done') : t('next');
     setReveal(cur.reveal);
-    _state.root.classList.toggle('is-blocking', cur.interactive === false);
     _state.root.classList.toggle('is-actionable', actionable);
     _state.root.classList.toggle('has-point', !!cur.point);
+    _state.root.classList.toggle('point-live', !!cur.pointLive);
   }
 
   function setRect(el, x, y, w, h, rx = 10) {
@@ -354,9 +350,9 @@
     return { x, y, w, h, rx: roundEl ? Math.min(w, h) / 2 : Math.min(8, Math.min(w, h) / 2) };
   }
 
-  // 依目標位置擺挖洞、亮框、四塊 blocker、說明框（每幀量；位置沒變就不寫 DOM）
+  // 依目標位置擺挖洞、亮框、說明框、可點範圍（每幀量；位置沒變就不寫 DOM）
   function place(r) {
-    const { ring, ring2, hole, hole2, pop, blockers, cur } = _state;
+    const { ring, ring2, hole, hole2, pop, cur } = _state;
     const vw = window.innerWidth;
     const vh = window.innerHeight;
     const sr = cur.spot ? rectOf(cur.spot) : null;
@@ -386,11 +382,8 @@
       // 沒有第二個洞：縮成主亮框中心的一點（下次出現時從那裡長出來，而不是從左上角飛來）
       setRect(hole2, x + w / 2, y + h / 2, 0, 0);
     }
-    const [top, right, bottom, left] = blockers;
-    Object.assign(top.style, { left: '0px', top: '0px', width: `${vw}px`, height: `${Math.max(0, y)}px` });
-    Object.assign(bottom.style, { left: '0px', top: `${y + h}px`, width: `${vw}px`, height: `${Math.max(0, vh - y - h)}px` });
-    Object.assign(left.style, { left: '0px', top: `${y}px`, width: `${Math.max(0, x)}px`, height: `${h}px` });
-    Object.assign(right.style, { left: `${x + w}px`, top: `${y}px`, width: `${Math.max(0, vw - x - w)}px`, height: `${h}px` });
+    // 可以點的範圍：主亮框＋（pointLive 的）第二個亮處；只看不點的步驟一個都沒有
+    _state.allow = cur.interactive === false ? [] : [{ x, y, w, h }, ...(b && cur.pointLive ? [b] : [])];
 
     // 說明框：右 → 左 → 下 → 上，都放不下（目標幾乎佔滿畫面）就放在目標內的右下角、不畫箭頭
     const clampX = (v) => clampN(v, EDGE, vw - pw - EDGE);
@@ -511,6 +504,20 @@
     advance(0);
   }
 
+  // 亮處以外的點擊一律擋下（window capture，比頁面任何 listener 都早）：按下時輕推說明框。
+  // 放行：說明框裡、亮處裡、導覽自己代點、鍵盤觸發的 click（detail 0，座標是 0,0）
+  const GUARDED = ['pointerdown', 'mousedown', 'mouseup', 'click', 'dblclick', 'contextmenu', 'auxclick'];
+  function onGuard(e) {
+    if (!_state || _state.programmatic) return;
+    if (e.type === 'click' && e.detail === 0) return;
+    if (_state.pop.contains(e.target)) return;
+    const inside = (_state.allow || []).some((a) => e.clientX >= a.x && e.clientX <= a.x + a.w && e.clientY >= a.y && e.clientY <= a.y + a.h);
+    if (inside) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === 'pointerdown') nudge();   // 只在按下時提醒：拖曳放開後補發的 click 落在亮處外，不該再推一次
+  }
+
   // 使用者自己點了亮起來的元素：讓點擊照常生效（不 preventDefault），等頁面換完再前進
   function onClick(e) {
     if (!_state || _state.programmatic || _state.moving || !_state.cur) return;
@@ -548,8 +555,9 @@
     const parts = build();
     _state = {
       i: from, cur: null, raf: 0, token: 0, lastKey: '', moving: false, programmatic: false,
-      reveal: null, steps, ...parts,
+      reveal: null, allow: [], steps, ...parts,
     };
+    GUARDED.forEach((type) => window.addEventListener(type, onGuard, true));
     document.addEventListener('click', onClick, true);
     document.addEventListener('keydown', onKey, true);
     document.addEventListener('due:action', onAction);
@@ -570,6 +578,7 @@
     const { root, raf } = _state;
     cancelAnimationFrame(raf);
     setReveal(null);
+    GUARDED.forEach((type) => window.removeEventListener(type, onGuard, true));
     document.removeEventListener('click', onClick, true);
     document.removeEventListener('keydown', onKey, true);
     document.removeEventListener('due:action', onAction);
