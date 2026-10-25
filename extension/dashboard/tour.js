@@ -24,6 +24,8 @@
       homeBody: '左邊是近期完成度與各時段的件數；右邊所有課程的作業依截止日期排好，逾期的置頂。',
       courseTitle: '打開一門課',
       courseBody: '側欄列出你這學期的課，數字是還沒做完的件數。點一門課看裡面的東西。',
+      renameTitle: '改成你習慣的課名',
+      renameBody: '點課名旁的鉛筆，就能改成你習慣的名字（例如中文課名），按 Enter 儲存。側欄、待辦卡片和 popup 都會跟著換。',
       checkTitle: '做完就勾掉',
       checkBody: '點左邊的圓圈標記完成，1.5 秒內再點一次可以撤銷。完成的作業會收進下方「已完成」。',
       dragTitle: '拖曳整理',
@@ -48,6 +50,8 @@
       homeBody: '左边是近期完成度和各时段的件数；右边所有课程的作业按截止日期排好，逾期的置顶。',
       courseTitle: '打开一门课',
       courseBody: '侧栏列出你这学期的课，数字是还没做完的件数。点一门课看里面的东西。',
+      renameTitle: '改成你习惯的课名',
+      renameBody: '点课名旁的铅笔，就能改成你习惯的名字（例如中文课名），按 Enter 保存。侧栏、待办卡片和 popup 都会跟着换。',
       checkTitle: '做完就勾掉',
       checkBody: '点左边的圆圈标记完成，1.5 秒内再点一次可以撤销。完成的作业会收进下方「已完成」。',
       dragTitle: '拖动整理',
@@ -72,6 +76,8 @@
       homeBody: 'On the left, how much of your near-term work is done and how many items fall in each window. On the right, every course’s assignments sorted by due date, overdue on top.',
       courseTitle: 'Open a course',
       courseBody: 'The sidebar lists this term’s courses; the number is what’s still to do. Click one to look inside.',
+      renameTitle: 'Rename a course',
+      renameBody: 'Click the pencil next to the course name to give it a name you recognize; press Enter to save. The sidebar, to-do cards and popup all follow.',
       checkTitle: 'Check it off',
       checkBody: 'Click the circle to mark an item done; click again within 1.5 seconds to undo. Done items move to “Done” below.',
       dragTitle: 'Drag to organize',
@@ -112,11 +118,19 @@
 
   // target：亮起來的元素（選擇器或回傳元素的函式；陣列＝取聯集）；advanceOn：使用者點到它就前進；next：按「下一步」時導覽代做的事；
   // before：顯示這一步前要先到的畫面；interactive：亮框內可不可以點（預設可以）；tryIt：可以在亮框裡試、但不會自動前進；
-  // scrollTo：要捲進可視範圍的元素（預設是第一個 target）
+  // scrollTo：要捲進可視範圍的元素（預設是第一個 target）；reveal：這一步期間加在 <html> 上的 class（把平常藏著的控制項亮出來）
   const STEPS = [
     { key: 'sync', target: '#sync-btn', advanceOn: '#sync-btn', before: goHome },
     { key: 'home', target: '#main-section', interactive: false, before: goHome },
     { key: 'course', target: '#course-nav', advanceOn: '#course-nav .nav-course-item', next: openCourse },
+    {
+      // 鉛筆平常要 hover 才出現：這一步把它亮出來（reveal 加在 <html> 上，換步／結束時拿掉）
+      key: 'rename',
+      target: ['#course-detail-container .detail-name-text', '#course-detail-container .btn-rename-course'],
+      before: openCourse,
+      reveal: 'tour-reveal-rename',
+      tryIt: true,
+    },
     { key: 'check', target: FIRST_ROW, before: openCourse, tryIt: true },
     {
       key: 'drag',
@@ -228,11 +242,19 @@
     pop.focus({ preventScroll: true });
   }
 
+  function setReveal(cls) {
+    if (_state.reveal === cls) return;
+    if (_state.reveal) document.documentElement.classList.remove(_state.reveal);
+    _state.reveal = cls || null;
+    if (cls) document.documentElement.classList.add(cls);
+  }
+
   function fillPop() {
     const { pop, i } = _state;
-    const step = STEPS[i];
-    const last = i === STEPS.length - 1;
-    pop.querySelector('.tour-counter').textContent = t('counter').replace('{n}', String(i + 1)).replace('{total}', String(STEPS.length));
+    const steps = _state.steps;
+    const step = steps[i];
+    const last = i === steps.length - 1;
+    pop.querySelector('.tour-counter').textContent = t('counter').replace('{n}', String(i + 1)).replace('{total}', String(steps.length));
     pop.querySelector('.tour-close').setAttribute('aria-label', t('close'));
     pop.querySelector('.tour-close').title = t('close');
     pop.querySelector('#tour-title').textContent = t(`${step.key}Title`);
@@ -241,7 +263,8 @@
     hint.hidden = !step.advanceOn && !step.tryIt;
     pop.querySelector('.tour-hint-text').textContent = step.advanceOn ? t('orClick') : t('tryIt');
     pop.querySelector('.tour-next-label').textContent = last ? t('done') : t('next');
-    pop.querySelector('.tour-progress-bar').style.width = `${((i + 1) / STEPS.length) * 100}%`;
+    pop.querySelector('.tour-progress-bar').style.width = `${((i + 1) / steps.length) * 100}%`;
+    setReveal(step.reveal);
     _state.root.classList.toggle('is-blocking', step.interactive === false);
     _state.root.classList.toggle('is-actionable', !!step.advanceOn);
   }
@@ -293,7 +316,7 @@
   function frame() {
     if (!_state) return;
     if (!_state.moving) {
-      const r = targetRect(STEPS[_state.i]);
+      const r = targetRect(_state.steps[_state.i]);
       if (r) place(r);
     }
     _state.raf = requestAnimationFrame(frame);
@@ -322,16 +345,17 @@
     const token = ++_state.token;
     _state.moving = true;
     _state.root.classList.add('is-moving');
-    for (; i < STEPS.length; i++) {
-      const step = STEPS[i];
+    const steps = _state.steps;
+    for (; i < steps.length; i++) {
+      const step = steps[i];
       act(step.before);
       if (await waitForTarget(step)) break;
       if (!_state || token !== _state.token) return;
     }
     if (!_state || token !== _state.token) return;
-    if (i >= STEPS.length) { end(); return; }
+    if (i >= steps.length) { end(); return; }
     _state.i = i;
-    const step = STEPS[i];
+    const step = steps[i];
     const n = q(step.scrollTo || (Array.isArray(step.target) ? step.target[0] : step.target));
     if (n && n.scrollIntoView) n.scrollIntoView({ block: 'nearest', behavior: reduced() ? 'auto' : 'smooth' });
     await sleep(reduced() ? 0 : 280);   // 等平滑捲動差不多停了再擺說明框
@@ -349,48 +373,56 @@
   // 「下一步」：這一步有代做的事（打開課程、回學期待辦）就先做，等畫面換完再前進；最後一步＝結束
   async function next() {
     if (!_state || _state.moving) return;
-    const step = STEPS[_state.i];
+    const step = _state.steps[_state.i];
     if (step.next) {
       act(step.next);
       await sleep(SETTLE_MS);
       if (!_state) return;
     }
-    if (_state.i >= STEPS.length - 1) end();
+    if (_state.i >= _state.steps.length - 1) end();
     else go(_state.i + 1);
   }
 
   // 使用者自己點了亮起來的元素：讓點擊照常生效（不 preventDefault），等頁面換完再前進
   function onClick(e) {
     if (!_state || _state.programmatic || _state.moving) return;
-    const step = STEPS[_state.i];
+    const step = _state.steps[_state.i];
     if (!step.advanceOn || !e.target.closest || !e.target.closest(step.advanceOn)) return;
     _state.moving = true;
     _state.root.classList.add('is-moving');
     setTimeout(() => {
       if (!_state) return;
-      if (_state.i >= STEPS.length - 1) end();
+      if (_state.i >= _state.steps.length - 1) end();
       else go(_state.i + 1);
     }, SETTLE_MS);
   }
 
-  // Esc 結束導覽；在 capture 階段攔下，不讓 dashboard 的 Esc 另外去關別的東西
+  // Esc 結束導覽；在 capture 階段攔下，不讓 dashboard 的 Esc 另外去關別的東西。
+  // 焦點在輸入框（導覽中試著改課名）時 Esc 是「取消編輯」，交給輸入框，不結束導覽
   function onKey(e) {
     if (!_state || e.key !== 'Escape' || e.isComposing) return;
+    const tgt = e.target;
+    if (tgt && (tgt.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(tgt.tagName))) return;
     e.stopPropagation();
     e.preventDefault();
     end();
   }
 
-  function start() {
+  // opts.only：只走這些步驟（key 陣列，照 STEPS 的順序）；opts.from：從這一步開始（挑選頁預覽單步用）
+  function start(opts = {}) {
     if (_state) end(true);
+    const only = Array.isArray(opts.only) && opts.only.length ? opts.only : null;
+    const steps = only ? STEPS.filter((s) => only.includes(s.key)) : STEPS.slice();
+    if (!steps.length) return;
+    const from = Math.max(0, steps.findIndex((s) => s.key === opts.from));
     const parts = build();
-    _state = { i: 0, raf: 0, token: 0, lastKey: '', moving: false, programmatic: false, ...parts };
+    _state = { i: from, raf: 0, token: 0, lastKey: '', moving: false, programmatic: false, reveal: null, steps, ...parts };
     document.addEventListener('click', onClick, true);
     document.addEventListener('keydown', onKey, true);
     // 第一步直接到位、不從 (0,0) 滑進來：先關過渡，第一次擺好、forced reflow 後再打開
     parts.root.classList.add('no-anim');
     _state.raf = requestAnimationFrame(frame);
-    go(0).then(() => {
+    go(from).then(() => {
       if (!_state) return;
       parts.root.getBoundingClientRect();
       parts.root.classList.remove('no-anim');
@@ -403,6 +435,7 @@
     if (!_state) return;
     const { root, raf } = _state;
     cancelAnimationFrame(raf);
+    setReveal(null);
     document.removeEventListener('click', onClick, true);
     document.removeEventListener('keydown', onKey, true);
     _state = null;
@@ -417,5 +450,5 @@
     if (_state && !_state.moving) fillPop();
   }
 
-  window.DueTour = { start, end, applyLanguage, isActive: () => !!_state };
+  window.DueTour = { start, end, applyLanguage, isActive: () => !!_state, steps: () => STEPS.map((s) => s.key) };
 })();

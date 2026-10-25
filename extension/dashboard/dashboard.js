@@ -5149,11 +5149,17 @@ if (menuOpenTutorial) {
   });
 }
 
-// ?tour=1：直接開互動導覽（dev harness 對齊效果用）
-// tour.js 在 dashboard.js 之後才載入：到 timer 裡才查得到 DueTour
-if (new URLSearchParams(location.search).get('tour') === '1') {
-  setTimeout(() => { if (typeof DueTour !== 'undefined') DueTour.start(); }, 600);   // 也等第一次 render 把側欄課程列畫出來
-}
+// ?tour=1：直接開互動導覽；?tour=sync,course,check：只走這幾步；&tourFrom=check：從這一步開始
+// （dev harness 與挑選頁 dev/tour-review.html 用）。tour.js 在 dashboard.js 之後才載入：到 timer 裡才查得到 DueTour
+(() => {
+  const params = new URLSearchParams(location.search);
+  const tour = params.get('tour');
+  if (!tour) return;
+  const only = tour === '1' ? null : tour.split(',').filter(Boolean);
+  setTimeout(() => {   // 也等第一次 render 把側欄課程列畫出來
+    if (typeof DueTour !== 'undefined') DueTour.start({ only, from: params.get('tourFrom') });
+  }, 600);
+})();
 
 const menuAiSettings = document.getElementById('menu-ai-settings');
 if (menuAiSettings) {
