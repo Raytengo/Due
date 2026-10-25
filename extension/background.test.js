@@ -47,7 +47,8 @@ function makeFetch(routes, { delayMs = 1 } = {}) {
 // getFails：第一個 callback 式 get 回呼 undefined（模擬 storage 錯誤 / runtime.lastError）
 // tabsQuery／executeScript：Claude 用量（SYNC_CLAUDE_USAGE）測試用，覆寫找 claude.ai 分頁與分頁內執行的結果
 // setFailsIf(obj)：回 true 的 set 整筆不寫入並 reject（模擬超過 QUOTA_BYTES 等寫入失敗）
-function loadBackground({ stored = {}, storageDelayMs = 0, fetch, getFails = false, tabsQuery, executeScript, setFailsIf, aiHandler }) {
+// tabs：覆寫／補上 chrome.tabs 的方法（背景登入補救測試用：create／get／remove／onUpdated）
+function loadBackground({ stored = {}, storageDelayMs = 0, fetch, getFails = false, tabsQuery, executeScript, setFailsIf, aiHandler, tabs = {} }) {
   const store = structuredClone(stored);
   const listeners = { message: [], nav: [] };
   const callbackErrors = [];   // 比照 Chrome：回呼內 throw 只會被記下，不會傳回呼叫端
@@ -108,7 +109,11 @@ function loadBackground({ stored = {}, storageDelayMs = 0, fetch, getFails = fal
       getURL: (p) => p,
     },
     webNavigation: { onCompleted: { addListener: (fn) => listeners.nav.push(fn) } },
-    tabs: { create() {}, query: tabsQuery || (async () => []) },
+    tabs: {
+      create() {}, query: tabsQuery || (async () => []),
+      get: async () => null, remove: async () => {}, onUpdated: { addListener() {}, removeListener() {} },
+      ...tabs,
+    },
     scripting: { executeScript: executeScript || (async () => []) },
   };
   const quiet = { log() {}, warn() {}, error() {} };
@@ -236,6 +241,70 @@ test('AUTO_SYNC：還沒有學校網址（從未造訪 Canvas）→ 回 no-base�
   assert.deepEqual(resp, { started: false, reason: 'no-base' });
   await sleep(30);
   assert.equal(stats.calls.length, 0);
+});
+
+// ── Dashboard 打開時的登入補救（AUTO_SYNC refreshSession）──
+// session 過期：API 401；背景開 Canvas 分頁讓 SSO 自動登入（stub：create 時把 loggedIn 打開），分頁落地 → 同步 → 關分頁
+function sessionFixture({ ssoAutoLogin, landUrl = `${BASE}/`, userActivates = false }) {
+  const state = { loggedIn: false, created: [], removed: [] };
+  const authed = (body) => () => (state.loggedIn ? res(200, body) : res(401, { errors: [] }));
+  const { fetch } = makeFetch([
+    [/\/api\/v1\/users\/self/, authed({ id: 42 })],
+    [/\/api\/v1\/courses\?/, authed([course(101)])],
+    [/\/courses\/\d+\/assignments\?/, authed([{ id: 1010, name: 'HW' }])],
+    [/\/courses\/\d+\/assignment_groups\?/, authed([{ id: 1, name: 'Homework', group_weight: 100 }])],
+  ]);
+  const tabs = {
+    create: async (opts) => {
+      state.created.push(opts);
+      if (ssoAutoLogin) state.loggedIn = true;
+      return { id: 7 };
+    },
+    get: async (id) => ({ id, status: 'complete', url: landUrl, active: userActivates }),
+    remove: async (id) => { state.removed.push(id); },
+  };
+  return { state, fetch, tabs };
+}
+const STALE = () => new Date(Date.now() - 6 * 60 * 1000).toISOString();
+
+test('Dashboard AUTO_SYNC：session 過期、SSO 自動登入 → 背景開 Canvas 分頁（不切過去）→ 確認登入就關分頁（不等同步）→ 同步', async () => {
+  const { state, fetch, tabs } = sessionFixture({ ssoAutoLogin: true });
+  const bg = loadBackground({ stored: { canvasBaseUrl: BASE, lastSync: STALE() }, fetch, tabs });
+  assert.deepEqual(await bg.send({ type: 'AUTO_SYNC', refreshSession: true }), { started: true });
+  await until(() => state.removed.length === 1);
+  assert.deepEqual(JSON.parse(JSON.stringify(state.created)), [{ url: `${BASE}/`, active: false }]);   // vm realm 的物件轉回本 realm
+  assert.deepEqual(state.removed, [7]);
+  assert.equal(bg.store.assignments, undefined, '分頁應在同步寫入前就關掉');
+  await until(() => bg.store.assignments);
+  assert.deepEqual(bg.store.assignments['101'], [{ id: 1010, name: 'HW' }]);
+});
+
+test('Dashboard AUTO_SYNC：SSO 要手動登入（分頁停在登入頁）→ 逾時關掉分頁、不寫資料；冷卻期間再打開 Dashboard 不再開分頁', async () => {
+  const { state, fetch, tabs } = sessionFixture({ ssoAutoLogin: false, landUrl: 'https://login.microsoftonline.com/abc' });
+  const bg = loadBackground({ stored: { canvasBaseUrl: BASE, lastSync: STALE() }, fetch, tabs });
+  await bg.send({ type: 'AUTO_SYNC', refreshSession: true });
+  await until(() => state.removed.length === 1);
+  assert.equal(bg.store.assignments, undefined);
+  await bg.send({ type: 'AUTO_SYNC', refreshSession: true });
+  await sleep(60);
+  assert.equal(state.created.length, 1, '冷卻期間不該再開分頁');
+});
+
+test('Dashboard AUTO_SYNC：使用者在補救期間切到那個分頁 → 不關掉它', async () => {
+  const { state, fetch, tabs } = sessionFixture({ ssoAutoLogin: false, landUrl: 'https://login.microsoftonline.com/abc', userActivates: true });
+  const bg = loadBackground({ stored: { canvasBaseUrl: BASE, lastSync: STALE() }, fetch, tabs });
+  await bg.send({ type: 'AUTO_SYNC', refreshSession: true });
+  await sleep(80);
+  assert.equal(state.created.length, 1);
+  assert.deepEqual(state.removed, []);
+});
+
+test('popup 的 AUTO_SYNC（不帶 refreshSession）未登入 → 不開分頁', async () => {
+  const { state, fetch, tabs } = sessionFixture({ ssoAutoLogin: true });
+  const bg = loadBackground({ stored: { canvasBaseUrl: BASE, lastSync: STALE() }, fetch, tabs });
+  await bg.send({ type: 'AUTO_SYNC' });
+  await sleep(60);
+  assert.equal(state.created.length, 0);
 });
 
 // ── P0-4b：同步進行中再收到 SYNC ──

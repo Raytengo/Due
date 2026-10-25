@@ -5637,6 +5637,12 @@ updateSideNav();
 
 loadData();
 
+// 打開 Dashboard 就在背景同步（5 分鐘節流，與 popup／造訪 Canvas 同一套）。refreshSession：Canvas 登入過期時，
+// background 會在背景開 Canvas 分頁讓 SSO 續上 session、同步完自動關掉。資料落地由常駐 storage.onChanged 重繪
+try {
+  chrome.runtime.sendMessage({ type: 'AUTO_SYNC', refreshSession: true }, () => void chrome.runtime.lastError);
+} catch (_) { /* dev harness 或擴充功能剛重新載入：這次不同步 */ }
+
 // ── Weight Edit Modal ──
 let _weightEditCourseId = null;
 // 權重草稿（N2）：{ key: weightDraftKey(courseId), values: [{ name, weight }] }。✕／Esc 關掉時存起來，
