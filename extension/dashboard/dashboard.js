@@ -5251,15 +5251,15 @@ function drawWelcomePinArrow({ play = false } = {}) {
   const ty = (ey - c2.y) / tl;
   const wing = (deg) => {
     const a = (deg * Math.PI) / 180;
-    return `${f(ex - (tx * Math.cos(a) - ty * Math.sin(a)) * 11)} ${f(ey - (tx * Math.sin(a) + ty * Math.cos(a)) * 11)}`;
+    return `${f(ex - (tx * Math.cos(a) - ty * Math.sin(a)) * 13)} ${f(ey - (tx * Math.sin(a) + ty * Math.cos(a)) * 13)}`;
   };
   head.setAttribute('d', `M ${wing(30)} L ${f(ex)} ${f(ey)} L ${wing(-30)}`);
-  // 字：弧線中段的右邊（貝茲曲線 t=0.5 的點往右 18px），放不下就往左收到視窗內
+  // 字：弧線中段的右邊（貝茲曲線 t=0.5 的點往右 18px、往下 30px），放不下就往左收到視窗內
   label.textContent = tr('wIntroHere');
   const mx = 0.125 * sx + 0.375 * c1.x + 0.375 * c2.x + 0.125 * ex;
   const my = 0.125 * sy + 0.375 * c1.y + 0.375 * c2.y + 0.125 * ey;
   label.setAttribute('text-anchor', 'start');
-  label.setAttribute('y', f(my));
+  label.setAttribute('y', f(my + 30));
   label.setAttribute('x', f(mx + 18));
   const lw = label.getComputedTextLength ? label.getComputedTextLength() : 0;
   if (mx + 18 + lw > vw - 12) label.setAttribute('x', f(Math.max(12, vw - 12 - lw)));
