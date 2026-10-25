@@ -1,140 +1,81 @@
 <div align="center">
 
-<img src="icon_design.png" width="120" alt="Due" />
+<img src="icon_design.png" alt="Due" width="110">
 
-# Due
+<h1>Due</h1>
 
-**A Canvas dashboard that tells you what to do next.**
+<b>Canvas 作業、截止日與評分比重的一頁儀表板</b>
 
-Due is a Chrome extension that syncs with your school's Canvas and lays out every
-assignment, deadline, and grade weight in one calm, prioritized dashboard —
-no Canvas API tokens, no account setup, no server. An optional AI feature can
-read your syllabus for grading weights; bring your own LLM key if you want it.
+<br><br>
 
-🌐 **English** · [繁體中文](README.zh-TW.md)
+<a href="https://chromewebstore.google.com/detail/due/mgncgfpppjecmfkahchchidfpckpnfid?hl=zh-TW"><img src="https://img.shields.io/chrome-web-store/v/mgncgfpppjecmfkahchchidfpckpnfid?label=Chrome%20Web%20Store&color=3c5e4e" alt="Chrome Web Store 版本"></a>
+<a href="https://chromewebstore.google.com/detail/due/mgncgfpppjecmfkahchchidfpckpnfid?hl=zh-TW"><img src="https://img.shields.io/chrome-web-store/rating/mgncgfpppjecmfkahchchidfpckpnfid?label=%E8%A9%95%E5%88%86&color=3c5e4e" alt="評分"></a>
+<a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-3c5e4e" alt="MIT License"></a>
+
+<br>
+
+<b>繁體中文</b> · <a href="README.en.md">English</a>
+
+<a href="#功能">功能</a> · <a href="#安裝">安裝</a> · <a href="#隱私">隱私</a> · <a href="#常見問題">常見問題</a>
 
 </div>
 
----
+<br>
 
-## What it does
+<a href="https://chromewebstore.google.com/detail/due/mgncgfpppjecmfkahchchidfpckpnfid?hl=zh-TW">
+  <img src=".github/assets/zh/marquee.png" alt="Due" width="100%">
+</a>
 
-Canvas buries what matters under menus and tabs. Due strips it down to a single
-question: *what should I do next?*
+## 為什麼做 Due
 
-- Click the toolbar icon for a **7-day popup** — everything due this week, plus a pinned "overdue" list, at a glance.
-- Open the **dashboard** for the full picture — every course, every assignment, color-coded by urgency, with grade weights and a live grade calculator.
+Canvas 很完整，但要知道「接下來該做什麼」，得一門課一門課點進去找。Due 把每一門課的作業、截止日和評分比重整理成一頁，逾期的釘在最上面；點一下工具列先看 7 天內要交的，再一鍵打開完整頁面。
 
-Due signs in as *you*: it borrows your browser's existing Canvas session, so
-there's nothing to configure. Log in to Canvas once and it syncs automatically.
-
----
-
-## Features
+## 功能
 
 | | |
-|---|---|
-| **7-day popup** | Instant view of what's due this week (your custom to-dos included), with a pinned overdue section |
-| **Urgency colors** | Red overdue · Orange ≤7 days · Yellow 8–30 days · Blue 30+ days |
-| **Progress ring** | How much of your near-term work (overdue in the last 30 days + due in the next 7) you've cleared, with a count for each urgency level |
-| **Grade weights** | Per-course breakdown of assignment groups and their weights |
-| **Grade calculator** | Enter scores for a live weighted total — Canvas grades prefill automatically |
-| **Drag to organize** | Exams & attendance auto-hide; drag any hidden item back, or tuck others away |
-| **One-tap done** | Mark anything complete (with a 1.5s undo window), independent of Canvas |
-| **Custom assignments** | Add your own to-dos that Canvas doesn't know about |
-| **Course renaming** | Give any course a friendlier display name — stored locally |
-| **Guided onboarding** | A 5-step tour on first run walks you through setup |
-| **Claude usage** | Optional: show your Claude plan usage % in the popup |
-| **Multi-language** | 繁體中文 · 简体中文 · English |
+| --- | --- |
+| **7 天待辦** | 點工具列就看到 7 天內要交的，逾期的置頂，做完直接勾掉（1.5 秒內可以反悔） |
+| **緊急度上色** | 逾期、7 天內、8–30 天、30 天以上，一眼分得出輕重 |
+| **評分比重** | 每門課的比重畫成圓餅圖；Canvas 有設定就照用，也可以自己填 |
+| **成績計算器** | 已評分的自動帶入，填上預估分數就算出加權總分；側欄「成績」一次看每一科 |
+| **自動收起考試與簽到** | 依作業類型和名稱判斷，收進每門課最下方的「已隱藏」；要交東西的作業不會被收起，判斷錯了拖回清單就好 |
+| **自訂作業、課程改名** | Canvas 上沒有的待辦也能加；課名太長就改個好認的 |
+| **AI 補比重（選用）** | Canvas 沒設比重的課，填入你自己的 Gemini、Qwen、DeepSeek 或 NVIDIA NIM 金鑰，Due 讀大綱補上 |
+| **三種語言** | 繁體中文、简体中文、English |
 
----
+<p align="center">
+  <img src=".github/assets/zh/shot3.png" alt="評分比重、近期進度與成績計算器" width="49%">
+  <img src=".github/assets/zh/shot4.png" alt="考試、簽到自動收起" width="49%">
+</p>
 
-## Which schools work
+## 安裝
 
-Due never asks for a Canvas API token or a password. It uses the Canvas session
-already in your browser — just be logged in. The only key Due ever asks for is
-optional: your own Gemini / Qwen / DeepSeek / NVIDIA NIM API key, if you turn on
-AI grading-weight analysis (see below).
+到 [Chrome 線上應用程式商店](https://chromewebstore.google.com/detail/due/mgncgfpppjecmfkahchchidfpckpnfid?hl=zh-TW)安裝，然後在同一個瀏覽器打開學校的 Canvas 並登入，Due 就會自動同步；之後每次打開 Canvas 都會順便更新，也可以在 Dashboard 按「同步」。不用 API token，也不用註冊。
 
-It works with schools whose Canvas address ends in `.instructure.com`
-(for example `hkust-gz.instructure.com`). Schools that run Canvas on their
-own domain (like `canvas.yourschool.edu`) aren't supported yet.
+Canvas 網址結尾是 instructure.com 的學校都能用（例如 hkust-gz.instructure.com）；用自己網域架設的 Canvas 目前還不支援。
 
----
+## 隱私
 
-## Install
+Due 沒有伺服器、沒有追蹤。資料只存在你的瀏覽器，開發者收不到。開啟選用的 AI 分析時，還沒有比重的課，其大綱與課程 PDF（必要時還有課程 PDF 的檔名清單）會用你自己的金鑰，從你的瀏覽器直接送到你選的 AI 供應商。如果你有用 claude.ai，popup 也能顯示 Claude 的用量，所以 Due 會要求 claude.ai 的權限；這些數字同樣只存在你的瀏覽器。完整內容見[隱私權政策](privacy-policy.md)。
 
-Due is on the Chrome Web Store — one click, no setup:
+## 常見問題
 
-**[→ Add Due to Chrome](https://chromewebstore.google.com/detail/due/mgncgfpppjecmfkahchchidfpckpnfid)**
+<details>
+<summary>要錢嗎？</summary>
+<br>
+不用，免費、開源。AI 分析用的是你自己金鑰的額度。
+</details>
 
-Then **log in to Canvas** and Due syncs automatically on your next visit. Click the Due icon → **Open Dashboard**, and 📌 pin the extension for one-click access. A short 5-step tour opens the first time to walk you through it.
+<details>
+<summary>手機能用嗎？</summary>
+<br>
+不行，Due 是電腦版 Chrome 的擴充功能。Edge、Brave 這類 Chromium 瀏覽器通常也能從 Chrome 商店安裝（Edge 要先允許其他市集的擴充功能），但沒有逐一實測。
+</details>
 
----
+## 參與
 
-## Optional: AI grading-weight analysis
+有 bug 或想法，歡迎[開 issue](https://github.com/Raytengo/Due/issues) 或送 PR。擴充功能的程式碼都在 `extension/`；想知道它怎麼運作，丟給 Claude 讀最快。
 
-Some courses never publish weights in Canvas. Turn this on and Due reads the
-course syllabus (text and PDF) after each sync, extracts the grading breakdown,
-and writes it into the course's **manual weights** — the same place you'd type
-them yourself, so you can still edit or reset them.
+## 授權
 
-- Settings gear → **AI analysis settings** → choose Gemini, Qwen, DeepSeek, or
-  NVIDIA NIM, paste your own API key, save.
-- Only courses without weights are analyzed; courses that already have Canvas or
-  manual weights are skipped. Once weights are found, that course is done (unless you
-  clear its weights). A course where none were found is tried again only when its
-  syllabus or files change, or when you change the AI settings. Nothing runs until you add a key.
-- AI-filled weights show a small **AI analysis** label under the pie chart until you
-  edit them. If your instructor later adds weights in Canvas, Due switches to those.
-- When you save, Chrome asks for access to `canvas-user-content.com` so Due can download
-  syllabus PDFs (Gemini reads the PDF itself; other providers get its text); decline and it still works with the syllabus text.
-- NVIDIA NIM does not allow direct browser calls, so saving with it selected asks for access to
-  `integrate.api.nvidia.com` — without that permission the provider cannot run at all.
-- Syllabus content goes straight from your browser to the provider you chose,
-  using your own key and quota, and that provider's terms apply (some free tiers,
-  such as the Gemini API free tier, may use it to improve their models). Due has no server in between.
-
----
-
-## Privacy
-
-Everything stays on your device. Due has **no backend server, no analytics, and
-no telemetry** — all data lives in `chrome.storage.local` and is never sent to
-the developer. If you enable the optional AI analysis, your syllabus is sent
-directly to the AI provider you picked, with your own key; the developer never
-sees it. Read the full [privacy policy](privacy-policy.md).
-
----
-
-## For developers
-
-Due is plain **vanilla JavaScript** on **Manifest V3** — no framework, no build step.
-
-```
-extension/
-├── manifest.json      # MV3 config
-├── background.js      # service worker: Canvas API sync + Claude usage
-├── ai/*.js            # optional AI grading-weight analysis: gradingRules · providers · analysisRunner
-├── popup.html / .js   # toolbar popup (7-day view)
-└── dashboard/
-    ├── index.html     # dashboard markup + styles
-    ├── dashboard.js   # rendering + events
-    ├── aiSettings.js  # AI analysis settings modal
-    └── *.js           # taskRules · completion · customAssignments · descSanitizer
-```
-
-- **Load it:** after editing anything in `extension/`, reload from `chrome://extensions`.
-- **Iterate fast:** run `node dev/serve.js` and open <http://localhost:8765/dev/harness.html>
-  (or `popup-harness.html`) to work on the dashboard and popup in a normal tab with mock data.
-- **Tests:** the shared logic modules are unit-tested with plain Node — e.g.
-  `node extension/dashboard/taskRules.test.js`.
-- **AI module tests:** `node extension/ai/gradingRules.test.js` and `node extension/ai/providers.test.js`.
-
-For the full architecture, data model, and design system, see [`CLAUDE.md`](CLAUDE.md).
-
----
-
-<div align="center">
-<sub>Version 2.5.0 · <a href="LICENSE">MIT License</a></sub>
-</div>
+[MIT](LICENSE)
