@@ -77,10 +77,15 @@
   const visible = (n) => !!n && n.getClientRects().length > 0;
   const DETAIL = '#course-detail-container';
   const inCourseDetail = () => visible(q(`${DETAIL} .course-detail-view`));
-  // 優先挑還有待辦的課（課程詳情裡才有可以勾、可以拖的列）
+  // 挑待辦最多的課（側欄徽章數字＝詳情清單的列數；is-placeholder＝0 件）：勾完成、拖曳兩步都要有列可用，
+  // 勾掉一件之後還得剩一件給拖曳，所以件數越多越好；平手取側欄靠前的。全部都是 0 件就只能挑第一門（後面的步驟會被跳過）
   function pickCourse() {
     const items = [...document.querySelectorAll('#course-nav .nav-course-item')];
-    return items.find((b) => !b.querySelector('.nav-course-badge.is-placeholder')) || items[0] || null;
+    const pending = (b) => {
+      const badge = b.querySelector('.nav-course-badge');
+      return badge && !badge.classList.contains('is-placeholder') ? parseInt(badge.textContent, 10) || 0 : 0;
+    };
+    return items.reduce((best, b) => (best && pending(best) >= pending(b) ? best : b), null);
   }
   function openCourse() {
     if (inCourseDetail()) return;
