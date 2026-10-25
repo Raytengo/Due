@@ -230,7 +230,7 @@ GET /api/v1/accounts/self、/api/v1/accounts/:account_id
 
 ### popup.html / popup.js
 
-- 7 天待辦快速預覽：顯示所有 7 天內到期的未繳作業清單
+- 7 天待辦快速預覽：顯示所有 7 天內到期的未繳作業清單；超過 3 筆內部捲動，捲動區高度由 `fitTaskListHeight` 量到第 3 筆下緣（扣掉其下框線，底下已有 `.divider`），不露半列；渲染、字型載入完成、勾完成收合後都重量（列高因課名折行／分組小標題而不固定）。量的是「收合完成後」的版面（`measureTaskListFit` 用離屏複本、去掉 `.collapsing`，不碰真實清單以免中斷進行中的過渡）：收合開始時清單高度就沿 `--reflow` 與列同步變到終點（`fitTaskListHeight(true)`），收完時只有最後一筆收合的列重量一次——連勾兩筆不會先縮後撐、勾掉唯一逾期項不會一幀跳 50px
 - **含自訂作業**（QA P1-7）：`popup.html` 載入 `dashboard/customAssignments.js`，`loadData` 以 `mergeAssignmentMaps` 合併 Canvas ∪ 自訂作業，規則與 dashboard 相同（掛在已不在 `courses` 的課上的自訂作業不列）；自訂作業沒有 Canvas 頁，點擊改開 Dashboard
 - 隱藏規則同 dashboard：hideable＝`!_isCustom && (isExam || isAttendance)`（`taskRules.isHideable`），hideable 的看 `manualShown`、其餘看 `manualHidden`；自訂作業名稱含 Quiz/Midterm/簽到也照樣列
 - 每筆任務顯示：緊急程度色點、作業名稱、**課程名稱**（支援自訂名稱）、剩餘時間

@@ -296,6 +296,7 @@ function renderTasks(groups, courseNames) {
 
   if (overdue.length === 0 && upcoming.length === 0) {
     list.innerHTML = `<li class="empty-state">${tr('emptyState')}</li>`;
+    fitTaskListHeight();
     return;
   }
 
@@ -308,7 +309,61 @@ function renderTasks(groups, courseNames) {
   }
 
   for (const task of upcoming) list.appendChild(makeTaskItem(task, courseNames, 'upcoming'));
+  fitTaskListHeight();
 }
+
+// 清單捲動區停在整列：露出前 POPUP_VISIBLE_TASKS 筆作業（連同其上的分組小標題），高度＝第 N 筆的下緣，
+// 不會切出半列；更多的項目靠常駐的 3px 捲軸提示可捲。列高不固定（課名折行、分組小標題），所以用量的。
+// 裁切點扣掉第 N 筆的下框線：底下已有 .divider，和 ≤N 筆時（:last-child 無框線）一樣只留一條線。
+// ≤N 筆時不設上限（自然高度、無捲軸）
+const POPUP_VISIBLE_TASKS = 3;
+
+// 量「收合完成後」的版面：正在收合的列／組標題（.collapsing）視為已移除。
+// 用離屏複本量，不碰真實清單——對收合中的元素 display:none 或改清單的 max-height 都會中斷它們進行中的過渡。
+// 回傳 { capped, px }：capped＝超過 N 筆、px 是停在第 N 筆下緣的高度；否則 px 是自然高度
+function measureTaskListFit(list) {
+  const clone = list.cloneNode(true);
+  clone.removeAttribute('id');
+  clone.setAttribute('aria-hidden', 'true');
+  clone.querySelectorAll('.collapsing').forEach((el) => el.remove());
+  Object.assign(clone.style, {
+    position: 'absolute', visibility: 'hidden', pointerEvents: 'none',
+    left: '0', top: '0', width: `${list.getBoundingClientRect().width}px`,
+    maxHeight: 'none', transition: 'none',
+  });
+  list.parentElement.appendChild(clone);
+  const items = clone.querySelectorAll('.task-item');
+  let res;
+  if (items.length > POPUP_VISIBLE_TASKS) {
+    const last = items[POPUP_VISIBLE_TASKS - 1];
+    const cut = last.getBoundingClientRect().bottom - parseFloat(getComputedStyle(last).borderBottomWidth || 0);
+    res = { capped: true, px: Math.floor(cut - clone.getBoundingClientRect().top) };
+  } else {
+    res = { capped: false, px: clone.scrollHeight };
+  }
+  clone.remove();
+  return res;
+}
+
+// animate：收合開始時呼叫，清單高度沿 --reflow 與列的收合同步變到終點（不在收完那一幀才跳）。
+// 終點不設上限時先動到自然高度，收完（不帶 animate 的那次）才換回 none；原本就沒設上限就跟著內容走、不動它
+function fitTaskListHeight(animate = false) {
+  const list = document.getElementById('task-list');
+  if (!list) return;
+  const fit = measureTaskListFit(list);
+  let target;
+  if (fit.capped) target = `${fit.px}px`;
+  else if (animate) {
+    if (!list.style.maxHeight || list.style.maxHeight === 'none') return;
+    target = `${fit.px}px`;
+  } else target = 'none';
+  if (list.style.maxHeight === target) return;   // 同值不重設：別打斷進行中的高度過渡
+  list.style.transition = animate && !reduceMotion() ? 'max-height var(--reflow)' : 'none';
+  list.style.maxHeight = target;
+}
+
+// 字型晚於首次渲染載入時列高會變 → 重量一次
+if (document.fonts) document.fonts.ready.then(fitTaskListHeight);
 
 // 分組小標題（樣式比照 .section-label；overdue 版用 var(--overdue) 色）
 function makeGroupHeading(text, group) {
@@ -509,6 +564,7 @@ function collapseRow(li, check) {
     el.style.paddingTop = '0';
     el.style.paddingBottom = '0';
   });
+  if (!rm) fitTaskListHeight(true);                      // 捲動區高度與列同一條曲線收到終點
 
   const prop = rm ? 'opacity' : 'max-height';
   let fallback = null;
@@ -521,6 +577,8 @@ function collapseRow(li, check) {
     li.removeEventListener('transitionend', onEnd);
     els.forEach((el) => el.remove());
     maybeShowEmpty();
+    // 少了一列：捲動區重量到新的第 3 筆下緣。還有別列在收合就交給最後收完的那一列量
+    if (!list.querySelector('.task-item.collapsing')) fitTaskListHeight();
   }
   li.addEventListener('transitionend', onEnd);
   fallback = setTimeout(done, rm ? FADE_FALLBACK_MS : COLLAPSE_FALLBACK_MS);

@@ -232,7 +232,8 @@
       margin: -4px 0 8px;
     }
 
-    /* 超過約 3 列即內部捲動，避免 popup 過長（≤3 列時自然高度、不出現捲軸）。
+    /* 超過 3 筆即內部捲動，避免 popup 過長。實際高度由 popup.js 的 fitTaskListHeight 量出
+       （停在第 3 筆的下緣，不露半列）；188px 只是 JS 量好之前的上限。
        左右各留 4px 給勾選圈的焦點框與 hover halo（否則被捲動容器裁掉左側，#4）；內容寬維持 284px */
     .task-list {
       list-style: none;
