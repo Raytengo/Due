@@ -28,7 +28,7 @@
       checkTitle: '做完就勾掉',
       checkBody: '點最左邊的圓圈，把這項標成完成。1.5 秒內再點一次可以反悔。',
       dragTitle: '拖曳整理',
-      dragBody: '按住名稱後的 ⋮⋮，往下拖到「已完成」或「已隱藏」。',
+      dragBody: '按住名稱後的 ⋮⋮，往下拖進「已隱藏」就算完成，拖回來就還原。',
       aiTitle: '讓 AI 幫你填評分比重',
       aiBody: '在 ⚙ 的「AI 分析設定」貼上你的 API key。',
       aiPoint: '會自動填在這裡',
@@ -46,7 +46,7 @@
       checkTitle: '做完就勾掉',
       checkBody: '点最左边的圆圈，把这项标成完成。1.5 秒内再点一次可以反悔。',
       dragTitle: '拖动整理',
-      dragBody: '按住名称后的 ⋮⋮，往下拖到「已完成」或「已隐藏」。',
+      dragBody: '按住名称后的 ⋮⋮，往下拖进「已隐藏」就算完成，拖回来就还原。',
       aiTitle: '让 AI 帮你填评分比重',
       aiBody: '在 ⚙ 的「AI 分析设置」贴上你的 API key。',
       aiPoint: '会自动填在这里',
@@ -64,7 +64,7 @@
       checkTitle: 'Check it off',
       checkBody: 'Click the circle on the left to mark this done. Click again within 1.5 seconds to undo.',
       dragTitle: 'Drag to organize',
-      dragBody: 'Grab the ⋮⋮ after a name and drag it down onto “Done” or “Hidden”.',
+      dragBody: 'Grab the ⋮⋮ after a name and drag it down into “Hidden” to mark it done; drag it back to undo.',
       aiTitle: 'Let AI fill in grade weights',
       aiBody: 'Paste your API key in ⚙ → “AI analysis settings”.',
       aiPoint: 'filled in here',
@@ -133,12 +133,12 @@
       advanceEvent: 'complete',
     },
     {
-      // 從清單最後一列往下拖：它緊鄰下方兩區，握把與目的地（虛線框）同時在畫面裡
+      // 從清單最後一列往下拖：它緊鄰下方「已隱藏」區（已完成＋隱藏合併的那一區），握把與目的地（虛線框）同時在畫面裡
       key: 'drag',
-      target: [lastRow, `${DETAIL} .done-items`, `${DETAIL} .hidden-items`],
+      target: [lastRow, `${DETAIL} .archive-items`],
       spot: lastRowGrip,
-      point: [`${DETAIL} .done-items`, `${DETAIL} .hidden-items`],
-      scrollTo: `${DETAIL} .hidden-items`,
+      point: `${DETAIL} .archive-items`,
+      scrollTo: `${DETAIL} .archive-items`,
       before: openCourse,
       advanceEvent: 'drag',
     },
@@ -373,46 +373,93 @@
     return { x, y, w, h, rx: roundEl ? Math.min(w, h) / 2 : Math.min(8, Math.min(w, h) / 2) };
   }
 
-  // 手繪箭頭：從說明框右邊出去、往右拐上去，途中繞一個小圈，從下方指進「指給你看」的框；箭頭兩撇順著最後的切線
+  // 手繪箭頭：從說明框右邊出去，途中繞一個小圈，指進「指給你看」的框；箭頭兩撇順著最後的切線。進框方向看相對位置：
+  //   框在右邊 → 往右走、繞圈、從框的左緣進去；框在上面且空間夠 → 往右拐上去、從下緣進去；
+  //   其餘（說明框貼在框下面）→ 繞到框的右側、由右往左進去
+  const SKETCH_MIN_RISE = 150;
+  const SKETCH_MIN_RUN = 120;
   function drawSketch(popBox, b) {
     const { sketchHalo, sketchPath, sketchHead, sketchLabel } = _state;
+    const f = (v) => v.toFixed(1);
     const sx = popBox.x + popBox.w + 8;
     const sy = popBox.y + Math.min(34, popBox.h / 2);
-    // 終點：目標框下緣，x 往起點右邊錯開（拐彎要有空間），夾在框內
-    const ex = clampN(sx + 110, b.x + 24, b.x + b.w - 24);
-    const ey = b.y + b.h + 12;
-    const rise = sy - ey;                       // 往上走的高度（目標在說明框上方）
-    const r = clampN(rise * 0.09, 9, 15);       // 小圈半徑
-    const P = { x: ex, y: ey + rise * 0.48 };   // 小圈的位置：往上那一段的中間
-    const f = (v) => v.toFixed(1);
-    const d = [
-      `M ${f(sx)} ${f(sy)}`,
-      // 往右出去、拐彎向上，到小圈的起點時方向朝上
-      `C ${f(sx + (ex - sx) * 0.75)} ${f(sy + 2)} ${f(ex)} ${f(sy - 4)} ${f(P.x)} ${f(P.y)}`,
-      // 小圈：往右鼓出去、繞回來稍微再往上一點
-      `C ${f(P.x + r * 2.4)} ${f(P.y - r * 1.8)} ${f(P.x + r * 2.4)} ${f(P.y + r * 1.6)} ${f(P.x)} ${f(P.y - r * 0.4)}`,
-      // 往上進框，最後一段幾乎垂直
-      `C ${f(P.x - r * 0.6)} ${f(P.y - r * 2.2)} ${f(ex)} ${f(ey + rise * 0.18)} ${f(ex)} ${f(ey)}`,
-    ].join(' ');
+    const below = b.y + b.h + 12;
+    let d;
+    let ex;
+    let ey;
+    let c2;          // 最後一段的第二個控制點（決定箭頭方向）
+    let label;       // 小字位置
+    if (b.x - sx >= SKETCH_MIN_RUN) {
+      // 由左往右：終點在框左緣，高度盡量跟起點齊（夾在框內），圈往上鼓
+      ex = b.x - 12;
+      ey = clampN(sy - 30, b.y + 24, b.y + b.h - 24);
+      const r = 11;
+      const P = { x: sx + (ex - sx) * 0.45, y: (sy + ey) / 2 };
+      c2 = { x: ex - 46, y: ey };
+      d = [
+        `M ${f(sx)} ${f(sy)}`,
+        `C ${f(sx + (P.x - sx) * 0.5)} ${f(sy)} ${f(P.x - r * 1.3)} ${f(P.y)} ${f(P.x)} ${f(P.y)}`,
+        `C ${f(P.x + r * 1.7)} ${f(P.y - r * 2.5)} ${f(P.x - r * 1.7)} ${f(P.y - r * 2.5)} ${f(P.x + r * 0.35)} ${f(P.y)}`,
+        `C ${f(P.x + r * 2.2)} ${f(P.y + r * 0.5)} ${f(c2.x)} ${f(c2.y)} ${f(ex)} ${f(ey)}`,
+      ].join(' ');
+      label = { x: ex - 10, y: ey - 20, anchor: 'end' };
+    } else if (sy - below >= SKETCH_MIN_RISE) {
+      // 由下往上：終點在框下緣，x 往起點右邊錯開（拐彎要有空間）
+      ex = clampN(sx + 110, b.x + 24, b.x + b.w - 24);
+      ey = below;
+      const rise = sy - ey;
+      const r = clampN(rise * 0.09, 9, 15);
+      const P = { x: ex, y: ey + rise * 0.48 };   // 小圈在往上那一段的中間
+      c2 = { x: ex, y: ey + rise * 0.18 };
+      d = [
+        `M ${f(sx)} ${f(sy)}`,
+        `C ${f(sx + (ex - sx) * 0.75)} ${f(sy + 2)} ${f(ex)} ${f(sy - 4)} ${f(P.x)} ${f(P.y)}`,
+        `C ${f(P.x + r * 2.4)} ${f(P.y - r * 1.8)} ${f(P.x + r * 2.4)} ${f(P.y + r * 1.6)} ${f(P.x)} ${f(P.y - r * 0.4)}`,
+        `C ${f(P.x - r * 0.6)} ${f(P.y - r * 2.2)} ${f(c2.x)} ${f(c2.y)} ${f(ex)} ${f(ey)}`,
+      ].join(' ');
+      label = { x: ex + 16, y: ey + 16 };
+    } else if (sy >= b.y + b.h * 0.5 && sx <= b.x + b.w + 40 && Math.max(b.x + b.w + 12, sx) + 64 + 40 < window.innerWidth) {
+      // 由右往左：終點在框右緣偏下，先往右走、在框右邊往上繞一圈，再往左指進去
+      ex = b.x + b.w + 12;
+      ey = b.y + b.h * 0.62;
+      const tx = Math.max(ex, sx) + 64;           // 往上那一段的 x
+      const r = 11;
+      const P = { x: tx, y: (sy + ey) / 2 + 6 };
+      c2 = { x: ex + 46, y: ey };
+      d = [
+        `M ${f(sx)} ${f(sy)}`,
+        `C ${f(sx + (tx - sx) * 0.75)} ${f(sy + 2)} ${f(tx)} ${f(sy - 4)} ${f(P.x)} ${f(P.y)}`,
+        `C ${f(P.x + r * 2.4)} ${f(P.y - r * 1.8)} ${f(P.x + r * 2.4)} ${f(P.y + r * 1.6)} ${f(P.x)} ${f(P.y - r * 0.4)}`,
+        `C ${f(P.x - r * 0.4)} ${f(ey + 8)} ${f(c2.x)} ${f(c2.y)} ${f(ex)} ${f(ey)}`,
+      ].join(' ');
+      label = { x: ex + 8, y: ey - 20 };
+    } else {
+      // 說明框跟框貼太近，畫不出像樣的箭頭 → 不畫線，只在虛線框上緣右側標字
+      sketchPath.setAttribute('d', '');
+      sketchHalo.setAttribute('d', '');
+      sketchHead.setAttribute('d', '');
+      const above = b.y - 12 >= EDGE + 8;
+      sketchLabel.setAttribute('x', f(b.x + b.w - 10));
+      sketchLabel.setAttribute('y', f(above ? b.y - 12 : b.y + 18));
+      sketchLabel.setAttribute('text-anchor', 'end');
+      return;
+    }
     sketchPath.setAttribute('d', d);
     sketchHalo.setAttribute('d', d);
-    // 箭頭兩撇：最後一段的切線是由下往上
-    const c2x = ex;
-    const c2y = ey + rise * 0.18;
-    const tl = Math.hypot(ex - c2x, ey - c2y) || 1;
-    const tx = (ex - c2x) / tl;
-    const ty = (ey - c2y) / tl;
+    // 箭頭兩撇：沿最後一段的切線（c2 → 終點）往回、左右各張 30°
+    const tl = Math.hypot(ex - c2.x, ey - c2.y) || 1;
+    const ux = (ex - c2.x) / tl;
+    const uy = (ey - c2.y) / tl;
     const wing = (deg) => {
       const a = (deg * Math.PI) / 180;
-      const wx = -(tx * Math.cos(a) - ty * Math.sin(a)) * 11;
-      const wy = -(tx * Math.sin(a) + ty * Math.cos(a)) * 11;
+      const wx = -(ux * Math.cos(a) - uy * Math.sin(a)) * 11;
+      const wy = -(ux * Math.sin(a) + uy * Math.cos(a)) * 11;
       return `${f(ex + wx)} ${f(ey + wy)}`;
     };
     sketchHead.setAttribute('d', `M ${wing(30)} L ${f(ex)} ${f(ey)} L ${wing(-30)}`);
-    // 小字擺在箭頭尖的右下方
-    sketchLabel.setAttribute('x', f(ex + 16));
-    sketchLabel.setAttribute('y', f(ey + 16));
-    sketchLabel.setAttribute('text-anchor', 'start');
+    sketchLabel.setAttribute('x', f(label.x));
+    sketchLabel.setAttribute('y', f(label.y));
+    sketchLabel.setAttribute('text-anchor', label.anchor || 'start');
   }
 
   // 每次換步：箭頭從起點畫到終點，小字隨後淡入（減少動態：直接出現）
@@ -420,7 +467,7 @@
     const { sketchHalo, sketchPath, sketchHead, sketchLabel } = _state;
     [sketchHalo, sketchPath, sketchHead, sketchLabel].forEach((n) => n.getAnimations().forEach((a) => a.cancel()));
     if (reduced()) return;
-    const len = sketchPath.getTotalLength();
+    const len = sketchPath.getAttribute('d') ? sketchPath.getTotalLength() : 0;
     [sketchHalo, sketchPath].forEach((n) => n.animate(
       [{ strokeDasharray: `${len}`, strokeDashoffset: `${len}` }, { strokeDasharray: `${len}`, strokeDashoffset: '0' }],
       { duration: 700, delay: 150, easing: 'cubic-bezier(0.65, 0, 0.35, 1)', fill: 'backwards' },
@@ -473,14 +520,22 @@
     const A = anchor;
     const cx = x + w / 2;   // 亮處中心（箭頭對準這裡）
     const cy = y + h / 2;
-    let side;
-    let px;
-    let py;
-    if (A.x + A.w + GAP + pw <= vw - EDGE) { side = 'right'; px = A.x + A.w + GAP; py = clampY(cy - ph / 2); }
-    else if (A.x - GAP - pw >= EDGE) { side = 'left'; px = A.x - GAP - pw; py = clampY(cy - ph / 2); }
-    else if (A.y + A.h + GAP + ph <= vh - EDGE) { side = 'bottom'; py = A.y + A.h + GAP; px = clampX(cx - pw / 2); }
-    else if (A.y - GAP - ph >= EDGE) { side = 'top'; py = A.y - GAP - ph; px = clampX(cx - pw / 2); }
-    else { side = 'inside'; px = clampX(A.x + A.w - pw - 24); py = clampY(A.y + A.h - ph - 24); }
+    // 依序試右、左、下、上：放得進視窗、而且不壓住「指給你看」的框（b）的第一個；都壓到就取第一個放得進的；
+    // 都放不下（目標幾乎佔滿畫面）就放在目標內的右下角、不畫箭頭
+    // 上／下兩個位置另外試「往左／往右錯開到框外」的版本（箭頭小三角仍對著亮處，只要還在說明框寬度內）
+    const vert = (side, py, fits) => [clampX(cx - pw / 2), ...(b ? [b.x - 12 - pw, b.x + b.w + 12] : [])]
+      .filter((px) => px >= EDGE && px + pw <= vw - EDGE && cx - px >= 20 && px + pw - cx >= 20)
+      .map((px) => ({ side, px, py, fits }));
+    const cands = [
+      { side: 'right', px: A.x + A.w + GAP, py: clampY(cy - ph / 2), fits: A.x + A.w + GAP + pw <= vw - EDGE },
+      { side: 'left', px: A.x - GAP - pw, py: clampY(cy - ph / 2), fits: A.x - GAP - pw >= EDGE },
+      ...vert('bottom', A.y + A.h + GAP, A.y + A.h + GAP + ph <= vh - EDGE),
+      ...vert('top', A.y - GAP - ph, A.y - GAP - ph >= EDGE),
+    ];
+    const hits = (c) => !!b && c.px < b.x + b.w + 8 && c.px + pw > b.x - 8 && c.py < b.y + b.h + 8 && c.py + ph > b.y - 8;
+    const pick = cands.find((c) => c.fits && !hits(c)) || cands.find((c) => c.fits)
+      || { side: 'inside', px: clampX(A.x + A.w - pw - 24), py: clampY(A.y + A.h - ph - 24) };
+    const { side, px, py } = pick;
     pop.dataset.side = side;
     pop.style.left = `${px}px`;
     pop.style.top = `${py}px`;
