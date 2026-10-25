@@ -110,8 +110,7 @@ GET /api/v1/accounts/self、/api/v1/accounts/:account_id
   "claudeOrgId": "...",
   "claudeUsage": { "usedPercent": 0, "resetAt": "..." },
   "aiConfig": { "provider": "gemini | qwen | deepseek | nvidia", "apiKey": "…", "model": "", "baseUrl": "", "consentedAt": "…" },
-  "gradingAnalysis": { "courseId": { "status": "done", "attempts": 1, "at": "…", "source": "syllabus_pdf", "provider": "gemini", "model": "gemini-2.5-flash", "components": [], "materialHash": "…" } },
-  "seenHints": { "drag": true, "pin": true }
+  "gradingAnalysis": { "courseId": { "status": "done", "attempts": 1, "at": "…", "source": "syllabus_pdf", "provider": "gemini", "model": "gemini-2.5-flash", "components": [], "materialHash": "…" } }
 }
 ```
 
@@ -192,7 +191,6 @@ GET /api/v1/accounts/self、/api/v1/accounts/:account_id
 
 ### background.js
 
-- `onInstalled`（`install`）開 `dashboard/index.html`（不帶參數、不再自動開教學；從未同步會落在「先登入 Canvas」空狀態）
 - 監聽 `webNavigation.onCompleted`（filter `{ hostSuffix: '.instructure.com' }`、只看 `frameId === 0`）— 使用者造訪 Canvas 時偵測網址並自動同步：同一網址 5 分鐘節流（記憶體 `_lastAutoSyncAt`，每次成功同步更新；SW 重啟由 storage 的 `lastSync` 回填）；從未同步過（`_lastAutoSyncAt` 為 0）或首次採用新網址立即同步；手動 `SYNC` 不受節流限制
 - 響應訊息：
   - `SYNC` → `{ success:true, failedCourses:[{id,name,error}] }`／`{ success:false, error }`
@@ -381,7 +379,7 @@ sidebar（300px）+ main-content（flex:1）
 
 **同步按鈕（`setSyncStatus`，#30）：** 閒置／三點／「✓ 已同步」／「同步失敗」四個標籤一開始就疊在同一格（`.sync-swap`），換狀態只改 `data-status`，CSS 原地 opacity＋blur 淡換（按鈕不變寬）；「✓ 已同步」停 1.5 秒（`SYNC_DONE_MS`）、「同步失敗」停 2.5 秒（`SYNC_ERROR_MS`，期間 disabled）再回閒置；結果經 `announce` 念出。`SYNC` 回 `success:false`（整體失敗，例如課程清單 401）或訊息通道錯誤 → 錯誤態（錯誤代碼橫幅屬 QA P0-3，決策不做）；部分失敗（`success:true`＋`failedCourses`，QA P0-1）仍是「✓ 已同步」；成功且已有資料 → 不立即重繪，交給 `requestRefresh()`（等 UI 閒置才原地重繪，同步期間勾的撤銷窗不被截斷）；首次同步（無資料）→ 同步期間畫 skeleton，結束後 `loadData()`
 
-**空狀態（`renderEmptyState`，QA P2-6）：** 沒有課程時區分「從未同步」（無 `lastSync`：`emptyNeverTitle/Body`）與「已同步但沒有進行中的課程」（有 `lastSync`、courses 空：`emptyNoCoursesTitle/Body`，說明 Due 只抓進行中的課程）。header 照常顯示「學校 · N 分鐘前同步／尚未同步」。從未同步＝新手的第一步：標題「先登入 Canvas」、說明登入後會自動跳回，按鈕「登入 {canvas}」（`emptyLoginCanvas`）；已同步沒課則是「前往 {canvas}」。主要動作（`openCanvasTab`，與教學的登入連結共用：點擊當下讀 storage 的 `canvasBaseUrl`，沒有就開 HKUST(GZ) 並附其他學校說明；從未同步時同教學「武裝」自動跳回）。`loadData` 的空分支把 `_currentData` 換成只有同步狀態（側欄計數與課程列不留上一份資料的殘影）、回到學期待辦（`currentPage='week'`），並以 `setNoCoursesMode(true)` 停用「+ 新增作業」「課程」「成績」（title 說明 `needCourses`）；有資料時 `render()` 解除
+**空狀態（`renderEmptyState`，QA P2-6）：** 沒有課程時區分「從未同步」（無 `lastSync`：`emptyNeverTitle/Body`）與「已同步但沒有進行中的課程」（有 `lastSync`、courses 空：`emptyNoCoursesTitle/Body`，說明 Due 只抓進行中的課程）。header 照常顯示「學校 · N 分鐘前同步／尚未同步」。主要動作「前往 Canvas」（`openCanvasTab`，與教學的登入連結共用：點擊當下讀 storage 的 `canvasBaseUrl`，沒有就開 HKUST(GZ) 並附其他學校說明；從未同步時同教學「武裝」自動跳回）。`loadData` 的空分支把 `_currentData` 換成只有同步狀態（側欄計數與課程列不留上一份資料的殘影）、回到學期待辦（`currentPage='week'`），並以 `setNoCoursesMode(true)` 停用「+ 新增作業」「課程」「成績」（title 說明 `needCourses`）；有資料時 `render()` 解除
 
 **側欄「偵測到另一個 Canvas」提示（`#canvas-candidate`，QA P1-9）：** 同步鍵上方一行安靜的提示。`loadData` 讀 `canvasBaseCandidate`（另存 `_canvasCandidate`，不進 `_currentData`），常駐 `storage.onChanged` 看到 `canvasBaseCandidate` 變動時只重畫這一行（`setCanvasCandidate`，不排整頁重繪）；`canvasBaseUrl` 屬於同步 key（`LIVE_SYNC_KEYS`），外部變更照常排整頁重繪（`requestRefresh`），並順手重畫這一行（`renderCanvasCandidate`）；候選存在且 `origin !== canvasBaseUrl` 才顯示（空狀態也顯示——放假沒課的學校同樣可能偵測到別校），host 顯示 `URL.host`、title 為完整 origin。「切換到這裡」送 `SET_CANVAS_BASE`：等待期間兩鈕停用、文字換 `canvasCandidateSwitching`（期間任何重畫都不解除）；成功 → 收起提示並 `loadData()`；失敗 → 提示保留、下方 `#canvas-candidate-error` 依回應的 `reason` 顯示說明：`'not-logged-in'` → `canvasCandidateFailed`（請先登入該 Canvas）；其餘（含訊息通道錯誤、沒有 reason）→ `canvasCandidateSyncFailed`（請稍後再試）；`_canvasCandidateError` 存原因字串，再按切換或候選換成別的網址時清除。「忽略」送 `IGNORE_CANVAS_BASE` 並立即收起。i18n：`canvasCandidateLabel`／`Switch`／`Switching`／`Ignore`／`Failed`／`SyncFailed`
 
@@ -442,14 +440,8 @@ sidebar（300px）+ main-content（flex:1）
 - `← 返回` 按鈕與瀏覽器返回統一走 `history.back()` → `popstate`；按鈕常駐於 `.page-tabs`，click 只在 top-level 綁一次（不可綁在 `renderCourseDetailSection` 裡：詳情會被勾選／拖曳／即時刷新反覆重繪，listener 累積會一次連發多個 `history.back()` 退出 dashboard，QA P1-8）；`showGridView()` 現依 `currentPage` 回對應清單（不再寫死回 courses grid，順帶修正「從週待辦開課程、Back 卻回課程頁」）
 - 動導航函式（`showCourseDetail`/`showGridView`/`switchPage`/`goToPage`）時務必同步維護對應的 push/replace，否則返回行為會錯亂
 
-**嵌入介面的一次性提示（2026-10-25，取代安裝時自動彈出的教學）：** 新手不再先讀 5 頁說明書：第一步是空狀態的「登入 Canvas」，之後兩則提示在第一次碰到該介面時出現在旁邊，一行字＋「知道了」，不擋畫面。看過記在 `seenHints`（不進 `_currentData`；`markHintSeen` read-modify-write；`loadData` 讀、常駐 onChanged 的 `applySeenHints` 收掉別的分頁看過的）。
-- `drag`：課程詳情「作業清單」標題下（`dragHintHtml`，由 `renderCourseDetailSection` 畫，重繪自然跟著走——不做浮動的遮罩高亮，就不必追元素位置）；該課有作業才畫。按「知道了」或**拖曳成功一次**（`commitDrag`，含鍵盤路徑）即看過
-- `pin`：側欄同步鍵上方的靜態節點 `#pin-hint`（`renderPinHint`）；有資料後才出現（先讓人登入），`chrome.action.getUserSettings().isOnToolbar` 已釘選就不出現，`onUserSettingsChanged`（Chrome 130+）偵測到使用者照著釘好 → 自己收起並記成看過
-- 文案 `hintDrag`／`hintPin` 裡的 `{grip}`／`{puzzle}`／`{pin}` 換成 SVG（`hintTextHtml`），旁邊補 sr-only 文字（`hintIcon*`）；收起走 `dismissHintEl`（高度收合＋淡出，`MOTION.disclosure`；減少動態只淡出；頁面隱藏時直接收掉——背景分頁不出幀），焦點在裡面就交給同步鍵／「作業清單」標題
-- dev harness：`dev/harness.html?empty=1` 模擬剛安裝、從未同步
-
 **新手教學（Welcome Modal，5 頁）：**
-- 不再自動開啟（舊版首次安裝帶 `?welcome=1`，參數處理已移除）；只剩設定選單「使用教學」可開；換頁為 translateX 滑動（track 500%、每步 20%，`welcomeGoStep` 位移 `(n-1)*20%`，完成頁按鈕判斷 `n===5`）。開過後以 `history.replaceState` 把 `welcome` 參數從網址拿掉（保留其他參數、hash 與 history state），重新整理不會再跳出（QA #48）
+- 首次安裝自動開啟（`?welcome=1`），設定選單「使用教學」可重開；換頁為 translateX 滑動（track 500%、每步 20%，`welcomeGoStep` 位移 `(n-1)*20%`，完成頁按鈕判斷 `n===5`）。開過後以 `history.replaceState` 把 `welcome` 參數從網址拿掉（保留其他參數、hash 與 history state），重新整理不會再跳出（QA #48）
 - 只有目前那頁可互動：其餘投影片設 `inert`（`_welcomeSyncSlides`），Tab 不會聚焦到畫面外的連結而把 `overflow:hidden` 的軌道捲走；`.welcome-main-area.scrollLeft` 開教學／換頁時歸零；按鈕列固定兩個節點（上一步／主按鈕），換頁只就地改文字、`data-wgo` 與 class，焦點留在原按鈕上（上一步要消失時先交給主按鈕，#8）；focus trap 的頭尾排除 inert 子樹（QA P2-13）。`.welcome-main-area` 用 `overflow: clip`（不可捲動，Tab 也捲不歪）；開教學以 forced reflow 直接歸位到第 1 頁（不靠 rAF）；減少動態時換頁 crossfade（#9）
 - 頁面：1 歡迎（右側為 HTML/CSS 迷你 Dashboard mock——SVG stroke 進度環＋分級摘要列；文字隨語言切換：標題 `wMockTitle`、環與摘要沿用真介面的 key、卡片日期以 `dueWithRel` 產生）→ 2 登入 Canvas → 3 釘選（`icons/pin_guide.png`，圖中圖示為 DUE 商標；alt 走 `wPinAlt`；載入失敗由 JS 收起預覽框——MV3 CSP 擋 inline onerror，QA #157）→ 4 拖曳整理（文案明講「進入任一課程頁」；右側 inline SVG 示意圖：課程大卡片內含 header、作業清單、浮起拖曳列、已隱藏區與隱藏/還原雙向箭頭；SVG 文字 `wds-*` 隨語言替換，箭頭旁直排短標中文逐字、英文轉 90°，見 `setSvgVerticalLabel`）→ 5 一切就緒
 - **登入 Canvas 自動跳回**（spec 2026-07-23-onboarding-redesign）：點連結（`openCanvasTab`：點擊時直接讀 storage 的 `canvasBaseUrl`；為空時 fallback `DEFAULT_CANVAS_URL`＝`https://hkust-gz.instructure.com`，此時連結文字明講「HKUST(GZ) Canvas」並附其他學校說明 `wCanvasOtherSchool`：打開網址結尾是 .instructure.com 的學校 Canvas）。**連結文字與目標出自同一份狀態**（`_welcomeCanvasBase`）：開教學、進第 2 頁、點擊當下、同步落地後都重讀 `canvasBaseUrl` 並重畫該行（`renderWelcomeCanvasLine`），不會寫著 HKUST(GZ) 卻開別校（review OB-3）。開分頁後「武裝」10 分鐘——`storage.onChanged` 只看 `lastSync` 落地（未登入時 API 401、lastSync 不動，不會過早跳回）→ `loadData()` 刷新、關閉開出的分頁、聚焦回 dashboard、連結旁顯示「✓ 已同步」；輔以 `tabs.onUpdated` 在 Canvas 分頁載入完成時補發手動 SYNC（繞過 5 分鐘節流）。chrome.* 呼叫皆守衛（dev harness 只 stub 部分 API）

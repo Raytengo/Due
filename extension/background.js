@@ -54,10 +54,10 @@ if (chrome.storage.onChanged) {
   });
 }
 
-// 首次安裝時開 Dashboard：還沒同步過會落在「先登入 Canvas」空狀態，之後的用法由介面裡的一次性提示帶
+// 首次安裝時開啟教學頁面
 chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason === 'install') {
-    chrome.tabs.create({ url: chrome.runtime.getURL('dashboard/index.html') });
+    chrome.tabs.create({ url: chrome.runtime.getURL('dashboard/index.html?welcome=1') });
   }
 });
 

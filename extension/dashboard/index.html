@@ -448,67 +448,6 @@
       color: var(--overdue);
     }
 
-    /* 嵌入介面的一次性提示（課程詳情的拖曳提示、側欄的釘選提示）：一行說明＋「知道了」，不擋畫面 */
-    .inline-hint {
-      display: flex;
-      align-items: flex-start;
-      gap: 12px;
-      margin-bottom: 10px;
-      padding: 8px 12px;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      background: var(--surface);
-      font-size: 12px;
-      line-height: 1.6;
-      color: var(--muted);
-    }
-
-    .inline-hint-text {
-      flex: 1;
-      min-width: 0;
-    }
-
-    /* 文字裡的圖示（握把、拼圖、圖釘）：跟著字色、對齊字的中線 */
-    .hint-icon {
-      display: inline-block;
-      vertical-align: -2px;
-      color: var(--dark);
-    }
-
-    .hint-icon-grip svg {
-      display: block;
-    }
-
-    .inline-hint-close {
-      flex-shrink: 0;
-      border: none;
-      background: none;
-      cursor: pointer;
-      padding: 0;
-      font-family: 'DM Mono', monospace;
-      font-size: 11px;
-      line-height: inherit;
-      letter-spacing: 0.03em;
-      color: var(--orange);
-      transition: color var(--t-color), scale var(--spring-press);
-    }
-
-    @media (hover: hover) and (pointer: fine) {
-      .inline-hint-close:hover {
-        color: var(--dark);
-      }
-    }
-
-    /* 側欄底色是 --surface：釘選提示換成頁面底色才看得出一格 */
-    #pin-hint {
-      margin-bottom: 14px;
-      background: var(--bg);
-    }
-
-    #pin-hint[hidden] {
-      display: none;
-    }
-
     .btn-sync {
       flex: 1;
       font-family: 'DM Mono', monospace;
@@ -4795,7 +4734,7 @@
        FLIP 補位與出場層的 WAAPI transform。勾選圈不縮（用填色回應）、拖曳握把不縮（用 grabbing 游標回應）、
        設定選單項目不縮（用 highlight 回應）。卡片／列用 :has 擋掉「按的是裡面的按鈕卻整張一起縮」。
        鍵盤 Enter／Space 走 click()，不觸發 :active——動作本身（morph、展開）就是回饋。減少動態：兩個 scale token 為 1（檔尾） */
-    :is(.btn-sync, .btn-theme-toggle, .btn-add-assignment, .detail-back-tab, .canvas-candidate-btn, .state-msg-action, .inline-hint-close,
+    :is(.btn-sync, .btn-theme-toggle, .btn-add-assignment, .detail-back-tab, .canvas-candidate-btn, .state-msg-action,
       .card-pager-btn, .btn-edit-weights, .btn-rename-course, .fold-toggle,
       .btn-delete-custom-assignment, .btn-edit-custom-assignment,
       .welcome-btn, .welcome-close,
@@ -4961,11 +4900,6 @@
         </div>
 
         <div class="sidebar-footer">
-          <!-- 一次性提示：把 Due 釘到工具列（renderPinHint；有資料、還沒釘、還沒按過「知道了」才出現） -->
-          <div class="inline-hint" id="pin-hint" data-hint="pin" role="note" hidden>
-            <span class="inline-hint-text"></span>
-            <button type="button" class="inline-hint-close">知道了</button>
-          </div>
           <!-- 偵測到另一個已登入的 Canvas（background 記的 canvasBaseCandidate）：不自動切換，由使用者決定 -->
           <div class="canvas-candidate" id="canvas-candidate" role="status" hidden>
             <div class="canvas-candidate-text"><span id="canvas-candidate-label">偵測到另一個 Canvas：</span><span class="canvas-candidate-host" id="canvas-candidate-host"></span></div>
