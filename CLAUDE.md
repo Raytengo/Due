@@ -272,6 +272,8 @@ sidebar（300px）+ main-content（flex:1）
 >
 > **滑動 indicator（#47）**：學期待辦／課程的 active 底色是同一塊 `#side-nav-indicator`（`updateSideNav` → `placeSideNavIndicator`／`placeIndicatorAt` 寫 `--y`／`--h`），換項時沿 `--spring-selection` 滑過去；沒有 active 項（課程詳情）→ `.is-off` 原地淡出、位置不動；恢復時先 `transition:none` 寫到新項位置、forced reflow 後才移除 `.is-off`——在新位置原地淡入，不從舊位置滑來。頁面載入（含 reload 還原課程頁／詳情）直接到位、項目本身的過渡先關掉，不會出現兩塊高亮。按下 active 項時 indicator 跟著縮（`--scale-choice`）。減少動態：直接跳
 >
+> **側欄課程列也有滑動底色**（2026-10-26）：`.course-nav-indicator`（底色 `--bg`＋inset 2px 橘線，同主導航 recipe）由 `placeCourseNavIndicator(navEl)` 在每次 `renderNav` 後定位——換課沿 `--spring-selection` 滑過去、回到清單（沒有 active 項）原地淡出、從清單進詳情在新位置原地淡入、載入第一次直接到位；`renderNav` 整段重建課程列，indicator 節點跨重建保留並放回最前面，先不經過渡寫回上一次的位置（`_courseNavIndAt`）、forced reflow 再寫新位置，同一課重繪不會動。indicator 接手後 active 項本身不畫底色與左線（`.course-nav.has-indicator`），padding 不再縮 2px；按下 active 項時 indicator 跟著縮；減少動態：直接到位、保留淡入淡出
+>
 > **每個作業只在一個地方**：已隱藏 → 已完成 → 待辦，由上往下判斷。`applyFilters` 只回待辦（沒隱藏、沒落地完成），學期待辦、課程 grid、側欄課程徽章、側欄學期待辦計數都用它，沒有任何模式能改變這些數字。
 
 **學期待辦頁（Week）：**

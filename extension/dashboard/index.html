@@ -302,9 +302,30 @@
 
     /* Course Nav */
     .course-nav {
+      position: relative;   /* 滑動 indicator 的定位基準；課程項的 offsetTop 也以此為準 */
       display: flex;
       flex-direction: column;
       gap: 2px;
+    }
+
+    /* 側欄課程列的 active 底色＋左側橘線：同主導航 #47 的 indicator recipe，換課時沿 spring.selection 滑過去，
+       沒有 active 項（回到清單）時原地淡出、回來時在新位置原地淡入。由 dashboard.js placeCourseNavIndicator() 定位 */
+    .course-nav-indicator {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 0;
+      height: var(--h, 0px);
+      translate: 0 var(--y, 0px);
+      border-radius: 5px;
+      background: var(--bg);
+      box-shadow: inset 2px 0 0 var(--orange);
+      pointer-events: none;
+      transition: translate var(--spring-selection), height var(--spring-selection), opacity var(--t-color), scale var(--spring-press);
+    }
+
+    .course-nav-indicator.is-off {
+      opacity: 0;
     }
 
     .nav-course-item {
@@ -346,6 +367,17 @@
 
     .nav-course-item.active .nav-course-name {
       color: var(--orange);
+    }
+
+    /* indicator 接手後，active 項自己不畫底色與左線（不然兩層疊色）；padding 不再因左線縮 2px，換課時字不會左右跳 */
+    .course-nav.has-indicator > .nav-course-item.active {
+      background: transparent;
+      border-left: none;
+      padding-left: 10px;
+    }
+
+    .nav-course-name {
+      transition: color var(--t-color);
     }
 
     .nav-course-name {
@@ -4713,7 +4745,8 @@
     }
 
     /* 按下的是 active 的學期待辦／課程：底色在 indicator 上（#47），跟著項目一起縮，整列看起來是同一塊 */
-    .side-nav:has(> .side-nav-item[data-page].active:active:not(:disabled)) > .side-nav-indicator {
+    .side-nav:has(> .side-nav-item[data-page].active:active:not(:disabled)) > .side-nav-indicator,
+    .course-nav:has(> .nav-course-item.active:active) > .course-nav-indicator {
       scale: var(--scale-choice);
     }
 
@@ -4789,7 +4822,8 @@
       }
 
       /* 側欄 indicator（#47）：不滑，位置直接到位；淡出／淡入（is-off）保留 */
-      .side-nav-indicator {
+      .side-nav-indicator,
+      .course-nav-indicator {
         transition: opacity var(--t-color);
       }
 

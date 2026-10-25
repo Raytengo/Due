@@ -1915,6 +1915,7 @@ function renderNav(courses, assignments) {
 
   if (!courses.length) {
     navEl.innerHTML = '';
+    _courseNavIndAt = null;
     return;
   }
 
@@ -1934,11 +1935,51 @@ function renderNav(courses, assignments) {
   navEl.innerHTML = sorted.map((c) => navCourseItemHtml(c, assignments)).join('');
   navEl.querySelectorAll('.nav-course-item').forEach(bindNavCourseItem);
   syncNavNameTitles(navEl);
+  placeCourseNavIndicator(navEl);
 
   if (focusedCourse) {
     const again = navEl.querySelector(`.nav-course-item[data-target-course="${focusedCourse}"]`);
     if (again) again.focus({ preventScroll: true });
   }
+}
+
+// 側欄課程列的滑動底色（同主導航 #47 的 indicator recipe）：換課時滑過去；沒有 active 項（回到清單）原地淡出，
+// 回來時在新位置原地淡入；載入後第一次直接到位。renderNav 每次整段重建課程列，indicator 節點跨重建保留、放回最前面——
+// 重新插入的節點沒有「前一個」樣式可過渡，所以先不經過渡寫回上一次的樣子、forced reflow，再寫新的（不用 rAF）
+let _courseNavInd = null;
+let _courseNavIndAt = null;      // 上次畫的位置 { y, h }；null＝沒有 active 項（已淡出）
+let _courseNavIndPlaced = false;
+function placeCourseNavIndicator(navEl) {
+  if (!_courseNavInd) {
+    _courseNavInd = document.createElement('div');
+    _courseNavInd.className = 'course-nav-indicator is-off';
+    _courseNavInd.setAttribute('aria-hidden', 'true');
+  }
+  const ind = _courseNavInd;
+  navEl.prepend(ind);
+  navEl.classList.add('has-indicator');
+  const first = !_courseNavIndPlaced;
+  _courseNavIndPlaced = true;
+  const prev = _courseNavIndAt;
+  const setAt = ({ y, h }) => {
+    ind.style.setProperty('--y', `${y}px`);
+    ind.style.setProperty('--h', `${h}px`);
+  };
+  ind.style.transition = 'none';
+  if (prev) { setAt(prev); ind.classList.remove('is-off'); } else ind.classList.add('is-off');
+  const act = navEl.querySelector('.nav-course-item.active');
+  const next = act ? { y: act.offsetTop, h: act.offsetHeight } : null;
+  if (next && (!prev || first)) setAt(next);         // 從沒有 active 來：在新位置原地淡入（不從舊位置滑來）
+  if (next && first) ind.classList.remove('is-off'); // 載入：直接出現
+  ind.getBoundingClientRect();                        // forced reflow：上一次的樣子（或新位置）先落定
+  ind.style.transition = '';
+  if (!next) {
+    ind.classList.add('is-off');                      // 原地淡出
+  } else {
+    setAt(next);                                      // 換課：從上一次的位置滑過去
+    ind.classList.remove('is-off');
+  }
+  _courseNavIndAt = next;
 }
 
 // 側欄課名被省略號截斷 → 整顆按鈕給 title 看全名（沒截斷不加，免得多一層重複提示，QA #135）
