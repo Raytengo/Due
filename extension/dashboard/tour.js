@@ -21,48 +21,54 @@
       next: '下一步',
       done: '開始使用',
       close: '結束導覽',
-      courseTitle: '打開一門課',
-      courseBody: '點這門課，看看裡面有什麼。',
-      renameTitle: '幫課取個好認的名字',
-      renameBody: '點鉛筆，或在左邊側欄連點兩下課名，改成你習慣的叫法，按 Enter 儲存。',
+      syncTitle: '先連上 Canvas',
+      syncBody: '點這裡登入學校的 Canvas，同步完會自己跳回來',
+      courseTitle: '點一門課',
+      courseBody: '作業和評分比重都在裡面',
+      renameTitle: '改成符合人性的名字',
+      renameBody: '點鉛筆，或在側欄點兩下更名',
       checkTitle: '做完就勾掉',
-      checkBody: '點最左邊的圓圈，把這項標成完成。1.5 秒內再點一次可以反悔。',
-      dragTitle: '拖曳整理',
-      dragBody: '按住名稱後的 ⋮⋮，往下拖進「已隱藏」就算完成，拖回來就還原。',
-      aiTitle: '讓 AI 幫你填評分比重',
-      aiBody: '在 ⚙ 的「AI 分析設定」貼上你的 API key。',
+      checkBody: '點圓圈標成完成，再點一次可以反悔',
+      dragTitle: '假裝沒看到',
+      dragBody: '按住 ⋮⋮ 往下拖進隱藏區',
+      aiTitle: '自動填入課程佔比',
+      aiBody: '在「AI 分析設定」填入 API 後可自動抓取（聽不懂的話也可以假裝沒看到）',
     },
     'zh-CN': {
       counter: '{n} / {total}',
       next: '下一步',
       done: '开始使用',
       close: '结束导览',
-      courseTitle: '打开一门课',
-      courseBody: '点这门课，看看里面有什么。',
-      renameTitle: '给课取个好认的名字',
-      renameBody: '点铅笔，或在左边侧栏连点两下课名，改成你习惯的叫法，按 Enter 保存。',
+      syncTitle: '先连上 Canvas',
+      syncBody: '点这里登录学校的 Canvas，同步完会自己跳回来',
+      courseTitle: '点一门课',
+      courseBody: '作业和评分比重都在里面',
+      renameTitle: '改成符合人性的名字',
+      renameBody: '点铅笔，或在侧栏点两下改名',
       checkTitle: '做完就勾掉',
-      checkBody: '点最左边的圆圈，把这项标成完成。1.5 秒内再点一次可以反悔。',
-      dragTitle: '拖动整理',
-      dragBody: '按住名称后的 ⋮⋮，往下拖进「已隐藏」就算完成，拖回来就还原。',
-      aiTitle: '让 AI 帮你填评分比重',
-      aiBody: '在 ⚙ 的「AI 分析设置」贴上你的 API key。',
+      checkBody: '点圆圈标成完成，再点一次可以反悔',
+      dragTitle: '假装没看到',
+      dragBody: '按住 ⋮⋮ 往下拖进隐藏区',
+      aiTitle: '自动填入课程占比',
+      aiBody: '在「AI 分析设置」填入 API 后可自动抓取（听不懂的话也可以假装没看到）',
     },
     en: {
       counter: '{n} / {total}',
       next: 'Next',
       done: 'Get started',
       close: 'End tour',
+      syncTitle: 'Connect Canvas first',
+      syncBody: 'Click here to sign in to your school’s Canvas; you’ll be brought back once it syncs',
       courseTitle: 'Open a course',
-      courseBody: 'Click this course to see what’s inside.',
-      renameTitle: 'Give it a name you know',
-      renameBody: 'Click the pencil, or double-click the course in the sidebar, type the name you use, and press Enter.',
-      checkTitle: 'Check it off',
-      checkBody: 'Click the circle on the left to mark this done. Click again within 1.5 seconds to undo.',
-      dragTitle: 'Drag to organize',
-      dragBody: 'Grab the ⋮⋮ after a name and drag it down into “Hidden” to mark it done; drag it back to undo.',
-      aiTitle: 'Let AI fill in grade weights',
-      aiBody: 'Paste your API key in ⚙ → “AI analysis settings”.',
+      courseBody: 'Assignments and grade weights are all in here',
+      renameTitle: 'Give it a human name',
+      renameBody: 'Click the pencil, or double-click it in the sidebar',
+      checkTitle: 'Done? Check it off',
+      checkBody: 'Click the circle to mark it done; click again to take it back',
+      dragTitle: 'Pretend you didn’t see it',
+      dragBody: 'Grab the ⋮⋮ and drag it down into Hidden',
+      aiTitle: 'Auto-fill grade weights',
+      aiBody: 'Add an API key in “AI analysis settings” and Due fetches them for you (if that means nothing to you, pretend you didn’t see it)',
     },
   };
 
@@ -102,8 +108,19 @@
   //   interactive：亮框內可不可以點（預設可以）；reveal：這一步期間加在 <html> 上的 class（亮出平常藏著的控制項）
   //   spot：使用者要點／要拖的那個小東西 → 主亮處改成圍著它的小圓（target 只用來等畫面、捲動）
   //   point：另外挖一個虛線框「指給你看」；pointLive：這個洞也是可以操作的地方（實線亮框、點擊放行）
+  //   skipIf()：開導覽時成立就整步拿掉（不算進編號）
+  //   doneWhen()：每幀檢查，成立就自動下一步（等的是頁面外發生的事，例如去 Canvas 登入後同步完成）
   //   resolve(state)：依這一趟的狀況換文案／目標
   const STEPS = [
+    {
+      // 第一次（還沒同步、沒有課）：亮空狀態的「前往 Canvas」。登入後 Canvas 自動同步、分頁自動跳回（openCanvasTab 的武裝），
+      // 側欄出現課程就自動下一步；已經有資料的人開導覽時就拿掉這一步（不佔 n / N 的編號）
+      key: 'sync',
+      target: '#empty-open-canvas',
+      spot: '#empty-open-canvas',
+      skipIf: () => !!q('#course-nav .nav-course-item'),
+      doneWhen: () => !!q('#course-nav .nav-course-item'),
+    },
     {
       key: 'course',
       target: pickCourse,
@@ -308,6 +325,7 @@
     pop.querySelector('.tour-close').title = t('close');
     pop.querySelector('#tour-title').textContent = t(`${textKey}Title`);
     pop.querySelector('#tour-body').textContent = t(`${textKey}Body`);
+
     pop.querySelector('.tour-next-label').textContent = last ? t('done') : t('next');
     setReveal(cur.reveal);
     _state.root.classList.toggle('has-point', !!cur.point);
@@ -412,8 +430,11 @@
   function frame() {
     if (!_state) return;
     if (!_state.moving && _state.cur) {
-      const r = rectOf(_state.cur.target);
-      if (r) place(r);
+      if (_state.cur.doneWhen && _state.cur.doneWhen()) advance(SETTLE_MS);
+      else {
+        const r = rectOf(_state.cur.target);
+        if (r) place(r);
+      }
     }
     _state.raf = requestAnimationFrame(frame);
   }
@@ -541,7 +562,7 @@
   function start(opts = {}) {
     if (_state) end(true);
     const only = Array.isArray(opts.only) && opts.only.length ? opts.only : null;
-    const steps = only ? STEPS.filter((s) => only.includes(s.key)) : STEPS.slice();
+    const steps = (only ? STEPS.filter((s) => only.includes(s.key)) : STEPS.slice()).filter((s) => !s.skipIf || !s.skipIf());
     if (!steps.length) return;
     const from = Math.max(0, steps.findIndex((s) => s.key === opts.from));
     const parts = build();

@@ -607,6 +607,7 @@
       outline: none;
     }
 
+
     /* 換步：說明框先淡出下沉一點，到新位置再浮上來；亮框框線也先收起來
        （點了課程之後到下一步出現前，框線不留在舊的那一列上，看起來像卡住的空白框） */
     .tour-root.is-moving .tour-pop {
@@ -2564,10 +2565,11 @@
       margin: 0 0 20px 0;
     }
 
+    /* 新手卡片只剩一頁、沒有頁數小點：按鈕靠右 */
     .welcome-footer {
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      justify-content: flex-end;
     }
 
     .welcome-dot {
@@ -5238,67 +5240,30 @@
       <div class="welcome-main-area">
         <div class="welcome-track" id="welcome-track">
 
-          <!-- Step 1: Welcome -->
+          <!-- 唯一一頁：開發者的話＋釘選 popup（圖與步驟沿用舊第 3 頁）＋語言切換；「開始導覽」接互動導覽（tour.js） -->
           <div class="welcome-step" id="wstep-1">
             <div class="welcome-step-head">
               <div class="welcome-icon">
                 <svg viewBox="0 0 24 24">
-                  <rect x="3" y="3" width="18" height="18" rx="3" />
-                  <line x1="8" y1="12" x2="16" y2="12" />
-                  <line x1="12" y1="8" x2="12" y2="16" />
+                  <path
+                    d="M12 2C9.2 2 7 4.2 7 7c0 1.9 1 3.5 2.5 4.3V13l-1.3 1.3c-.3.3-.3.7 0 1L9.5 16.5c.3.3.7.3 1 0L12 15l1.5 1.5c.3.3.7.3 1 0l1.3-1.3c.3-.3.3-.7 0-1L14.5 13v-1.7C16 10.5 17 8.9 17 7c0-2.8-2.2-5-5-5z" />
+                  <line x1="12" y1="16" x2="12" y2="22" />
                 </svg>
               </div>
-              <div class="welcome-eyebrow">1 / 5</div>
             </div>
-            <div class="welcome-title" id="wstep-1-title">歡迎使用 Due</div>
-            <div class="welcome-body split" style="flex:1; padding-top: 8px;">
+            <div class="welcome-title" id="wstep-1-title">這是一個巨大的 TODO list，用以表達遊子思鄉之情</div>
+            <div class="welcome-body split" style="flex:1">
               <div class="welcome-body-text">
-                <span id="wstep-1-intro">Due，提醒你該做的事 ⚡️</span>
-                <div
-                  style="margin-top: 40px; font-style: italic; color: var(--muted); line-height: 1.7; font-size: 14px;">
-                  <span id="wstep-1-q1">「Canvas找個作業要翻半天」- 有人</span>
-                  <div style="margin-top: 15px;">
-                    <span id="wstep-1-q2">「明天要交Lab喔...」- 另一個人</span>
-                  </div>
-                </div>
+                <span id="wstep-1-body">釘選瀏覽器右上角的 popup，那個很好用</span>
+                <ul class="welcome-inst-list">
+                  <div style="margin-bottom: 15px;"></div>
+                  <li><span class="welcome-inst-num">1</span><span class="welcome-inst-text" id="wstep-1-li1">點擊瀏覽器右上角的<strong>拼圖圖示</strong>（擴充功能）</span></li>
+                  <li><span class="welcome-inst-num">2</span><span class="welcome-inst-text" id="wstep-1-li2">找到 <strong>Due</strong>，點擊旁邊的<strong>釘選圖示</strong></span></li>
+                  <li><span class="welcome-inst-num">3</span><span class="welcome-inst-text" id="wstep-1-li3">工具列出現 Due 圖示後即完成</span></li>
+                </ul>
               </div>
-
-              <div class="welcome-dash-mock" style="flex:0 0 280px; margin-top:0; align-self: flex-start; position: relative; top: -51px;">
-                <div class="welcome-dash-mock-header">
-                  <span class="welcome-dash-mock-title" id="wmock-title">Dashboard 概覽</span>
-                </div>
-                <div class="welcome-dash-mock-body">
-                  <div class="welcome-dash-mock-chart">
-                    <div class="welcome-dash-mock-ring" id="wmock-ring" role="img" aria-label="當週待辦 3/5">
-                      <svg viewBox="0 0 48 48" aria-hidden="true">
-                        <circle class="welcome-dash-mock-ring-track" cx="24" cy="24" r="20"></circle>
-                        <circle class="welcome-dash-mock-ring-bar" cx="24" cy="24" r="20"
-                          stroke-dasharray="125.66" stroke-dashoffset="50.27"></circle>
-                      </svg>
-                      <div class="welcome-dash-mock-ring-center">
-                        <div class="welcome-dash-mock-ring-frac"><b>3</b>/5</div>
-                      </div>
-                    </div>
-                    <div class="welcome-dash-mock-ring-cap" id="wmock-ring-cap">當週待辦</div>
-                    <div class="welcome-dash-mock-sum">
-                      <div class="welcome-dash-mock-sum-row is-overdue"><span class="welcome-dash-mock-sum-num">1</span><span id="wmock-sum-overdue">已逾期</span></div>
-                      <div class="welcome-dash-mock-sum-row is-urgent"><span class="welcome-dash-mock-sum-num">3</span><span id="wmock-sum-urgent">7天內</span></div>
-                      <div class="welcome-dash-mock-sum-row is-soon"><span class="welcome-dash-mock-sum-num">2</span><span id="wmock-sum-soon">8-30天</span></div>
-                    </div>
-                  </div>
-                  <div class="welcome-dash-mock-cards">
-                    <div class="welcome-dash-mock-card">
-                      <div class="welcome-dash-mock-card-tag">CHINESE</div>
-                      <div class="welcome-dash-mock-card-title" id="wmock-card1">期中小組報告大綱</div>
-                      <div class="welcome-dash-mock-card-date" id="wmock-date1">3月15日（3天後）</div>
-                    </div>
-                    <div class="welcome-dash-mock-card">
-                      <div class="welcome-dash-mock-card-tag">MATH</div>
-                      <div class="welcome-dash-mock-card-title">Group Project Progress...</div>
-                      <div class="welcome-dash-mock-card-date" id="wmock-date2">3月15日（3天後）</div>
-                    </div>
-                  </div>
-                </div>
+              <div class="welcome-preview square" style="align-self: flex-start; background: var(--bg);">
+                <img src="../icons/pin_guide.png" id="wstep-1-img" alt="釘選 Due 到工具列的步驟示意圖" />
               </div>
             </div>
             <div class="welcome-lang-switch-row">
@@ -5309,172 +5274,6 @@
               </div>
             </div>
           </div>
-
-          <!-- Step 2: Canvas Login -->
-          <div class="welcome-step" id="wstep-2">
-            <div class="welcome-step-head">
-              <div class="welcome-icon">
-                <svg viewBox="0 0 24 24">
-                  <circle cx="12" cy="8" r="4" />
-                  <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
-                </svg>
-              </div>
-              <div class="welcome-eyebrow">2 / 5</div>
-            </div>
-            <div class="welcome-title" id="wstep-2-title">登入 Canvas（必須）</div>
-            <div class="welcome-body" style="flex:1">
-              <span id="wstep-2-body">Due 透過你的 Canvas 登入狀態同步資料，不需要額外設定或 Token。</span>
-              <ul class="welcome-inst-list">
-                <div style="margin-bottom: 10px;"></div>
-                <li><span class="welcome-inst-num">1</span><span class="welcome-inst-text" id="wstep-2-li1">登入 <a class="welcome-inline-link" id="welcome-canvas-link">HKUST(GZ) Canvas ↗</a>（點一下，同步完成會自動帶你回來）<span class="welcome-inst-sub">其他學校：打開你學校的 Canvas（網址結尾是 .instructure.com）並登入，Due 會自動偵測</span></span><span class="welcome-canvas-synced" id="welcome-canvas-synced" hidden></span></li>
-                <li><span class="welcome-inst-num">2</span><span class="welcome-inst-text" id="wstep-2-li2">Due 會<strong>在你每次打開Canvas時自動更新</strong>你的所有課程與作業</span></li>
-                <li><span class="welcome-inst-num">3</span><span class="welcome-inst-text" id="wstep-2-li3">點擊工具列或進入 Dashboard 都可以看到相關資訊</span></li>
-              </ul>
-            </div>
-          </div>
-
-          <!-- Step 3:釘選 Due 到工具列 -->
-          <div class="welcome-step" id="wstep-3">
-            <div class="welcome-step-head">
-              <div class="welcome-icon">
-                <svg viewBox="0 0 24 24">
-                  <path
-                    d="M12 2C9.2 2 7 4.2 7 7c0 1.9 1 3.5 2.5 4.3V13l-1.3 1.3c-.3.3-.3.7 0 1L9.5 16.5c.3.3.7.3 1 0L12 15l1.5 1.5c.3.3.7.3 1 0l1.3-1.3c.3-.3.3-.7 0-1L14.5 13v-1.7C16 10.5 17 8.9 17 7c0-2.8-2.2-5-5-5z" />
-                  <line x1="12" y1="16" x2="12" y2="22" />
-                </svg>
-              </div>
-              <div class="welcome-eyebrow">3 / 5</div>
-            </div>
-            <div class="welcome-title" id="wstep-3-title">釘選 Due 到工具列</div>
-            <div class="welcome-body split" style="flex:1">
-              <div class="welcome-body-text">
-                <span id="wstep-3-body">釘選後點一下圖示就能查看 7 天待辦</span>
-                <span id="wstep-3-joke">（是為了這碟醋包的餃子btw）</span>
-                <ul class="welcome-inst-list">
-                  <div style="margin-bottom: 15px;"></div>
-                  <li><span class="welcome-inst-num">1</span><span class="welcome-inst-text" id="wstep-3-li1">點擊瀏覽器右上角的<strong>拼圖圖示</strong>（擴充功能）</span></li>
-                  <li><span class="welcome-inst-num">2</span><span class="welcome-inst-text" id="wstep-3-li2">找到 <strong>Due</strong>，點擊旁邊的<strong>釘選圖示</strong></span></li>
-                  <li><span class="welcome-inst-num">3</span><span class="welcome-inst-text" id="wstep-3-li3">工具列出現 Due 圖示後即完成</span></li>
-                </ul>
-              </div>
-              <div class="welcome-preview square" style="align-self: flex-start; background: var(--bg); position: relative; top: -43px;">
-                <img src="../icons/pin_guide.png" id="wstep-3-img" alt="釘選 Due 到工具列的步驟示意圖" />
-              </div>
-            </div>
-          </div>
-
-          <!-- Step 4: 拖曳整理作業清單（隱藏／還原） -->
-          <div class="welcome-step" id="wstep-4">
-            <div class="welcome-step-head">
-              <div class="welcome-icon">
-                <svg viewBox="0 0 24 24">
-                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
-                  <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
-                  <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24" />
-                  <line x1="1" y1="1" x2="23" y2="23" />
-                </svg>
-              </div>
-              <div class="welcome-eyebrow">4 / 5</div>
-            </div>
-            <div class="welcome-title" id="wstep-4-title">拖曳整理作業清單</div>
-            <div class="welcome-body split" style="flex:1">
-              <div class="welcome-body-text">
-                <span id="wstep-4-body">Due 會自動隱藏考試、簽到<br>你也可以自己決定要藏誰、留誰</span>
-                <p class="welcome-inst-text" id="wstep-4-li1" style="margin-top: 42px;">進入任一<strong>課程頁</strong>，按住作業的 <strong>⠿</strong> 拖到底部「<strong>已隱藏</strong>」區即可隱藏；反之亦然</p>
-              </div>
-              <div class="welcome-drag-illus" aria-hidden="true">
-                <svg viewBox="0 0 280 232" xmlns="http://www.w3.org/2000/svg">
-                  <defs>
-                    <filter id="wds-shadow" x="-20%" y="-20%" width="140%" height="160%">
-                      <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#141413" flood-opacity="0.18" />
-                    </filter>
-                    <marker id="wds-arrow-o" viewBox="0 0 8 8" refX="6" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                      <path d="M0,0 L8,4 L0,8 z" style="fill:var(--orange)" />
-                    </marker>
-                    <marker id="wds-arrow-g" viewBox="0 0 8 8" refX="6" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                      <path d="M0,0 L8,4 L0,8 z" style="fill:var(--green)" />
-                    </marker>
-                  </defs>
-
-                  <!-- 課程大卡片：整個拖曳場景都發生在這張卡裡 -->
-                  <rect x="8" y="6" width="264" height="218" rx="8" style="fill:var(--bg); stroke:var(--border)" />
-                  <!-- 課程 header 帶（代碼＋Serif 課名，課程詳情的識別元素） -->
-                  <path d="M16 6 h248 a8 8 0 0 1 8 8 v30 h-264 v-30 a8 8 0 0 1 8 -8 z" style="fill:var(--surface)" />
-                  <text x="20" y="21" style="font-family:'DM Mono',monospace; font-size:7px; fill:var(--mid); letter-spacing:.08em">DSAA 5002</text>
-                  <text x="20" y="38" style="font-family:'Source Serif 4',Georgia,serif; font-size:14px; fill:var(--dark)">Data Mining</text>
-
-                  <!-- 作業清單：兩列極簡列（無 due 色條，焦點留給拖曳列） -->
-                  <circle cx="32" cy="66" r="5.5" style="fill:none; stroke:var(--border); stroke-width:1.5" />
-                  <rect x="44" y="63" width="110" height="6" rx="3" style="fill:var(--mid); opacity:.4" />
-                  <circle cx="32" cy="90" r="5.5" style="fill:none; stroke:var(--border); stroke-width:1.5" />
-                  <rect x="44" y="87" width="88" height="6" rx="3" style="fill:var(--mid); opacity:.4" />
-
-                  <!-- 拖曳中的浮起列（陰影＋微傾，仿 .drag-clone）——畫面主角 -->
-                  <g transform="translate(52 112) rotate(2)">
-                    <rect width="170" height="26" rx="6" style="fill:var(--bg); stroke:var(--orange); stroke-width:1" filter="url(#wds-shadow)" />
-                    <circle cx="15" cy="13" r="5" style="fill:none; stroke:var(--border); stroke-width:1.5" />
-                    <rect x="27" y="10" width="78" height="6" rx="3" style="fill:var(--mid); opacity:.55" />
-                    <g style="fill:var(--orange)">
-                      <circle cx="146" cy="8" r="1.3" /><circle cx="151" cy="8" r="1.3" />
-                      <circle cx="146" cy="13" r="1.3" /><circle cx="151" cy="13" r="1.3" />
-                      <circle cx="146" cy="18" r="1.3" /><circle cx="151" cy="18" r="1.3" />
-                    </g>
-                  </g>
-
-                  <!-- 清單底部的已隱藏區（放置目標） -->
-                  <rect x="22" y="156" width="230" height="52" rx="6" style="fill:var(--surface); stroke:var(--border); stroke-dasharray:4 3" />
-                  <path d="M32 167 l4 4 -4 4" style="fill:none; stroke:var(--mid); stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round" />
-                  <text id="wds-hidden-label" x="44" y="175" style="font-family:'DM Mono',monospace; font-size:9px; fill:var(--mid); letter-spacing:.05em">已隱藏 2 項</text>
-                  <rect x="44" y="190" width="74" height="6" rx="3" style="fill:var(--purple); opacity:.8" />
-                  <rect x="126" y="186" width="26" height="13" rx="3" style="fill:none; stroke:var(--purple); opacity:.8" />
-                  <text id="wds-exam" x="139" y="196" text-anchor="middle" style="font-family:'DM Mono',monospace; font-size:8px; fill:var(--purple)">考試</text>
-
-                  <!-- 右側：拖下隱藏（橘）；左側：拖回還原（綠） -->
-                  <path d="M 246 90 C 262 112, 262 130, 248 152" marker-end="url(#wds-arrow-o)" style="fill:none; stroke:var(--orange); stroke-width:1.5" />
-                  <!-- 直排短標：中文逐字一行（tspan）、英文整字轉 90°（dashboard.js setSvgVerticalLabel 依語言重建） -->
-                  <text id="wds-hide" x="247" y="115" style="font-family:'DM Mono',monospace; font-size:9px; fill:var(--orange)"><tspan x="247" dy="0">隱</tspan><tspan x="247" dy="12">藏</tspan></text>
-                  <path d="M 34 184 C 18 158, 18 122, 30 96" marker-end="url(#wds-arrow-g)" style="fill:none; stroke:var(--green); stroke-width:1.5" />
-                  <text id="wds-show" x="22" y="132" style="font-family:'DM Mono',monospace; font-size:9px; fill:var(--green)"><tspan x="22" dy="0">還</tspan><tspan x="22" dy="12">原</tspan></text>
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          <!-- Step 5: Done -->
-          <div class="welcome-step" id="wstep-5">
-            <div class="welcome-step-head">
-              <div class="welcome-icon green">
-                <svg viewBox="0 0 24 24">
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-              </div>
-              <div class="welcome-eyebrow">5 / 5</div>
-            </div>
-            <div class="welcome-title" id="wstep-5-title">開始用 Due 吧</div>
-            <div class="welcome-body" style="flex:1">
-              <span id="wstep-5-body">這幾個功能容易錯過，記得試試：</span>
-              <div class="welcome-feat-cards">
-                <div class="welcome-feat-card">
-                  <div class="welcome-feat-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" /></svg></div>
-                  <div class="welcome-feat-text">
-                    <div class="welcome-feat-name" id="wstep-5-feat1-name">自動課程分析</div>
-                    <div class="welcome-feat-desc" id="wstep-5-feat1-desc">接上你自己的 AI API，自動抓出每門課的分數權重</div>
-                  </div>
-                </div>
-                <div class="welcome-feat-card">
-                  <div class="welcome-feat-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg></div>
-                  <div class="welcome-feat-text">
-                    <div class="welcome-feat-name" id="wstep-5-feat2-name">課程改名</div>
-                    <div class="welcome-feat-desc" id="wstep-5-feat2-desc">改成你習慣的叫法</div>
-                  </div>
-                </div>
-              </div>
-              <div class="welcome-support">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2" /><path d="m2 7 10 6 10-6" /></svg>
-                <span id="wstep-5-support">有 bug 或建議？跟我說一聲 → <a class="welcome-inline-link" href="mailto:0610raymond@gmail.com">0610raymond@gmail.com</a></span>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -5482,13 +5281,6 @@
       <div class="welcome-shared-footer">
         <div class="welcome-divider"></div>
         <div class="welcome-footer">
-          <div class="welcome-dots" id="welcome-dots">
-            <div class="welcome-dot active" data-wstep="1"></div>
-            <div class="welcome-dot" data-wstep="2"></div>
-            <div class="welcome-dot" data-wstep="3"></div>
-            <div class="welcome-dot" data-wstep="4"></div>
-            <div class="welcome-dot" data-wstep="5"></div>
-          </div>
           <div class="welcome-btn-row" id="welcome-btn-row">
             <!-- Buttons injected by JS -->
           </div>

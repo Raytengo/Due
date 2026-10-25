@@ -255,6 +255,10 @@ const I18N = {
     wBtnPrev: '上一步',
     wBtnNext: '下一步',
     wBtnDone: '開始使用',
+    // 新手卡片（只剩一頁）：開發者的話＋釘選 popup；按鈕接互動導覽
+    wIntroTitle: '這是一個巨大的 TODO list，用以表達遊子思鄉之情',
+    wIntroBody: '釘選瀏覽器右上角的 popup，那個很好用',
+    wBtnTour: '開始導覽 →',
   },
   'zh-CN': {
     courses: '课程',
@@ -417,6 +421,9 @@ const I18N = {
     wBtnPrev: '上一步',
     wBtnNext: '下一步',
     wBtnDone: '开始使用',
+    wIntroTitle: '这是一个巨大的 TODO list，用以表达游子思乡之情',
+    wIntroBody: '把浏览器右上角的 popup 固定起来，那个很好用',
+    wBtnTour: '开始导览 →',
   },
   en: {
     courses: 'Courses',
@@ -579,6 +586,9 @@ const I18N = {
     wBtnPrev: 'Back',
     wBtnNext: 'Next',
     wBtnDone: 'Start Using Due',
+    wIntroTitle: 'This is one giant to-do list, written to express a wanderer’s homesickness',
+    wIntroBody: 'Pin the popup at the top right of your browser. It’s really handy',
+    wBtnTour: 'Start the tour →',
   },
 };
 
@@ -595,104 +605,17 @@ function applyWelcomeTranslations() {
     const el = document.getElementById(id);
     if (el) el.innerHTML = tr(key);
   };
-  setText('wstep-1-title', 'wTitle1');
-  setText('wstep-1-intro', 'wBody1Intro');
-  setText('wstep-1-q1', 'wBody1Q1');
-  setText('wstep-1-q2', 'wBody1Q2');
-  // 第 1 頁迷你 Dashboard：與真介面同一套字串（日期標籤走 formatDue 同款格式）
-  setText('wmock-title', 'wMockTitle');
-  setText('wmock-ring-cap', 'weekDoneLabel');
-  const mockRing = document.getElementById('wmock-ring');
-  if (mockRing) mockRing.setAttribute('aria-label', `${tr('weekDoneLabel')} 3/5`);
-  setText('wmock-sum-overdue', 'overdueGroup');
-  setText('wmock-sum-urgent', 'within7Days');
-  setText('wmock-sum-soon', 'within30Days');
-  setText('wmock-card1', 'wMockCard1');
-  const mockDate = dueWithRel(shortDateStr(new Date(2000, 2, 15)), daysLaterText(3));
-  ['wmock-date1', 'wmock-date2'].forEach((id) => {
-    const el = document.getElementById(id);
-    if (el) el.textContent = mockDate;
-  });
-  setText('wstep-2-title', 'wTitle2');
-  setText('wstep-2-body', 'wBody2');
-  renderWelcomeCanvasLine();
-  setHTML('wstep-2-li2', 'wStep2Li2');
-  setText('wstep-2-li3', 'wStep2Li3');
-  setText('wstep-3-title', 'wTitle3');
-  setText('wstep-3-body', 'wBody3');
-  setText('wstep-3-joke', 'wBody3Joke');
-  setHTML('wstep-3-li1', 'wStep3Li1');
-  setHTML('wstep-3-li2', 'wStep3Li2');
-  setText('wstep-3-li3', 'wStep3Li3');
-  const pinImg = document.getElementById('wstep-3-img');
+  setText('wstep-1-title', 'wIntroTitle');
+  setText('wstep-1-body', 'wIntroBody');
+  setHTML('wstep-1-li1', 'wStep3Li1');
+  setHTML('wstep-1-li2', 'wStep3Li2');
+  setText('wstep-1-li3', 'wStep3Li3');
+  const pinImg = document.getElementById('wstep-1-img');
   if (pinImg) pinImg.alt = tr('wPinAlt');
-  setText('wstep-4-title', 'wTitle4');
-  setHTML('wstep-4-body', 'wBody4');
-  setHTML('wstep-4-li1', 'wStep4Li1');
-  // 第 4 頁拖曳示意圖（SVG）的文字
-  const wdsHidden = document.getElementById('wds-hidden-label');
-  if (wdsHidden) wdsHidden.textContent = tr('archiveToggle').replace('{n}', 2);
-  setText('wds-exam', 'wMockExam');
-  setSvgVerticalLabel(document.getElementById('wds-hide'), tr('wMockHide'));
-  setSvgVerticalLabel(document.getElementById('wds-show'), tr('wMockShow'));
-  setText('wstep-5-title', 'wTitle5');
-  setText('wstep-5-body', 'wBody5');
-  setText('wstep-5-feat1-name', 'wFeatCustomName');
-  setText('wstep-5-feat1-desc', 'wFeatCustomDesc');
-  setText('wstep-5-feat2-name', 'wFeatRenameName');
-  setText('wstep-5-feat2-desc', 'wFeatRenameDesc');
-  setHTML('wstep-5-support', 'wSupport5');
-  // 「已同步」狀態若已顯示，隨語言切換更新文字
-  const syncedEl = document.getElementById('welcome-canvas-synced');
-  if (syncedEl && !syncedEl.hidden) syncedEl.textContent = tr('wCanvasSynced');
   document.querySelectorAll('.welcome-lang-switch button').forEach((btn) => {
     btn.classList.toggle('active', btn.dataset.lang === _uiLanguage);
   });
   _welcomeUpdateButtons(_welcomeStep);
-}
-
-// 示意圖箭頭旁的直排短標：中文逐字直排（每字一個 tspan），英文整個字轉 90° 直排
-function setSvgVerticalLabel(el, text) {
-  if (!el) return;
-  if (el.dataset.x == null) { el.dataset.x = el.getAttribute('x'); el.dataset.y = el.getAttribute('y'); }
-  const { x, y } = el.dataset;
-  if (/^[\u3000-\u9fff\uff00-\uffef]+$/.test(text)) {
-    el.removeAttribute('transform');
-    el.removeAttribute('text-anchor');
-    el.setAttribute('x', x);
-    el.setAttribute('y', y);
-    el.innerHTML = [...text].map((ch, i) => `<tspan x="${x}" dy="${i ? 12 : 0}">${esc(ch)}</tspan>`).join('');
-  } else {
-    // 轉 90° 後字身落在錨點右側；以兩個中文字直排的中心（y+2）為中點、右移 2px 避開箭頭弧線
-    const cx = +x + 2;
-    const cy = +y + 2;
-    el.textContent = text;
-    el.setAttribute('x', cx);
-    el.setAttribute('y', cy);
-    el.setAttribute('text-anchor', 'middle');
-    el.setAttribute('transform', `rotate(90 ${cx} ${cy})`);
-  }
-}
-
-// 「登入 Canvas」那一行：已偵測到學校 → 連到該校；尚未偵測 → 明講是 HKUST(GZ)，並說明其他學校怎麼做。
-// 連結文字與連結目標必須出自同一份狀態（_welcomeCanvasBase；點擊時的目標見 openCanvasTab 的 onBase，review OB-3）
-function renderWelcomeCanvasLine() {
-  const li1 = document.getElementById('wstep-2-li1');
-  if (!li1) return;
-  const label = _welcomeCanvasBase ? 'Canvas' : tr('wCanvasDefaultSchool');
-  li1.innerHTML = tr('wStep2Li1').replace('{canvas}', () => esc(label))
-    + (_welcomeCanvasBase ? '' : `<span class="welcome-inst-sub">${esc(tr('wCanvasOtherSchool'))}</span>`);
-}
-
-// 重讀 storage 的 canvasBaseUrl（尚未同步出課程時 _currentData 是空的）；有變才重畫第 2 頁那一行
-function setWelcomeCanvasBase(base) {
-  const next = base || null;
-  if (next === _welcomeCanvasBase) return;
-  _welcomeCanvasBase = next;
-  renderWelcomeCanvasLine();
-}
-function refreshWelcomeCanvasBase() {
-  chrome.storage.local.get(['canvasBaseUrl'], (d) => setWelcomeCanvasBase(d && d.canvasBaseUrl));
 }
 
 function setUILanguage(lang) {
@@ -5045,13 +4968,11 @@ function setNoCoursesMode(on) {
   });
 }
 
-// 開 Canvas 分頁（教學「登入 Canvas」連結與空狀態共用）：點擊當下讀 storage 的 canvasBaseUrl
-// （尚未同步出課程時 _currentData 是空的），沒有就開預設學校。
-// onBase(base)：開之前回報實際用的 base（教學據此把連結文字對齊目標）；armReturn：同步落地後自動跳回 dashboard
-function openCanvasTab({ armReturn = false, onBase = null } = {}) {
+// 開 Canvas 分頁（空狀態的「前往 Canvas」，新手導覽第一步亮的就是它）：點擊當下讀 storage 的 canvasBaseUrl
+// （尚未同步出課程時 _currentData 是空的），沒有就開預設學校。armReturn：同步落地後自動跳回 dashboard
+function openCanvasTab({ armReturn = false } = {}) {
   chrome.storage.local.get(['canvasBaseUrl'], (d) => {
     const base = (d && d.canvasBaseUrl) || null;
-    if (onBase) onBase(base);
     if (!chrome.tabs?.create) return;
     chrome.tabs.create({ url: base || DEFAULT_CANVAS_URL, active: true }, (tab) => {
       if (armReturn && tab) _armCanvasReturn(tab.id);
@@ -5197,9 +5118,8 @@ if (menuOpenTutorial) {
     // 先收選單（焦點還給 ⚙）再開教學：教學的 focus trap 會把當下的焦點記成觸發元素、關閉時還給它——
     // 記到的要是 ⚙，而不是馬上變 display:none 的「使用教學」
     closeSettingsMenu();
-    // 原型：使用教學改成互動導覽（tour.js）；舊的 5 頁教學 modal 先留著（首次安裝仍會開）
-    if (typeof DueTour !== 'undefined') DueTour.start();
-    else openWelcomeModal();
+    // 新手卡片（開發者的話＋釘選 popup）→ 按「開始導覽」接互動導覽（tour.js）
+    openWelcomeModal();
   });
 }
 
@@ -5224,9 +5144,13 @@ if (menuAiSettings) {
   });
 }
 
+// 新手卡片按「開始導覽」→ 等卡片收起再開互動導覽（tour.js 在 dashboard.js 之後載入，執行期才查得到）
+function startTourAfterWelcome() {
+  setTimeout(() => { if (typeof DueTour !== 'undefined') DueTour.start(); }, MOTION.fade.duration * 2);
+}
+
 // ── Welcome Modal ──
 let _welcomeStep = 1;
-let _welcomeCanvasBase = null;   // 已偵測到的學校 Canvas 網址（開教學時從 storage 讀；尚未同步時 _currentData 是空的）
 
 function _welcomeUpdateDots(n) {
   document.querySelectorAll('.welcome-dot[data-wstep]').forEach(d => {
@@ -5236,7 +5160,7 @@ function _welcomeUpdateDots(n) {
 
 // 按鈕列固定兩個節點（上一步／主按鈕），換頁只就地改文字、data-wgo 與 class（#8）：
 // 舊版每步 btnRow.innerHTML 重建，按「開始設定」後持有焦點的按鈕被拆掉、焦點掉到 <body>，Tab 還能離開 modal。
-// 第 1 頁沒有「上一步」（hidden）；第 5 頁主按鈕變成「開始使用」（#welcome-done-btn，overlay 委派關閉）
+// 第 1 頁沒有「上一步」（hidden）；最後一頁（現在只剩一頁）主按鈕是「開始導覽 →」（#welcome-done-btn，overlay 委派：關卡片、開導覽）
 function _welcomeUpdateButtons(n) {
   const btnRow = document.getElementById('welcome-btn-row');
   if (!btnRow) return;
@@ -5258,12 +5182,12 @@ function _welcomeUpdateButtons(n) {
   prev.dataset.wgo = String(Math.max(1, n - 1));
   prev.textContent = tr('wBtnPrev');
 
-  const isLast = n === 5;
+  const isLast = n === document.querySelectorAll('#welcome-track .welcome-step').length;
   main.classList.toggle('ora', isLast);
   if (isLast) {
     main.id = 'welcome-done-btn';
     delete main.dataset.wgo;
-    main.textContent = tr('wBtnDone');
+    main.textContent = tr('wBtnTour');
   } else {
     main.removeAttribute('id');
     main.dataset.wgo = String(n + 1);
@@ -5303,7 +5227,6 @@ function openWelcomeModal() {
   _welcomeSyncSlides(1);
   const overlay = document.getElementById('welcome-overlay');
   if (overlay) overlay.classList.add('open');
-  refreshWelcomeCanvasBase();   // 第 2 頁「登入 Canvas」連結對齊目前偵測到的學校（OB-3）
 }
 
 function closeWelcomeModal() {
@@ -5320,7 +5243,6 @@ function welcomeGoStep(n) {
   _welcomeUpdateDots(n);
   _welcomeUpdateButtons(n);
   _welcomeSyncSlides(n);
-  if (n === 2) refreshWelcomeCanvasBase();   // 進「登入 Canvas」頁：連結對齊目前偵測到的學校
 }
 
 document.getElementById('welcome-close')?.addEventListener('click', closeWelcomeModal);
@@ -5329,9 +5251,9 @@ document.querySelectorAll('.welcome-lang-switch button').forEach((btn) => {
   btn.addEventListener('click', () => setUILanguage(btn.dataset.lang));
 });
 
-// 教學第 3 頁示意圖載入失敗 → 收起預覽框，不留破圖（MV3 CSP 擋 inline onerror，改由這裡綁，QA #157）
+// 新手卡片的釘選示意圖載入失敗 → 收起預覽框，不留破圖（MV3 CSP 擋 inline onerror，改由這裡綁，QA #157）
 (() => {
-  const img = document.getElementById('wstep-3-img');
+  const img = document.getElementById('wstep-1-img');
   if (!img) return;
   const hide = () => {
     const box = img.closest('.welcome-preview');
@@ -5362,9 +5284,6 @@ function _returnToDashboard() {
   if (!armed) return;
   _disarmCanvasReturn();
   loadData(); // 剛同步完的資料上畫面
-  refreshWelcomeCanvasBase();   // 同步落地＝學校已偵測到：連結改指向該校
-  const syncedEl = document.getElementById('welcome-canvas-synced');
-  if (syncedEl) { syncedEl.hidden = false; syncedEl.textContent = tr('wCanvasSynced'); }
   // 只關我們自己開的那個 Canvas 分頁（可能已被使用者關掉，lastError 靜默）
   if (chrome.tabs?.remove && armed.canvasTabId != null) {
     chrome.tabs.remove(armed.canvasTabId, () => void chrome.runtime.lastError);
@@ -5597,8 +5516,6 @@ if (chrome.storage?.onChanged?.addListener) {
     // 目前網址變了 → 也重畫這一行（canvasBaseUrl 是同步 key，外部變更另由下方 requestRefresh 排整頁重繪）
     if (changes.canvasBaseCandidate) setCanvasCandidate(changes.canvasBaseCandidate.newValue);
     else if (changes.canvasBaseUrl) renderCanvasCandidate();
-    // 教學開著、使用者自己去開學校 Canvas（未武裝）時網址落地 → 第 2 頁連結文字跟著換，不會寫著 HKUST(GZ) 卻開別校
-    if (changes.canvasBaseUrl) setWelcomeCanvasBase(changes.canvasBaseUrl.newValue);
 
     // 武裝期間 lastSync 落地 → 跳回 dashboard（內含 loadData，不必再排一般重繪）
     const ls = changes.lastSync;
@@ -5648,8 +5565,7 @@ if (chrome.runtime?.onMessage?.addListener) {
   });
 }
 
-// Delegate: overlay background click to close, canvas link, data-wgo step nav, dot clicks
-// （canvas link 用委派：applyWelcomeTranslations 會以 innerHTML 重建該連結，直接綁定會失效）
+// Delegate: overlay background click to close, 「開始導覽」, data-wgo step nav, dot clicks
 const _welcomeOverlay = document.getElementById('welcome-overlay');
 trackBackdropPress(_welcomeOverlay);
 _welcomeOverlay?.addEventListener('click', (e) => {
@@ -5657,14 +5573,7 @@ _welcomeOverlay?.addEventListener('click', (e) => {
     if (isBackdropClick(_welcomeOverlay, e)) closeWelcomeModal();   // 按下點在卡片內、拖到背景放開 → 不關（QA P2-9）
     return;
   }
-  const link = e.target.closest('#welcome-canvas-link');
-  if (link) {
-    e.preventDefault();
-    // 開的目標＝點擊當下 storage 的 canvasBaseUrl；連結文字同步改成這份狀態（不會寫著 HKUST(GZ) 卻開別校）
-    openCanvasTab({ armReturn: true, onBase: setWelcomeCanvasBase });
-    return;
-  }
-  if (e.target.closest('#welcome-done-btn')) { closeWelcomeModal(); return; }
+  if (e.target.closest('#welcome-done-btn')) { closeWelcomeModal(); startTourAfterWelcome(); return; }
   const btn = e.target.closest('[data-wgo]');
   if (btn) { welcomeGoStep(+btn.dataset.wgo); return; }
   const dot = e.target.closest('.welcome-dot[data-wstep]');
