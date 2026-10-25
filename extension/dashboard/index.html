@@ -198,7 +198,7 @@
 
     /* 學期待辦／課程共用一塊 active 底色（indicator recipe，#47）：換頁時沿 spring.selection 從上一項滑到下一項，
        不再是兩處底色各自淡出淡入。位置由 dashboard.js placeSideNavIndicator() 寫入 --y／--h；
-       沒有 active 項（課程詳情、已繳交）時 .is-off 原地淡出（transition.color）。用獨立的 translate 屬性，
+       沒有 active 項（課程詳情）時 .is-off 原地淡出（transition.color）。用獨立的 translate 屬性，
        按下 active 項時的 scale（#24）才疊得上去、以 indicator 自己的中心縮放。減少動態：位置直接到位（檔尾） */
     .side-nav-indicator {
       position: absolute;
@@ -247,12 +247,12 @@
 
     /* 學期待辦／課程的 active 底色改由 indicator 畫（#47），本身不再上底色（含 hover）。
        .has-indicator 由 placeSideNavIndicator() 第一次定位時加上：在那之前（JS 還沒跑的第一次繪製）底色仍畫在項目上，
-       載入那一幀就看得到選取。「已繳交」是獨立的過濾切換，保留上面自己的 .active 底色 */
+       載入那一幀就看得到選取 */
     .side-nav.has-indicator > .side-nav-item[data-page].active {
       background: transparent;
     }
 
-    /* 沒有課程時停用（課程／已繳交）：淡化、不給 hover（title 說明原因，見 setNoCoursesMode） */
+    /* 沒有課程時停用（課程／成績）：淡化、不給 hover（title 說明原因，見 setNoCoursesMode） */
     .side-nav-item:disabled {
       cursor: default;
       color: var(--mid);
@@ -302,9 +302,35 @@
 
     /* Course Nav */
     .course-nav {
+      position: relative;   /* 滑動 indicator 的定位基準；課程項的 offsetTop 也以此為準 */
       display: flex;
       flex-direction: column;
       gap: 2px;
+    }
+
+    /* 側欄課程列的 active 底色＋左側橘線：同主導航 #47 的 indicator recipe，換課時沿 spring.selection 滑過去，
+       沒有 active 項（回到清單）時原地淡出、回來時在新位置原地淡入。由 dashboard.js placeCourseNavIndicator() 定位 */
+    .course-nav-indicator {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 0;
+      height: var(--h, 0px);
+      translate: 0 var(--y, 0px);
+      border-radius: 5px;
+      background: var(--bg);
+      box-shadow: inset 2px 0 0 var(--orange);
+      pointer-events: none;
+      transition: translate var(--spring-selection), height var(--spring-selection), opacity var(--t-color), scale var(--spring-press);
+    }
+
+    .course-nav-indicator.is-off {
+      opacity: 0;
+    }
+
+    /* 改名中：輸入框自己有橘框，indicator 的底色與左側橘線退場，不疊成兩個框 */
+    .course-nav:has(> .nav-rename-input) > .course-nav-indicator {
+      opacity: 0;
     }
 
     .nav-course-item {
@@ -322,7 +348,7 @@
       background: transparent;
       width: 100%;
       text-align: left;
-      transition: background-color var(--t-color), scale var(--spring-press);
+      transition: background-color var(--t-color), color var(--t-color), scale var(--spring-press);
       position: relative;
       user-select: none;   /* 雙擊重命名時不選取課名文字 */
     }
@@ -346,6 +372,17 @@
 
     .nav-course-item.active .nav-course-name {
       color: var(--orange);
+    }
+
+    /* indicator 接手後，active 項自己不畫底色與左線（不然兩層疊色）；padding 不再因左線縮 2px，換課時字不會左右跳 */
+    .course-nav.has-indicator > .nav-course-item.active {
+      background: transparent;
+      border-left: none;
+      padding-left: 10px;
+    }
+
+    .nav-course-name {
+      transition: color var(--t-color);
     }
 
     .nav-course-name {
@@ -399,7 +436,7 @@
       align-items: center;
     }
 
-    /* 偵測到另一個 Canvas：同步鍵上方一行安靜的提示（文字按鈕比照 .hidden-items-toggle） */
+    /* 偵測到另一個 Canvas：同步鍵上方一行安靜的提示（文字按鈕比照 .fold-toggle） */
     .canvas-candidate {
       margin-bottom: 14px;
       font-size: 12px;
@@ -446,6 +483,289 @@
     .canvas-candidate-error {
       margin-top: 4px;
       color: var(--overdue);
+    }
+
+    /* ── 互動導覽（tour.js）：變暗＋亮框＋說明框；亮處以外的點擊由 tour.js 在 capture 階段擋下 ── */
+    .tour-root {
+      position: fixed;
+      inset: 0;
+      z-index: 9000;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity var(--t-overlay);
+    }
+
+    .tour-root.is-open {
+      opacity: 1;
+    }
+
+    .tour-root.is-closing .tour-pop {
+      pointer-events: none;
+    }
+
+    /* 變暗層：SVG mask 挖洞（主亮框＋「指給你看」的第二個洞），洞跟著亮框一起滑 */
+    .tour-dim {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    .tour-dim-fill {
+      fill: rgba(20, 20, 19, 0.5);
+    }
+
+    .tour-hole {
+      transition: x var(--t-disclosure), y var(--t-disclosure), width var(--t-disclosure), height var(--t-disclosure), rx var(--t-disclosure);
+    }
+
+    /* 亮框：框內透明、看得到底下真的介面；細橘線外加一圈淡橘光暈 */
+    .tour-ring {
+      position: fixed;
+      border-radius: 10px;
+      box-shadow: 0 0 0 1.5px var(--orange), 0 0 0 6px rgba(217, 119, 87, 0.16);
+      pointer-events: none;
+      transition: left var(--t-disclosure), top var(--t-disclosure), width var(--t-disclosure), height var(--t-disclosure),
+        border-radius var(--t-disclosure), opacity var(--t-fade);
+    }
+
+    /* 脈動信標（hotspot beacon）：實心小點＋兩圈錯開的擴散光圈，掛在要點的亮框角上，提示「點這裡」 */
+    .tour-beacon {
+      position: fixed;
+      width: 12px;
+      height: 12px;
+      margin: -6px 0 0 -6px;
+      border-radius: 50%;
+      background: var(--orange);
+      box-shadow: 0 0 0 2px var(--bg);
+      pointer-events: none;
+      opacity: 0;
+      scale: 0.4;
+      transition: opacity var(--t-fade), scale var(--t-fade), left var(--t-disclosure), top var(--t-disclosure);
+    }
+
+    .tour-root.is-spot:not(.is-moving) .tour-beacon {
+      opacity: 1;
+      scale: 1;
+    }
+
+    .tour-beacon span {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: var(--orange);
+      animation: tour-beacon 1.8s var(--ease-out) infinite;
+    }
+
+    .tour-beacon span + span {
+      animation-delay: 0.9s;
+    }
+
+    @keyframes tour-beacon {
+      from { scale: 1; opacity: 0.55; }
+      to { scale: 3.2; opacity: 0; }
+    }
+
+    /* 「指給你看」的第二個洞：虛線框，不是要點的地方 */
+    .tour-ring2 {
+      position: fixed;
+      border: 1.5px dashed var(--orange);
+      border-radius: 10px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity var(--t-fade);
+    }
+
+    .tour-root.has-point .tour-ring2 {
+      opacity: 1;
+    }
+
+    /* 第二個亮處也是可以操作的地方（改課名時的側欄）：跟主亮框一樣的實線框 */
+    .tour-root.point-live .tour-ring2 {
+      border: none;
+      box-shadow: 0 0 0 1.5px var(--orange), 0 0 0 6px rgba(217, 119, 87, 0.16);
+    }
+
+
+
+
+    .tour-pop {
+      position: fixed;
+      width: 320px;
+      padding: 18px 20px 16px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--bg);
+      box-shadow: 0 1px 2px rgba(20, 20, 19, 0.06), 0 16px 40px -10px rgba(20, 20, 19, 0.35);
+      color: var(--dark);
+      pointer-events: auto;
+      transition: opacity var(--t-fade), translate var(--t-fade);
+    }
+
+    .tour-pop:focus {
+      outline: none;
+    }
+
+
+    /* 換步：說明框先淡出下沉一點，到新位置再浮上來；亮框框線也先收起來
+       （點了課程之後到下一步出現前，框線不留在舊的那一列上，看起來像卡住的空白框） */
+    .tour-root.is-moving .tour-pop {
+      opacity: 0;
+      translate: 0 4px;
+    }
+
+    .tour-root.is-moving .tour-ring,
+    .tour-root.is-moving .tour-ring2 {
+      opacity: 0;
+    }
+
+    .tour-root.no-anim .tour-ring,
+    .tour-root.no-anim .tour-hole,
+    .tour-root.no-anim .tour-pop {
+      transition: none;
+    }
+
+    /* 箭頭：轉 45° 的方塊，貼在靠亮框的那一側，對齊亮框中線（--arrow-y／--arrow-x） */
+    .tour-arrow {
+      position: absolute;
+      width: 11px;
+      height: 11px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      rotate: 45deg;
+    }
+
+    .tour-pop[data-side="right"] .tour-arrow {
+      left: -6.5px;
+      top: var(--arrow-y, 50%);
+      translate: 0 -50%;
+      border-top: none;
+      border-right: none;
+    }
+
+    .tour-pop[data-side="left"] .tour-arrow {
+      right: -6.5px;
+      top: var(--arrow-y, 50%);
+      translate: 0 -50%;
+      border-bottom: none;
+      border-left: none;
+    }
+
+    .tour-pop[data-side="bottom"] .tour-arrow {
+      top: -6.5px;
+      left: var(--arrow-x, 50%);
+      translate: -50% 0;
+      border-right: none;
+      border-bottom: none;
+    }
+
+    .tour-pop[data-side="top"] .tour-arrow {
+      bottom: -6.5px;
+      left: var(--arrow-x, 50%);
+      translate: -50% 0;
+      border-left: none;
+      border-top: none;
+    }
+
+    .tour-pop[data-side="inside"] .tour-arrow {
+      display: none;
+    }
+
+    .tour-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: -4px -8px 6px 0;
+    }
+
+    .tour-counter {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      color: var(--mid);
+    }
+
+    .tour-close {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px;
+      height: 26px;
+      border: none;
+      border-radius: 6px;
+      background: none;
+      color: var(--mid);
+      cursor: pointer;
+      transition: background-color var(--t-color), color var(--t-color), scale var(--spring-press);
+    }
+
+    .tour-title {
+      font-family: 'Source Serif 4', Georgia, serif;
+      font-size: 19px;
+      font-weight: 400;
+      line-height: 1.3;
+      margin-bottom: 8px;
+    }
+
+    .tour-body {
+      font-size: 13.5px;
+      font-weight: 300;
+      line-height: 1.7;
+      color: var(--muted);
+    }
+
+    .tour-foot {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 18px;
+    }
+
+    .tour-next {
+      flex-shrink: 0;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      height: 32px;
+      padding: 0 14px;
+      border: none;
+      border-radius: 6px;
+      background: var(--dark);
+      color: var(--bg);
+      font-family: 'DM Mono', monospace;
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+      transition: background-color var(--t-color), scale var(--spring-press);
+    }
+
+    .tour-next svg {
+      transition: translate var(--t-color);
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+      .tour-close:hover {
+        background: var(--surface);
+        color: var(--dark);
+      }
+
+      .tour-next:hover {
+        background: #34322d;
+      }
+
+      .tour-next:hover svg {
+        translate: 2px 0;
+      }
+    }
+
+    .tour-close:active,
+    .tour-next:active {
+      scale: var(--scale-press);
+    }
+
+    /* 導覽「改課名」這一步：鉛筆平常要 hover 才出現，這一步直接亮出來 */
+    .tour-reveal-rename .btn-rename-course {
+      opacity: 1;
     }
 
     .btn-sync {
@@ -872,9 +1192,14 @@
     .wk-ring-bar {
       fill: none;
       stroke: var(--green);
-      stroke-width: 20;
+      stroke-width: 20;   /* = dashboard.js RING_W */
       stroke-linecap: round;
       transition: stroke-dashoffset var(--ring);
+    }
+
+    /* 全部完成：弧停在兩端圓帽相碰的位置後換成實心圓，12 點鐘不留 dash 接縫（dashboard.js ringOffset） */
+    .wk-ring-bar.is-full {
+      stroke-dasharray: none;
     }
 
     .wk-ring-center {
@@ -922,6 +1247,8 @@
       letter-spacing: 0.08em;
       color: var(--muted);
       margin-top: 6px;
+      position: relative;
+      top: 6px;   /* 只把說明字往下挪，分子位置不動 */
     }
 
     /* 分級摘要：可點列，跳到右側對應區塊 */
@@ -1206,11 +1533,10 @@
       border-bottom: none;
     }
 
-    /* 已完成列淡化（主清單＋已繳交視圖的已隱藏列）：只套在內容上，不整列 opacity——整列會疊乘到
-       拖曳握把與操作鈕（已繳交視圖握把曾只剩約 1.6:1，QA #79）。用變數讓拖曳 clone／殘影歸零淡化，
+    /* 已完成列淡化（下方「已隱藏」區裡已完成的列）：只套在內容上，不整列 opacity——整列會疊乘到
+       拖曳握把與操作鈕（握把曾只剩約 1.6:1，QA #79）。用變數讓拖曳 clone／殘影歸零淡化，
        維持舊外觀（clone 全不透明、殘影只吃 .drag-source 的 0.3）*/
-    .assignment-item.submitted,
-    .hidden-item-row.submitted {
+    .assignment-item.submitted {
       --done-fade: 0.45;
     }
 
@@ -1222,10 +1548,7 @@
     .assignment-item.submitted > .assignment-check,
     .assignment-item.submitted .assignment-title > span:first-child,
     .assignment-item.submitted .assignment-left > :not(.assignment-title),
-    .assignment-item.submitted .assignment-right > :not(.custom-actions-row),
-    .hidden-item-row.submitted .hidden-item-title > span:first-child,
-    .hidden-item-row.submitted .hidden-item-left > :not(.hidden-item-title),
-    .hidden-item-row.submitted .hidden-item-right > :not(.custom-actions-row) {
+    .assignment-item.submitted .assignment-right > :not(.custom-actions-row) {
       opacity: var(--done-fade);
     }
 
@@ -1402,8 +1725,7 @@
       color: var(--dark);
     }
 
-    .assignment-title > span:first-child,
-    .hidden-item-title > span:first-child {
+    .assignment-title > span:first-child {
       min-width: 0;
       white-space: nowrap;
       overflow: hidden;
@@ -1669,12 +1991,12 @@
        內容從 2px 模糊清晰（blur.disclosure），三者與 chevron 同一個 transition.disclosure，讀起來是同一個動作。
        收合時 visibility:hidden（面板裡的連結、輸入框不在 Tab 順序裡，A17）：
        打開那一邊 visibility 立刻生效（0s，鍵盤移動後焦點要能馬上落進去，#6）；收合等淡出跑完才藏。
-       拖曳降級時（.drop-active）稽核清單也走同一個開合，不再硬切 */
+       拖曳中收合區維持收合（只亮起外框當放置目標，展開一長串已完成會很亂，spec 2026-10-25） */
     .detail-right-panel {
       interpolate-size: allow-keywords;
     }
 
-    :is(.assignment-desc, .grade-calc-body, .hidden-items-list) {
+    :is(.assignment-desc, .grade-calc-body, .fold-list) {
       display: block;
       height: 0;
       overflow: clip;
@@ -1684,7 +2006,7 @@
       transition: height var(--t-disclosure), opacity var(--t-disclosure), filter var(--t-disclosure), visibility var(--t-disclosure);
     }
 
-    :is(.assignment-desc.open, .grade-calc.open .grade-calc-body, .hidden-items.open .hidden-items-list, .hidden-items.drop-active .hidden-items-list) {
+    :is(.assignment-desc.open, .grade-calc.open .grade-calc-body, .detail-fold.open .fold-list) {
       height: auto;
       opacity: 1;
       filter: none;
@@ -2060,13 +2382,6 @@
       color: var(--mid);
     }
 
-    .welcome-lang-switch-row {
-      display: flex;
-      justify-content: flex-end;
-      margin-top: 4px;
-      margin-bottom: 16px;
-    }
-
     .welcome-lang-switch {
       display: flex;
       gap: 2px;
@@ -2243,10 +2558,46 @@
       margin: 0 0 20px 0;
     }
 
+    /* 新手卡片：語言切換在左下、主按鈕在右下（兩邊各自對齊卡片內距） */
     .welcome-footer {
       display: flex;
       align-items: center;
       justify-content: space-between;
+    }
+
+    .welcome-footer > .welcome-lang-switch {
+      margin: 0 0 24px 40px;
+    }
+
+    /* 卡片外的手繪箭頭：指向瀏覽器右上角（擴充功能圖示在那）＋「（應該在這）」 */
+    .welcome-pin-arrow {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+      pointer-events: none;
+    }
+
+    .welcome-pin-arrow-line {
+      fill: none;
+      stroke: var(--orange);
+      stroke-width: 5;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    /* 跟手繪箭頭同一種手寫感：中文翩翩體（macOS）→ 楷體（Windows）；英文 Noteworthy／Bradley Hand → Segoe Print。
+       不用 italic（中文沒有真斜體，瀏覽器硬拉斜很醜） */
+    .welcome-pin-arrow-label {
+      fill: var(--orange);
+      font-family: 'HanziPen TC', 'HanziPen SC', 'Kaiti TC', 'KaiTi', 'BiauKai', 'Noteworthy', 'Bradley Hand', 'Segoe Print', cursive;
+      font-size: 25px;
+      dominant-baseline: middle;
+    }
+
+    html[lang="en"] .welcome-pin-arrow-label {
+      font-family: 'Noteworthy', 'Bradley Hand', 'Segoe Print', cursive;
     }
 
     .welcome-dot {
@@ -3211,9 +3562,13 @@
       padding: 0;
     }
 
-    /* 側欄行內重命名輸入框：取代整個 .nav-course-item 按鈕，尺寸與其對齊 */
+    /* 側欄行內重命名輸入框：取代整個 .nav-course-item 按鈕，尺寸與其對齊——高度釘在課程項的 38px
+       （7px×2 padding＋24px badge），改名時下面的課不會往上跳。
+       position:relative 讓它疊在課程列的滑動 indicator（absolute）之上，不然 indicator 會蓋住輸入框 */
     .nav-rename-input {
+      position: relative;
       width: 100%;
+      height: 38px;
       box-sizing: border-box;
       padding: 6px 9px;
       border: 1px solid var(--orange);
@@ -3318,16 +3673,6 @@
       font-weight: 500;
     }
 
-    /* 權重來源小字（AI 分析／Canvas 設定）：圖例最後一行的註腳，與圖例文字左緣對齊（圓點 12px＋間距 8px），不搶圖例 */
-    .detail-weight-source {
-      padding-left: 20px;
-      font-family: 'DM Mono', monospace;
-      font-size: 10.5px;
-      letter-spacing: 0.02em;
-      color: var(--mid);
-      cursor: default;
-    }
-
     .btn-edit-weights {
       display: inline-flex;
       align-items: center;
@@ -3397,17 +3742,6 @@
       margin: 24px 0 10px;
     }
 
-    /* 「已繳交」過濾開著：標題後附過濾名（深色，在淡灰標題中可辨，QA #5/#119） */
-    .detail-filter-tag {
-      color: var(--dark);
-    }
-
-    .detail-filter-tag::before {
-      content: '·';
-      margin: 0 6px;
-      color: var(--muted);
-    }
-
     /* 清單沒有作業時的提示（整段渲染與完成最後一項後的就地更新共用） */
     .detail-list-empty {
       padding: 12px 0;
@@ -3415,14 +3749,15 @@
       font-size: 13px;
     }
 
-    /* ── 已隱藏區（自動隱藏的考試・簽到＋手動拖進來的作業；跟隨完成過濾，見 spec 2026-10-23）── */
-    .hidden-items {
+    /* ── 作業清單下方的「已隱藏」收合區（.archive-items，spec 2026-10-25-drop-submitted-filter）──
+       已完成＋被隱藏（自動隱藏的考試・簽到、手動隱藏的作業）合成一區；開關、箭頭、清單用 .fold-* */
+    .detail-fold {
       margin-top: 12px;
       padding-top: 10px;
       border-top: 1px solid var(--border);
     }
 
-    .hidden-items-toggle {
+    .fold-toggle {
       display: inline-flex;
       align-items: center;
       gap: 6px;
@@ -3439,31 +3774,13 @@
     }
 
     @media (hover: hover) and (pointer: fine) {
-      .hidden-items-toggle:hover {
+      .fold-toggle:hover {
         color: var(--orange);
       }
     }
 
-    /* 另一個完成桶的隱藏數短註（「另 M 項已完成，在『已繳交』中」）：接在數量後、較淡、以「·」隔開；
-       與數量同一段行內文字，窄欄時自然換行並對齊在箭頭之後 */
-    .hidden-items-note {
-      color: var(--mid);
-      transition: color var(--t-color);   /* hover 時跟著開關轉橘：淡入，不是一幀切上去（#37） */
-    }
-
-    .hidden-items-note::before {
-      content: '·';
-      margin: 0 6px;
-    }
-
-    @media (hover: hover) and (pointer: fine) {
-      .hidden-items-toggle:hover .hidden-items-note {
-        color: inherit;
-      }
-    }
-
-    /* 箭頭固定對齊第一行（短註換行時不跑到兩行中間） */
-    .hidden-items-arrow {
+    /* 箭頭固定對齊第一行 */
+    .fold-arrow {
       font-size: 11px;
       line-height: 1;
       display: inline-flex;
@@ -3473,39 +3790,20 @@
       transition: transform var(--t-disclosure);   /* 與清單的開合同一個 timing（#28） */
     }
 
-    .hidden-items-label {
+    .fold-label {
       line-height: 16px;
     }
 
-    .hidden-items.open .hidden-items-arrow {
+    .detail-fold.open .fold-arrow {
       transform: rotate(90deg);
     }
 
     /* 清單開合見「展開面板」共用規則（#28）；上方 4px 間距放內層，外層 height:0 才收得乾淨 */
-    .hidden-items-list-inner {
+    .fold-list-inner {
       padding-top: 4px;
     }
 
-    /* 隱藏列不整列降透明：淡化只靠較小字級＋標題改 --mid＋分組/時間標籤 0.75（見下），不疊乘到握把與操作鈕（QA #79） */
-    .hidden-item-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 0;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .hidden-item-row:last-child {
-      border-bottom: none;
-    }
-
-    /* 分組/時間標籤是次要資訊：略降透明；已完成的隱藏列改由 --done-fade 覆寫（同元素覆寫，不疊乘） */
-    .hidden-item-row .assignment-group,
-    .hidden-item-row .due-label {
-      opacity: 0.75;
-    }
-
-    /* ── 拖曳隱藏／取消隱藏（作業清單 ↔ 已隱藏區；pointer 自繪拖曳，見 spec 2026-07-22、2026-10-23）── */
+    /* ── 拖曳（作業清單 ↔ 下方「已隱藏」區；pointer 自繪拖曳，見 spec 2026-07-22、2026-10-25）── */
     /* 握把：緊跟作業名稱後，唯一拖曳起點；靜止 0.75 對 --bg 約 3.2:1（UI 元件 ≥3:1，QA #79） */
     .drag-grip {
       flex: 0 0 auto;
@@ -3527,7 +3825,6 @@
 
     @media (hover: hover) and (pointer: fine) {
       /* 滑過該列握把全亮（靜止 0.75 之上，QA #79） */
-      .hidden-item-row:hover .drag-grip,
       .assignment-item:hover .drag-grip {
         opacity: 1;
       }
@@ -3541,18 +3838,13 @@
     /* 鍵盤焦點在該列（:has(:focus-visible)＝只算鍵盤）時握把跟 hover 一樣亮起；
        握把本身拿到焦點時全亮、第一幀就到位（#6 會把它改成 button）；
        觸控時以 0.85 常駐（#11） */
-    :is(.hidden-item-row, .assignment-item):has(:focus-visible) .drag-grip {
+    .assignment-item:has(:focus-visible) .drag-grip {
       opacity: 1;
     }
 
-    :is(.hidden-item-row, .assignment-item) .drag-grip:focus-visible {
+    .assignment-item .drag-grip:focus-visible {
       opacity: 1;
       transition: none;
-    }
-
-    /* 握把拿到鍵盤焦點時整列維持不透明，焦點框才不會跟著被淡掉（#6；已隱藏列現已不整列降透明（QA #79），此條為保險） */
-    .hidden-item-row:has(.drag-grip:focus-visible) {
-      opacity: 1;
     }
 
     @media not all and (hover: hover) and (pointer: fine) {
@@ -3593,7 +3885,7 @@
     /* 放置目標：虛線框 + 淡橘底 + 提示文字（data-drophint）*/
     /* 底色過渡寫在 base（#41）：只寫在 .drop-active 上的話淡入有、淡出卻是硬切 */
     .detail-assignments-list,
-    .hidden-items {
+    .detail-fold {
       transition: background-color var(--t-color);
     }
 
@@ -3603,7 +3895,7 @@
     }
 
     .detail-assignments-list.drop-active,
-    .hidden-items.drop-active {
+    .detail-fold.drop-active {
       outline: 2px dashed var(--orange);
       outline-offset: 3px;
       border-radius: 8px;
@@ -3612,7 +3904,7 @@
 
     /* 游標真正在目標上方：實線＋加深，表示「放開即生效」 */
     .detail-assignments-list.drop-hover,
-    .hidden-items.drop-hover {
+    .detail-fold.drop-hover {
       outline-style: solid;
       background: rgba(217, 119, 87, 0.09);
     }
@@ -3620,7 +3912,7 @@
     /* 提示文字（data-drophint）：升級目標＝清單，置於紅框「頂部」（::before）；
        降級目標＝稽核區，因頂部已有展開按鈕，維持置於「底部」（::after）*/
     .detail-assignments-list.drop-active::before,
-    .hidden-items.drop-active::after {
+    .detail-fold.drop-active::after {
       content: attr(data-drophint);
       display: block;
       text-align: center;
@@ -3640,9 +3932,9 @@
       line-height: 1.6;
       white-space: nowrap;
     }
-    .hidden-items.drop-active::after { padding: 8px 0 2px; }
+    /* 收合區拖曳中不展開（spec 2026-10-25），放置框只有標題一行太小、不好瞄準 → 提示字上下多留空間 */
+    .detail-fold.drop-active::after { padding: 18px 0 14px; }
 
-    /* 降級拖曳中：即使稽核區收合，也展開列表作為放置目標——走「展開面板」共用規則的開合（#28），不硬切 */
 
     /* 落點：clone 飛入、快到時與落地列交叉淡換（settleClone 以 inline opacity 處理，#41），落地後淡橘閃一下 */
     .drag-arrived {
@@ -3665,7 +3957,7 @@
       cursor: grabbing !important;
     }
 
-    .hidden-items-empty {
+    .fold-empty {
       font-family: 'DM Mono', monospace;
       font-size: 11px;
       color: var(--mid);
@@ -3673,61 +3965,51 @@
       padding: 10px 0;
     }
 
-    .hidden-item-left {
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-      flex: 1;
-      min-width: 0;
-    }
-
-    .hidden-item-title {
-      display: flex;
-      align-items: center;
-      gap: 7px;
-      min-width: 0;
-      font-size: 14px;
-      color: var(--mid);
-    }
-
-    .hidden-item-right {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-      gap: 4px;
-      margin-left: 20px;
-      flex-shrink: 0;
-    }
-
     /* ── View Transitions — Card ↔ Detail Morph ──
        具名 deviation（#39）：group 曲線保留 cubic-bezier(0.22,1,0.36,1)（≈ ease.out）、0.28s。
        B2 對 morph 的角色曲線是 ease.inOut、recipe 是 spring.dialog 750ms，但這是高頻 drill-down，
        起步慢的曲線看起來像延遲、750ms 又太長。減少動態時 JS 不命名共享元素（見 setMorphName），只剩 root crossfade。 */
-    ::view-transition-group(course-shell),
-    ::view-transition-group(course-code),
-    ::view-transition-group(course-name),
-    ::view-transition-group(course-badge),
-    ::view-transition-group(course-meta) {
-      animation-duration: 0.28s;
-      animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+    ::view-transition-group(course-shell) {
+      /* 具名 deviation：Apple 系統動畫常用的 cubic-bezier(0.32,0.72,0,1)（起步快、收尾長而柔），0.36s */
+      animation-duration: 0.36s;
+      animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+      /* 外框：快照不縮放（object-fit:none，貼左上），只有 group 的框在長大／縮小，內容在框裡被裁切。
+         框線（1px 的 box-shadow 環）、陰影、底色畫在 group 上；dashboard.js startMorph 會用 WAAPI 讓它們
+         從出發那一端的實際樣子連續變到抵達那一端（hover 的橘框 → 詳情的灰框＋陰影）。這裡是動畫沒接上時的後備 */
+      overflow: clip;
+      border-radius: 8px;
+      background: var(--surface);
+      box-shadow: 0 0 0 1px var(--border);
     }
 
+    /* 不閃（2026-10-25，比照 macOS）：框裡墊著實心的 --surface（卡片與詳情同色），舊內容很快淡出、新內容稍後淡入，
+       中間露出的是同色的卡片底，不是頁面底色，也不會兩種版面的字疊在一起。VT 預設的 plus-lighter 混合會在
+       兩層交疊時變亮，一律改成 normal。文字全程原尺寸、不縮放（#16） */
     ::view-transition-old(course-shell),
     ::view-transition-new(course-shell) {
-      animation-duration: 0.22s;
+      /* 快照維持自己的原尺寸、貼在框的左上角（不縮放），框長大時多出來的部分露出 group 的實心底 */
+      width: auto;
+      height: auto;
+      mix-blend-mode: normal;
+      /* 快照自己的 1px 框線（與 hover 的陰影）裁掉：不然卡片的框會變成大框裡面的第二個小框；
+         框線只由 group 畫（見上方，會從出發端的樣子連續變到抵達端） */
+      clip-path: inset(1px round 7px);
     }
 
-    ::view-transition-old(course-code),
-    ::view-transition-old(course-name),
-    ::view-transition-old(course-badge),
-    ::view-transition-old(course-meta),
-    ::view-transition-new(course-code),
-    ::view-transition-new(course-name),
-    ::view-transition-new(course-badge),
-    ::view-transition-new(course-meta) {
-      animation-duration: 0.18s;
-      height: 100%;
-      overflow: hidden;
+    ::view-transition-old(course-shell) {
+      animation: vt-fade-away 0.1s ease-out both;
+    }
+
+    ::view-transition-new(course-shell) {
+      animation: vt-fade-over 0.2s cubic-bezier(0.32, 0.72, 0, 1) 0.06s both;
+    }
+
+    @keyframes vt-fade-away {
+      to { opacity: 0; }
+    }
+
+    @keyframes vt-fade-over {
+      from { opacity: 0; }
     }
 
     /* Sidebar: 不参与动画，保持静止 */
@@ -3740,25 +4022,18 @@
       animation: none;
     }
 
-    /* 页面其余部分：快速切换，不干扰 morph 动画 */
+    /* 頁面其餘部分：同一個原則——舊的不淡出、新的淡入蓋上去（normal 混合），整頁不會先變空再出現 */
+    ::view-transition-old(root),
+    ::view-transition-new(root) {
+      mix-blend-mode: normal;
+    }
+
     ::view-transition-old(root) {
-      animation: vt-root-out 0.08s ease forwards;
+      animation: none;
     }
 
     ::view-transition-new(root) {
-      animation: vt-root-in 0.1s ease 0.05s both;
-    }
-
-    @keyframes vt-root-out {
-      to {
-        opacity: 0;
-      }
-    }
-
-    @keyframes vt-root-in {
-      from {
-        opacity: 0;
-      }
+      animation: vt-fade-over 0.24s cubic-bezier(0.32, 0.72, 0, 1) both;
     }
 
     /* ── Weight Edit Modal ── */
@@ -4722,8 +4997,7 @@
         padding-left: 16px;
         padding-right: 16px;
       }
-      .assignment-right,
-      .hidden-item-right {
+      .assignment-right {
         margin-left: 12px;
       }
       .detail-card-bottom .due-label {
@@ -4762,7 +5036,7 @@
        設定選單項目不縮（用 highlight 回應）。卡片／列用 :has 擋掉「按的是裡面的按鈕卻整張一起縮」。
        鍵盤 Enter／Space 走 click()，不觸發 :active——動作本身（morph、展開）就是回饋。減少動態：兩個 scale token 為 1（檔尾） */
     :is(.btn-sync, .btn-theme-toggle, .btn-add-assignment, .detail-back-tab, .canvas-candidate-btn, .state-msg-action,
-      .card-pager-btn, .btn-edit-weights, .btn-rename-course, .hidden-items-toggle,
+      .card-pager-btn, .btn-edit-weights, .btn-rename-course, .fold-toggle,
       .btn-delete-custom-assignment, .btn-edit-custom-assignment,
       .welcome-btn, .welcome-close,
       .custom-assignment-close, .weight-edit-close, .custom-assignment-actions button, .confirm-actions button,
@@ -4782,7 +5056,8 @@
     }
 
     /* 按下的是 active 的學期待辦／課程：底色在 indicator 上（#47），跟著項目一起縮，整列看起來是同一塊 */
-    .side-nav:has(> .side-nav-item[data-page].active:active:not(:disabled)) > .side-nav-indicator {
+    .side-nav:has(> .side-nav-item[data-page].active:active:not(:disabled)) > .side-nav-indicator,
+    .course-nav:has(> .nav-course-item.active:active) > .course-nav-indicator {
       scale: var(--scale-choice);
     }
 
@@ -4806,6 +5081,24 @@
     }
 
     @media (prefers-reduced-motion: reduce) {
+      .tour-ring,
+      .tour-pop {
+        transition: opacity var(--t-fade);
+      }
+
+      .tour-hole {
+        transition: none;
+      }
+
+      .tour-root.is-moving .tour-pop {
+        translate: none;
+      }
+
+      .tour-beacon span {
+        animation: none;
+        opacity: 0;
+      }
+
       :root {
         --lift: 0px;
         --scale-press: 1;
@@ -4827,18 +5120,18 @@
 
       /* 弧直接到位（JS 不等 transitionend）、chevron 不轉、教學頁直接換 */
       .wk-ring-bar,
-      .hidden-items-arrow,
+      .fold-arrow,
       .grade-calc-arrow,
       .welcome-track {
         transition: none;
       }
 
       /* 展開面板（#28）：高度直接到位，只留淡入淡出、模糊清晰與 visibility */
-      :is(.assignment-desc, .grade-calc-body, .hidden-items-list) {
+      :is(.assignment-desc, .grade-calc-body, .fold-list) {
         transition: opacity var(--t-disclosure), filter var(--t-disclosure), visibility var(--t-disclosure);
       }
 
-      :is(.assignment-desc.open, .grade-calc.open .grade-calc-body, .hidden-items.open .hidden-items-list, .hidden-items.drop-active .hidden-items-list) {
+      :is(.assignment-desc.open, .grade-calc.open .grade-calc-body, .detail-fold.open .fold-list) {
         transition: opacity var(--t-disclosure), filter var(--t-disclosure), visibility 0s;
       }
 
@@ -4858,7 +5151,8 @@
       }
 
       /* 側欄 indicator（#47）：不滑，位置直接到位；淡出／淡入（is-off）保留 */
-      .side-nav-indicator {
+      .side-nav-indicator,
+      .course-nav-indicator {
         transition: opacity var(--t-color);
       }
 
@@ -4914,14 +5208,6 @@
             <span class="side-nav-name" id="nav-courses-label">課程</span>
             <span class="side-nav-count" id="nav-courses-count"></span>
           </button>
-          <button class="side-nav-item" id="nav-submitted">
-            <span class="side-nav-name" id="nav-submitted-label">已繳交</span>
-            <span class="side-nav-count" id="nav-submitted-count"></span>
-          </button>
-          <!-- 學期成績：開 modal（不是頁面）；分數只在這裡與各課成績計算器出現（決策 3，spec 2026-10-25-semester-grades） -->
-          <button class="side-nav-item" id="nav-grades" aria-haspopup="dialog">
-            <span class="side-nav-name" id="nav-grades-label">成績</span>
-          </button>
         </nav>
 
         <div class="sidebar-section" style="flex:1;min-height:0;">
@@ -4976,109 +5262,20 @@
 
   <!-- Welcome Modal -->
   <div class="welcome-overlay" id="welcome-overlay">
+    <!-- 手繪箭頭：從卡片右上角指向瀏覽器右上角（擴充功能圖示的位置），由 drawWelcomePinArrow 擺 -->
+    <svg class="welcome-pin-arrow" id="welcome-pin-arrow" aria-hidden="true">
+      <path class="welcome-pin-arrow-line"></path>
+      <path class="welcome-pin-arrow-line welcome-pin-arrow-head"></path>
+      <text class="welcome-pin-arrow-label"></text>
+    </svg>
     <div class="welcome-card">
       <button class="welcome-close" id="welcome-close"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
 
       <div class="welcome-main-area">
         <div class="welcome-track" id="welcome-track">
 
-          <!-- Step 1: Welcome -->
+          <!-- 唯一一頁：開發者的話＋釘選 popup（圖與步驟沿用舊第 3 頁）＋語言切換；「開始導覽」接互動導覽（tour.js） -->
           <div class="welcome-step" id="wstep-1">
-            <div class="welcome-step-head">
-              <div class="welcome-icon">
-                <svg viewBox="0 0 24 24">
-                  <rect x="3" y="3" width="18" height="18" rx="3" />
-                  <line x1="8" y1="12" x2="16" y2="12" />
-                  <line x1="12" y1="8" x2="12" y2="16" />
-                </svg>
-              </div>
-              <div class="welcome-eyebrow">1 / 5</div>
-            </div>
-            <div class="welcome-title" id="wstep-1-title">歡迎使用 Due</div>
-            <div class="welcome-body split" style="flex:1; padding-top: 8px;">
-              <div class="welcome-body-text">
-                <span id="wstep-1-intro">Due，提醒你該做的事 ⚡️</span>
-                <div
-                  style="margin-top: 40px; font-style: italic; color: var(--muted); line-height: 1.7; font-size: 14px;">
-                  <span id="wstep-1-q1">「Canvas找個作業要翻半天」- 有人</span>
-                  <div style="margin-top: 15px;">
-                    <span id="wstep-1-q2">「明天要交Lab喔...」- 另一個人</span>
-                  </div>
-                </div>
-              </div>
-
-              <div class="welcome-dash-mock" style="flex:0 0 280px; margin-top:0; align-self: flex-start; position: relative; top: -51px;">
-                <div class="welcome-dash-mock-header">
-                  <span class="welcome-dash-mock-title" id="wmock-title">Dashboard 概覽</span>
-                </div>
-                <div class="welcome-dash-mock-body">
-                  <div class="welcome-dash-mock-chart">
-                    <div class="welcome-dash-mock-ring" id="wmock-ring" role="img" aria-label="近期完成 3/5">
-                      <svg viewBox="0 0 48 48" aria-hidden="true">
-                        <circle class="welcome-dash-mock-ring-track" cx="24" cy="24" r="20"></circle>
-                        <circle class="welcome-dash-mock-ring-bar" cx="24" cy="24" r="20"
-                          stroke-dasharray="125.66" stroke-dashoffset="50.27"></circle>
-                      </svg>
-                      <div class="welcome-dash-mock-ring-center">
-                        <div class="welcome-dash-mock-ring-frac"><b>3</b>/5</div>
-                      </div>
-                    </div>
-                    <div class="welcome-dash-mock-ring-cap" id="wmock-ring-cap">近期完成</div>
-                    <div class="welcome-dash-mock-sum">
-                      <div class="welcome-dash-mock-sum-row is-overdue"><span class="welcome-dash-mock-sum-num">1</span><span id="wmock-sum-overdue">已逾期</span></div>
-                      <div class="welcome-dash-mock-sum-row is-urgent"><span class="welcome-dash-mock-sum-num">3</span><span id="wmock-sum-urgent">7天內</span></div>
-                      <div class="welcome-dash-mock-sum-row is-soon"><span class="welcome-dash-mock-sum-num">2</span><span id="wmock-sum-soon">8-30天</span></div>
-                    </div>
-                  </div>
-                  <div class="welcome-dash-mock-cards">
-                    <div class="welcome-dash-mock-card">
-                      <div class="welcome-dash-mock-card-tag">CHINESE</div>
-                      <div class="welcome-dash-mock-card-title" id="wmock-card1">期中小組報告大綱</div>
-                      <div class="welcome-dash-mock-card-date" id="wmock-date1">3月15日（3天後）</div>
-                    </div>
-                    <div class="welcome-dash-mock-card">
-                      <div class="welcome-dash-mock-card-tag">MATH</div>
-                      <div class="welcome-dash-mock-card-title">Group Project Progress...</div>
-                      <div class="welcome-dash-mock-card-date" id="wmock-date2">3月15日（3天後）</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div class="welcome-lang-switch-row">
-              <div class="welcome-lang-switch" id="welcome-lang-switch">
-                <button data-lang="zh-TW" id="welcome-lang-zh-tw">繁中</button>
-                <button data-lang="zh-CN" id="welcome-lang-zh-cn">简中</button>
-                <button data-lang="en" id="welcome-lang-en">EN</button>
-              </div>
-            </div>
-          </div>
-
-          <!-- Step 2: Canvas Login -->
-          <div class="welcome-step" id="wstep-2">
-            <div class="welcome-step-head">
-              <div class="welcome-icon">
-                <svg viewBox="0 0 24 24">
-                  <circle cx="12" cy="8" r="4" />
-                  <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
-                </svg>
-              </div>
-              <div class="welcome-eyebrow">2 / 5</div>
-            </div>
-            <div class="welcome-title" id="wstep-2-title">登入 Canvas（必須）</div>
-            <div class="welcome-body" style="flex:1">
-              <span id="wstep-2-body">Due 透過你的 Canvas 登入狀態同步資料，不需要額外設定或 Token。</span>
-              <ul class="welcome-inst-list">
-                <div style="margin-bottom: 10px;"></div>
-                <li><span class="welcome-inst-num">1</span><span class="welcome-inst-text" id="wstep-2-li1">登入 <a class="welcome-inline-link" id="welcome-canvas-link">HKUST(GZ) Canvas ↗</a>（點一下，同步完成會自動帶你回來）<span class="welcome-inst-sub">其他學校：打開你學校的 Canvas（網址結尾是 .instructure.com）並登入，Due 會自動偵測</span></span><span class="welcome-canvas-synced" id="welcome-canvas-synced" hidden></span></li>
-                <li><span class="welcome-inst-num">2</span><span class="welcome-inst-text" id="wstep-2-li2">Due 會<strong>在你每次打開Canvas時自動更新</strong>你的所有課程與作業</span></li>
-                <li><span class="welcome-inst-num">3</span><span class="welcome-inst-text" id="wstep-2-li3">點擊工具列或進入 Dashboard 都可以看到相關資訊</span></li>
-              </ul>
-            </div>
-          </div>
-
-          <!-- Step 3:釘選 Due 到工具列 -->
-          <div class="welcome-step" id="wstep-3">
             <div class="welcome-step-head">
               <div class="welcome-icon">
                 <svg viewBox="0 0 24 24">
@@ -5087,135 +5284,20 @@
                   <line x1="12" y1="16" x2="12" y2="22" />
                 </svg>
               </div>
-              <div class="welcome-eyebrow">3 / 5</div>
             </div>
-            <div class="welcome-title" id="wstep-3-title">釘選 Due 到工具列</div>
+            <div class="welcome-title" id="wstep-1-title">世界是一個巨大的 TODO list，以表達遊子思鄉之情</div>
             <div class="welcome-body split" style="flex:1">
               <div class="welcome-body-text">
-                <span id="wstep-3-body">釘選後點一下圖示就能查看 7 天待辦</span>
-                <span id="wstep-3-joke">（是為了這碟醋包的餃子btw）</span>
+                <span id="wstep-1-body">釘一下 popup，那個很好用</span>
                 <ul class="welcome-inst-list">
                   <div style="margin-bottom: 15px;"></div>
-                  <li><span class="welcome-inst-num">1</span><span class="welcome-inst-text" id="wstep-3-li1">點擊瀏覽器右上角的<strong>拼圖圖示</strong>（擴充功能）</span></li>
-                  <li><span class="welcome-inst-num">2</span><span class="welcome-inst-text" id="wstep-3-li2">找到 <strong>Due</strong>，點擊旁邊的<strong>釘選圖示</strong></span></li>
-                  <li><span class="welcome-inst-num">3</span><span class="welcome-inst-text" id="wstep-3-li3">工具列出現 Due 圖示後即完成</span></li>
+                  <li><span class="welcome-inst-num">1</span><span class="welcome-inst-text" id="wstep-1-li1">點擊瀏覽器右上角的<strong>拼圖</strong></span></li>
+                  <li><span class="welcome-inst-num">2</span><span class="welcome-inst-text" id="wstep-1-li2">找到 <strong>Due</strong>，點下<strong>釘選圖示</strong></span></li>
+                  <li><span class="welcome-inst-num">3</span><span class="welcome-inst-text" id="wstep-1-li3">有問題 mail 我 <a class="welcome-inline-link" href="mailto:0610raymond@gmail.com">0610raymond@gmail.com</a></span></li>
                 </ul>
               </div>
-              <div class="welcome-preview square" style="align-self: flex-start; background: var(--bg); position: relative; top: -43px;">
-                <img src="../icons/pin_guide.png" id="wstep-3-img" alt="釘選 Due 到工具列的步驟示意圖" />
-              </div>
-            </div>
-          </div>
-
-          <!-- Step 4: 拖曳整理作業清單（隱藏／還原） -->
-          <div class="welcome-step" id="wstep-4">
-            <div class="welcome-step-head">
-              <div class="welcome-icon">
-                <svg viewBox="0 0 24 24">
-                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
-                  <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
-                  <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24" />
-                  <line x1="1" y1="1" x2="23" y2="23" />
-                </svg>
-              </div>
-              <div class="welcome-eyebrow">4 / 5</div>
-            </div>
-            <div class="welcome-title" id="wstep-4-title">拖曳整理作業清單</div>
-            <div class="welcome-body split" style="flex:1">
-              <div class="welcome-body-text">
-                <span id="wstep-4-body">Due 會自動隱藏考試、簽到<br>你也可以自己決定要藏誰、留誰</span>
-                <p class="welcome-inst-text" id="wstep-4-li1" style="margin-top: 42px;">進入任一<strong>課程頁</strong>，按住作業的 <strong>⠿</strong> 拖到底部「<strong>已隱藏</strong>」區即可隱藏；反之亦然</p>
-              </div>
-              <div class="welcome-drag-illus" aria-hidden="true">
-                <svg viewBox="0 0 280 232" xmlns="http://www.w3.org/2000/svg">
-                  <defs>
-                    <filter id="wds-shadow" x="-20%" y="-20%" width="140%" height="160%">
-                      <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#141413" flood-opacity="0.18" />
-                    </filter>
-                    <marker id="wds-arrow-o" viewBox="0 0 8 8" refX="6" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                      <path d="M0,0 L8,4 L0,8 z" style="fill:var(--orange)" />
-                    </marker>
-                    <marker id="wds-arrow-g" viewBox="0 0 8 8" refX="6" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                      <path d="M0,0 L8,4 L0,8 z" style="fill:var(--green)" />
-                    </marker>
-                  </defs>
-
-                  <!-- 課程大卡片：整個拖曳場景都發生在這張卡裡 -->
-                  <rect x="8" y="6" width="264" height="218" rx="8" style="fill:var(--bg); stroke:var(--border)" />
-                  <!-- 課程 header 帶（代碼＋Serif 課名，課程詳情的識別元素） -->
-                  <path d="M16 6 h248 a8 8 0 0 1 8 8 v30 h-264 v-30 a8 8 0 0 1 8 -8 z" style="fill:var(--surface)" />
-                  <text x="20" y="21" style="font-family:'DM Mono',monospace; font-size:7px; fill:var(--mid); letter-spacing:.08em">DSAA 5002</text>
-                  <text x="20" y="38" style="font-family:'Source Serif 4',Georgia,serif; font-size:14px; fill:var(--dark)">Data Mining</text>
-
-                  <!-- 作業清單：兩列極簡列（無 due 色條，焦點留給拖曳列） -->
-                  <circle cx="32" cy="66" r="5.5" style="fill:none; stroke:var(--border); stroke-width:1.5" />
-                  <rect x="44" y="63" width="110" height="6" rx="3" style="fill:var(--mid); opacity:.4" />
-                  <circle cx="32" cy="90" r="5.5" style="fill:none; stroke:var(--border); stroke-width:1.5" />
-                  <rect x="44" y="87" width="88" height="6" rx="3" style="fill:var(--mid); opacity:.4" />
-
-                  <!-- 拖曳中的浮起列（陰影＋微傾，仿 .drag-clone）——畫面主角 -->
-                  <g transform="translate(52 112) rotate(2)">
-                    <rect width="170" height="26" rx="6" style="fill:var(--bg); stroke:var(--orange); stroke-width:1" filter="url(#wds-shadow)" />
-                    <circle cx="15" cy="13" r="5" style="fill:none; stroke:var(--border); stroke-width:1.5" />
-                    <rect x="27" y="10" width="78" height="6" rx="3" style="fill:var(--mid); opacity:.55" />
-                    <g style="fill:var(--orange)">
-                      <circle cx="146" cy="8" r="1.3" /><circle cx="151" cy="8" r="1.3" />
-                      <circle cx="146" cy="13" r="1.3" /><circle cx="151" cy="13" r="1.3" />
-                      <circle cx="146" cy="18" r="1.3" /><circle cx="151" cy="18" r="1.3" />
-                    </g>
-                  </g>
-
-                  <!-- 清單底部的已隱藏區（放置目標） -->
-                  <rect x="22" y="156" width="230" height="52" rx="6" style="fill:var(--surface); stroke:var(--border); stroke-dasharray:4 3" />
-                  <path d="M32 167 l4 4 -4 4" style="fill:none; stroke:var(--mid); stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round" />
-                  <text id="wds-hidden-label" x="44" y="175" style="font-family:'DM Mono',monospace; font-size:9px; fill:var(--mid); letter-spacing:.05em">已隱藏 2 項</text>
-                  <rect x="44" y="190" width="74" height="6" rx="3" style="fill:var(--purple); opacity:.8" />
-                  <rect x="126" y="186" width="26" height="13" rx="3" style="fill:none; stroke:var(--purple); opacity:.8" />
-                  <text id="wds-exam" x="139" y="196" text-anchor="middle" style="font-family:'DM Mono',monospace; font-size:8px; fill:var(--purple)">考試</text>
-
-                  <!-- 右側：拖下隱藏（橘）；左側：拖回還原（綠） -->
-                  <path d="M 246 90 C 262 112, 262 130, 248 152" marker-end="url(#wds-arrow-o)" style="fill:none; stroke:var(--orange); stroke-width:1.5" />
-                  <!-- 直排短標：中文逐字一行（tspan）、英文整字轉 90°（dashboard.js setSvgVerticalLabel 依語言重建） -->
-                  <text id="wds-hide" x="247" y="115" style="font-family:'DM Mono',monospace; font-size:9px; fill:var(--orange)"><tspan x="247" dy="0">隱</tspan><tspan x="247" dy="12">藏</tspan></text>
-                  <path d="M 34 184 C 18 158, 18 122, 30 96" marker-end="url(#wds-arrow-g)" style="fill:none; stroke:var(--green); stroke-width:1.5" />
-                  <text id="wds-show" x="22" y="132" style="font-family:'DM Mono',monospace; font-size:9px; fill:var(--green)"><tspan x="22" dy="0">還</tspan><tspan x="22" dy="12">原</tspan></text>
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          <!-- Step 5: Done -->
-          <div class="welcome-step" id="wstep-5">
-            <div class="welcome-step-head">
-              <div class="welcome-icon green">
-                <svg viewBox="0 0 24 24">
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-              </div>
-              <div class="welcome-eyebrow">5 / 5</div>
-            </div>
-            <div class="welcome-title" id="wstep-5-title">開始用 Due 吧</div>
-            <div class="welcome-body" style="flex:1">
-              <span id="wstep-5-body">這幾個功能容易錯過，記得試試：</span>
-              <div class="welcome-feat-cards">
-                <div class="welcome-feat-card">
-                  <div class="welcome-feat-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" /></svg></div>
-                  <div class="welcome-feat-text">
-                    <div class="welcome-feat-name" id="wstep-5-feat1-name">自動課程分析</div>
-                    <div class="welcome-feat-desc" id="wstep-5-feat1-desc">接上你自己的 AI API，自動抓出每門課的分數權重</div>
-                  </div>
-                </div>
-                <div class="welcome-feat-card">
-                  <div class="welcome-feat-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg></div>
-                  <div class="welcome-feat-text">
-                    <div class="welcome-feat-name" id="wstep-5-feat2-name">課程改名</div>
-                    <div class="welcome-feat-desc" id="wstep-5-feat2-desc">改成你習慣的叫法</div>
-                  </div>
-                </div>
-              </div>
-              <div class="welcome-support">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2" /><path d="m2 7 10 6 10-6" /></svg>
-                <span id="wstep-5-support">有 bug 或建議？跟我說一聲 → <a class="welcome-inline-link" href="mailto:0610raymond@gmail.com">0610raymond@gmail.com</a></span>
+              <div class="welcome-preview square" style="align-self: flex-start; background: var(--bg);">
+                <img src="../icons/pin_guide.png" id="wstep-1-img" alt="釘選 Due 到工具列的步驟示意圖" />
               </div>
             </div>
           </div>
@@ -5226,12 +5308,11 @@
       <div class="welcome-shared-footer">
         <div class="welcome-divider"></div>
         <div class="welcome-footer">
-          <div class="welcome-dots" id="welcome-dots">
-            <div class="welcome-dot active" data-wstep="1"></div>
-            <div class="welcome-dot" data-wstep="2"></div>
-            <div class="welcome-dot" data-wstep="3"></div>
-            <div class="welcome-dot" data-wstep="4"></div>
-            <div class="welcome-dot" data-wstep="5"></div>
+          <!-- 語言切換在左下，主按鈕在右下 -->
+          <div class="welcome-lang-switch" id="welcome-lang-switch">
+            <button data-lang="zh-TW" id="welcome-lang-zh-tw">繁中</button>
+            <button data-lang="zh-CN" id="welcome-lang-zh-cn">简中</button>
+            <button data-lang="en" id="welcome-lang-en">EN</button>
           </div>
           <div class="welcome-btn-row" id="welcome-btn-row">
             <!-- Buttons injected by JS -->
@@ -5391,6 +5472,7 @@
   <script src="../ai/gradingRules.js"></script>
   <script src="dashboard.js"></script>
   <script src="aiSettings.js"></script>
+  <script src="tour.js"></script>
 </body>
 
 </html>

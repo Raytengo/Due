@@ -61,16 +61,98 @@ chrome.runtime.onInstalled.addListener((details) => {
   }
 });
 
-// 自動同步節流：使用者在 Canvas 每點開一頁都會觸發 onCompleted，
-// 若不節流，每一頁都會對所有課程 × 作業 × 權重發出大量並行請求。
+// 自動同步節流：使用者在 Canvas 每點開一頁都會觸發 onCompleted，每次打開 popup 也會送 AUTO_SYNC，
+// 若不節流，每一頁／每次打開都會對所有課程 × 作業 × 權重發出大量並行請求。
 // 規則：同一個 Canvas、距上次成功同步未滿 5 分鐘就跳過（依記憶體時間戳 _lastAutoSyncAt 判斷）；
 //      從未同步（_lastAutoSyncAt 為 0）或首次偵測採用新網址一律立即同步；
 //      手動 SYNC 訊息不受此節流限制。
 const AUTO_SYNC_MIN_INTERVAL_MS = 5 * 60 * 1000; // 5 分鐘
 
+// 呼叫前先 await _ready（_lastAutoSyncAt 由 storage 的 lastSync 回填）
+function autoSyncDue() {
+  return !_lastAutoSyncAt || Date.now() - _lastAutoSyncAt >= AUTO_SYNC_MIN_INTERVAL_MS;
+}
+
 // 自動同步不能讓 rejection 逸出（會變成 unhandled rejection）
 function runAutoSync() {
   return syncAll().catch((err) => console.error('[Due] auto-sync 失敗:', err));
+}
+
+// ── 打開 Dashboard 時的登入補救 ──
+// 同步本身不需要開 Canvas 分頁（SW 直接帶 cookie 打 API）；會失敗多半是 Canvas 的 session cookie 過期（例如重開瀏覽器）。
+// 這時在背景開一個 Canvas 分頁（不切過去）：學校 SSO 還記得使用者的話會自動登入回 Canvas，session 就續上了 →
+// 分頁一回到 Canvas 就確認登入、立刻關掉分頁，再同步（同步不需要分頁，不留著它等）。
+// SSO 要使用者自己輸入（停在登入頁）→ 等到上限就關掉，冷卻一段時間不再開，免得每次打開 Dashboard 都閃一個登入分頁。
+// 使用者在這段期間切到那個分頁（可能正要登入）就不關它。
+const SESSION_REFRESH_TIMEOUT_MS = 20 * 1000;   // 上限，不是固定等待：SSO 轉址通常幾秒內就回到 Canvas
+const SESSION_REFRESH_COOLDOWN_MS = 30 * 60 * 1000;
+let _sessionRefresh = null;           // 進行中的補救（同時只開一個分頁）
+let _sessionRefreshFailedAt = 0;      // 上次補救後仍未登入的時間（冷卻用）
+
+// 分頁停在 base 的非登入頁且載入完成 → true；逾時 → false。先看一次目前狀態，再聽 onUpdated
+function waitForCanvasTab(tabId, base, timeoutMs) {
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (ok) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      chrome.tabs.onUpdated.removeListener(onUpdated);
+      resolve(ok);
+    };
+    const landed = (tab) => {
+      if (!tab || tab.status !== 'complete' || !tab.url) return false;
+      try {
+        const u = new URL(tab.url);
+        return u.origin === base && !u.pathname.startsWith('/login');
+      } catch (_) { return false; }
+    };
+    const onUpdated = (id, _info, tab) => { if (id === tabId && landed(tab)) finish(true); };
+    const timer = setTimeout(() => finish(false), timeoutMs);
+    chrome.tabs.onUpdated.addListener(onUpdated);
+    chrome.tabs.get(tabId).then((tab) => { if (landed(tab)) finish(true); }, () => finish(false));
+  });
+}
+
+async function closeTabIfBackground(tabId) {
+  const tab = await chrome.tabs.get(tabId).catch(() => null);
+  if (tab && !tab.active) await chrome.tabs.remove(tabId).catch(() => {});
+}
+
+async function refreshCanvasSession(base) {
+  let tabId = null;
+  let ok = false;
+  try {
+    const tab = await chrome.tabs.create({ url: `${base}/`, active: false });
+    tabId = tab && tab.id;
+    if (tabId == null) return false;
+    const landed = await waitForCanvasTab(tabId, base, SESSION_REFRESH_TIMEOUT_MS);
+    ok = landed && await isLoggedInCanvas(base);
+  } catch (err) {
+    console.error('[Due] 背景登入補救失敗:', err);
+  } finally {
+    if (tabId != null) await closeTabIfBackground(tabId);   // 登入續上（或確定不行）就關，不等同步
+  }
+  if (!ok) {
+    _sessionRefreshFailedAt = Date.now();
+    return false;
+  }
+  await syncAll().catch((err) => console.error('[Due] 補救後同步失敗:', err));   // 分頁落地時 webNavigation 也會觸發：syncBase 會加入同一場
+  return true;
+}
+
+// Dashboard 打開時的自動同步：先照常同步；失敗且確認是未登入 → 背景分頁補救（有冷卻、同時只跑一個）
+async function autoSyncWithSessionRefresh(base) {
+  try {
+    await syncAll();
+    return;
+  } catch (err) {
+    console.error('[Due] auto-sync 失敗:', err);
+  }
+  if (_sessionRefresh || Date.now() - _sessionRefreshFailedAt < SESSION_REFRESH_COOLDOWN_MS) return;
+  if (BASE_URL !== base || await isLoggedInCanvas(base)) return;   // 已登入卻失敗（網路、5xx）：開分頁也沒用
+  _sessionRefresh = refreshCanvasSession(base).finally(() => { _sessionRefresh = null; });
+  await _sessionRefresh;
 }
 
 // ── Canvas 網址偵測 ──
@@ -208,14 +290,9 @@ chrome.webNavigation
           return;
         }
 
-        // 同一個 Canvas：從未成功同步過（_lastAutoSyncAt 為 0；SW 重啟後若 storage 也無 lastSync 亦為 0）→ 立即同步
-        if (!_lastAutoSyncAt) {
-          runAutoSync();
-          return;
-        }
-
+        // 同一個 Canvas：從未成功同步過（_lastAutoSyncAt 為 0；SW 重啟後若 storage 也無 lastSync 亦為 0）→ 立即同步；
         // 否則套用 5 分鐘節流（依記憶體時間戳判斷，不必每頁讀 storage）
-        if (Date.now() - _lastAutoSyncAt < AUTO_SYNC_MIN_INTERVAL_MS) {
+        if (!autoSyncDue()) {
           console.log('[Due] auto-sync 跳過：距上次同步未滿 5 分鐘');
           return;
         }
@@ -241,6 +318,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const respond = (r) => { responded = true; sendResponse(r); };
       const isAsync = handleAiMessage(message, respond, BASE_URL);
       if (!isAsync && !responded) sendResponse(undefined);
+    });
+    return true;
+  }
+
+  // popup／Dashboard 打開時送來：先在背景同步，使用者看到資料時已是新的。
+  // 與造訪 Canvas 同一套 5 分鐘節流；還沒有學校網址（從未偵測到 Canvas）就不動。不等同步結束就回應（頁面可能隨時關掉）。
+  // refreshSession（只有 Dashboard 帶）：同步因未登入失敗時，背景開 Canvas 分頁讓 SSO 續上 session，同步完自動關掉
+  if (message.type === 'AUTO_SYNC') {
+    _ready.then(() => {
+      if (!BASE_URL) { sendResponse({ started: false, reason: 'no-base' }); return; }
+      if (!autoSyncDue()) { sendResponse({ started: false, reason: 'throttled' }); return; }
+      if (message.refreshSession) autoSyncWithSessionRefresh(BASE_URL);
+      else runAutoSync();
+      sendResponse({ started: true });
     });
     return true;
   }
