@@ -276,7 +276,7 @@ sidebar（300px）+ main-content（flex:1）
 
 **學期待辦頁（Week）：**
 - 左側「本週概覽」面板（頂部對齊，`.week-left`）：
-  - **進度環**（`.wk-ring`，SVG stroke 綠色弧）：近期完成度 `nearDone/nearTotal`；範圍＝逾期窗（30 天）∪ 未來 7 天（`isNearAssignment`），分母含已完成項，現算；中央顯示 `X/Y` + 「近期完成」（`weekDoneLabel`；不是「本週」——範圍含 30 天內的逾期，QA #14），`role="img"`，aria-label 與 title 寫出範圍（`weekRingScope`）
+  - **進度環**（`.wk-ring`，SVG stroke 綠色弧）：近期完成度 `nearDone/nearTotal`；範圍＝逾期窗（30 天）∪ 未來 7 天（`isNearAssignment`），分母含已完成項，現算；中央顯示 `X/Y` + 「當週待辦」（`weekDoneLabel`；全部完成時換成「當週無待辦」；owner 2026-10-26 決定用「當週」字樣、範圍不變——範圍其實含 30 天內的逾期，完整範圍寫在 aria-label 與 title 的 `weekRingScope`，QA #14），`role="img"`，aria-label 與 title 寫出範圍（`weekRingScope`）
   - **分級摘要**（`.wk-breakdown` / `.wk-sum-row`）：逾期/7天內/8-30天/30天以上 的未完成數，色碼（逾期紅底凸顯），只顯示 count>0；每列為 `<button>`，點擊/Enter/Space 捲動右側清單到對應區塊（`data-scroll-group` ↔ `.week-group[data-group]`，手動算位移用 `scrollTo` smooth；減少動態時瞬間捲動），捲動的同時焦點移到目標組標題（#33）
   - （舊 conic 圓餅 `.week-pie`/`.week-legend` 已移除）
 - 右側：2 欄 task cards，依緊急度分區塊顯示（`.week-group[data-group]`）；分組委派 `taskRules.urgency`
@@ -361,7 +361,7 @@ sidebar（300px）+ main-content（flex:1）
 - **落地＝就地移除，不整段重繪**（`finishComplete`／`finishCompleteWeek`）：① 焦點交接：離場項持有焦點時交給下一項（沒有就上一項）的勾選圈，再沒有就交給 `#page-title`／`.detail-assignments-label`（`handOffFocus`；只在離場那一刻移，scope 限目前清單——開詳情時 `#main-section` 只是隱藏，用 document 查會找到看不見的同 id 勾選圈）② 碎點從被點的勾選圈中心迸出，畫在 fixed、`pointer-events:none` 的 `#burst-layer`（`spawnBurstDots`，#20）③ 節點立刻抽出版面、搬進出場層釘在原視覺位置淡出＋縮到 0.96（`exitInPlace`，`EXIT_SCALE`；殘影裁在原捲動容器內、離場節點 inert，#19）④ **同一幀**其餘卡片／列／組標題／分隔線／摘要列以 FLIP 沿 `--reflow` 滑進空位（`flipSnapshot`／`flipPlay`，WAAPI id `reflow`，只動 transform；再次觸發時從目前位置接續，#18）⑤ 組標題 (N)、摘要列數字、空狀態、詳情 header 待辦數／緊急 badge（`updateDetailHeader`）、詳情的「已隱藏」區（`refreshArchiveSection`）、側欄計數、進度環就地更新。組裡最後一張離場時，組標題＋相鄰分隔線＋左欄摘要列一起離場。捲動位置、展開的描述／成績計算器／已隱藏區、其他仍在窗內的項目都保得住
 - `isDoneLanded(a)`：撤銷窗內的項目畫面上還在清單裡，計數、組標題、進度環、側欄都先不算它完成，落地那一刻才一起更新
 - 整段重繪（`renderCourseDetailSection`／`renderWeekSection`／`renderCardGrid`）一律先 `clearCompleteTimers()`；撤銷窗內導覽離開時完成已在勾選當下寫入，那一列／卡留在已隱藏的容器裡直到下次重繪（`finishComplete*` 看到節點已不在畫面上就略過）。`rerenderDetailAndNav(cid)`／`rerenderWeekAndNav()`（拖曳、標回未完成用）只在仍停在該課詳情／週待辦版面時重繪（QA #113）
-- 進度環就地更新（`updateWeekRing`，#12）：只改 `stroke-dashoffset`（0.8s 過渡從目前位置 retarget，不換節點），分子 tick（forced reflow 重播）、aria-label 同步。**「全部完成」慶祝只看狀態轉移**：最後一項近期作業落地、分子剛到分母且上次顯示的還沒到（`_prevRingDone`）→ 等弧真的停在終點（`whenRingLands`，只認停在 target 的 transitionend；減少動態或已在終點立即執行）才 `celebrateRingArrival`：中心換字淡入「全部完成」＋播報（減少動態也保留），非減少動態才有環與分子的彈跳和 16 顆多色碎點。全部完成後再勾非近期項不重播；連勾最後兩項只由後落地的那一項觸發一次
+- 進度環就地更新（`updateWeekRing`，#12）：offset 一律走 `ringOffset(done, total)`——弧長＝進度 ×（周長 − 線寬 `RING_W`），圓帽兩端在 100% 時剛好於 12 點鐘相碰（照「進度 × 周長」畫的話約 95% 就看似合攏，0.8s 曲線最慢的尾段藏在圓帽底下，接合處像卡住）；全部完成且弧停住（`whenRingLands`）→ `.is-full`（`stroke-dasharray:none` 實心圓，不留接縫），離開全部完成時移除。只改 `stroke-dashoffset`（0.8s 過渡從目前位置 retarget，不換節點），分子 tick（forced reflow 重播）、aria-label 同步。**「全部完成」慶祝只看狀態轉移**：最後一項近期作業落地、分子剛到分母且上次顯示的還沒到（`_prevRingDone`）→ 等弧真的停在終點（`whenRingLands`，只認停在 target 的 transitionend；減少動態或已在終點立即執行）才 `celebrateRingArrival`：中心換字淡入「當週無待辦」（`weekAllDoneLabel`）＋播報（減少動態也保留），非減少動態才有環與分子的彈跳和 16 顆多色碎點。全部完成後再勾非近期項不重播；連勾最後兩項只由後落地的那一項觸發一次
 - 撤銷窗口內點作業名稱（詳情列的 Canvas 連結）＝點該列 → 取消完成，不開 Canvas
 - 即時刷新遇到撤銷窗：見「開發注意事項」第 9 點——任何一項還在窗內、離場或 FLIP 還在跑，整頁重繪就延後
 - `isDone` 公式不變：兩張 map 同時有 id 時 `manualDone` 勝出；但 `setDone` 下一次寫入就會把它正規化，不會再卡在「標不回未完成」（見 docs/superpowers/specs/2026-07-21-bidirectional-completion-toggle-design.md）

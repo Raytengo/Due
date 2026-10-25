@@ -872,9 +872,14 @@
     .wk-ring-bar {
       fill: none;
       stroke: var(--green);
-      stroke-width: 20;
+      stroke-width: 20;   /* = dashboard.js RING_W */
       stroke-linecap: round;
       transition: stroke-dashoffset var(--ring);
+    }
+
+    /* 全部完成：弧停在兩端圓帽相碰的位置後換成實心圓，12 點鐘不留 dash 接縫（dashboard.js ringOffset） */
+    .wk-ring-bar.is-full {
+      stroke-dasharray: none;
     }
 
     .wk-ring-center {
@@ -4931,7 +4936,7 @@
                 </div>
                 <div class="welcome-dash-mock-body">
                   <div class="welcome-dash-mock-chart">
-                    <div class="welcome-dash-mock-ring" id="wmock-ring" role="img" aria-label="近期完成 3/5">
+                    <div class="welcome-dash-mock-ring" id="wmock-ring" role="img" aria-label="當週待辦 3/5">
                       <svg viewBox="0 0 48 48" aria-hidden="true">
                         <circle class="welcome-dash-mock-ring-track" cx="24" cy="24" r="20"></circle>
                         <circle class="welcome-dash-mock-ring-bar" cx="24" cy="24" r="20"
@@ -4941,7 +4946,7 @@
                         <div class="welcome-dash-mock-ring-frac"><b>3</b>/5</div>
                       </div>
                     </div>
-                    <div class="welcome-dash-mock-ring-cap" id="wmock-ring-cap">近期完成</div>
+                    <div class="welcome-dash-mock-ring-cap" id="wmock-ring-cap">當週待辦</div>
                     <div class="welcome-dash-mock-sum">
                       <div class="welcome-dash-mock-sum-row is-overdue"><span class="welcome-dash-mock-sum-num">1</span><span id="wmock-sum-overdue">已逾期</span></div>
                       <div class="welcome-dash-mock-sum-row is-urgent"><span class="welcome-dash-mock-sum-num">3</span><span id="wmock-sum-urgent">7天內</span></div>

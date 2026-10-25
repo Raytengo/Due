@@ -198,9 +198,9 @@ const I18N = {
     within30Days: '8-30天',
     beyond30Days: '30天以上',
     noTasks: '無待辦事項',
-    weekDoneLabel: '近期完成',
+    weekDoneLabel: '當週待辦',
     weekRingScope: '範圍：30 天內的逾期＋未來 7 天到期',
-    weekAllDoneLabel: '全部完成',
+    weekAllDoneLabel: '當週無待辦',
     // ui widgets
     editWeight: '編輯',
     weightEditTitle: '編輯評分權重',
@@ -365,9 +365,9 @@ const I18N = {
     within30Days: '8-30天',
     beyond30Days: '30天以上',
     noTasks: '无待办事项',
-    weekDoneLabel: '近期完成',
+    weekDoneLabel: '当周待办',
     weekRingScope: '范围：30 天内的逾期＋未来 7 天到期',
-    weekAllDoneLabel: '全部完成',
+    weekAllDoneLabel: '当周无待办',
     editWeight: '编辑',
     weightEditTitle: '编辑评分权重',
     weightReset: '还原 Canvas 权重',
@@ -529,9 +529,9 @@ const I18N = {
     within30Days: '8-30 days',
     beyond30Days: 'Later (30d+)',
     noTasks: 'No pending tasks',
-    weekDoneLabel: 'Near-term',
+    weekDoneLabel: 'This week',
     weekRingScope: 'Overdue within 30 days + due in the next 7 days',
-    weekAllDoneLabel: 'All done',
+    weekAllDoneLabel: 'Week cleared',
     editWeight: 'Edit',
     weightEditTitle: 'Edit Grade Weights',
     weightReset: 'Reset to Canvas weights',
@@ -2147,6 +2147,15 @@ let _prevRingDone = null;
 // 進度環 SVG 幾何：158 外徑、20 線寬 → 半徑 69，全周長 2πr
 const RING_R = 69;
 const RING_C = 2 * Math.PI * RING_R;
+const RING_W = 20;   // 弧的線寬（index.html .wk-ring-bar 的 stroke-width，改一邊要改另一邊）
+
+// 進度 → stroke-dashoffset。圓帽讓弧的兩端各多出半個線寬：弧長若照「進度 × 周長」畫，約 95% 時頭就碰到尾巴，
+// 看起來已經合攏，剩下的動畫（剛好是 0.8s 曲線最慢的尾段）都藏在圓帽底下，像卡在接合處。
+// 改成「進度 ×（周長 − 線寬）」：100% 時兩端剛好在 12 點鐘碰上，之後換成實心圓（.is-full）；0 時不畫
+function ringOffset(done, total) {
+  const p = total > 0 ? done / total : 0;
+  return p > 0 ? RING_C - (RING_C - RING_W) * p : RING_C;
+}
 
 // ── 進度環「落點迸發」慶祝（見 spec 2026-07-23 後記）──
 // 只在最後一項近期作業落地（撤銷窗結束、離開清單）、弧合攏的瞬間觸發（updateWeekRing）；
@@ -2259,13 +2268,12 @@ function renderWeekSection(courses, assignments) {
 
   // 「本週概覽」進度環：範圍＝逾期窗 ∪ 未來 7 天（近期可行動集），現算完成/總數（含已完成項）
   const { nearDone, nearTotal } = computeNearProgress(courses, assignments);
-  const donePct = nearTotal > 0 ? (nearDone / nearTotal) * 100 : 0;
-  const targetOffset = RING_C * (1 - donePct / 100);
+  const targetOffset = ringOffset(nearDone, nearTotal);
   // 讀取畫面上舊弧的目前 offset 當動畫起點（可正確接續被打斷的動畫）；無舊節點（首次掛載）直接用目標值不做動畫
   const _prevBar = document.querySelector('.wk-ring-bar');
   const _prevParsed = _prevBar ? parseFloat(getComputedStyle(_prevBar).strokeDashoffset) : NaN;
   const prevOffset = Number.isFinite(_prevParsed) ? _prevParsed : targetOffset;
-  // 環的範圍不是「本週」：逾期窗（30 天）∪ 未來 7 天 → 標「近期完成」，範圍寫進 aria-label 與 title（QA #14）
+  // 環的範圍＝逾期窗（30 天）∪ 未來 7 天；字樣依 owner 決定（2026-10-26）寫「當週待辦」，完整範圍寫進 aria-label 與 title（QA #14）
   const ringAria = `${tr('weekDoneLabel')} ${nearDone}/${nearTotal} · ${tr('weekRingScope')}`;
   // 分子變動時給數字一個微上滑 tick（與弧的過渡同曲線）；首次渲染不 tick
   const fracTick = _prevRingDone !== null && _prevRingDone !== nearDone;
@@ -2340,6 +2348,8 @@ function renderWeekSection(courses, assignments) {
   if (_barEl) {
     _barEl.getBoundingClientRect();   // forced reflow：提交起點樣式
     _barEl.style.strokeDashoffset = `${targetOffset}`;
+    // 全部完成：弧停在兩端相碰的位置後換成實心圓（沒有 dash 接縫）
+    if (nearTotal > 0 && nearDone === nearTotal) whenRingLands(_barEl, prevOffset, targetOffset, () => _barEl.classList.add('is-full'));
   }
 
   // 「全部完成」慶祝不在整段重繪裡判斷：只在最後一項近期作業落地時由 updateWeekRing 依「上次顯示的分子 → 這次」的
@@ -3257,8 +3267,10 @@ function updateWeekRing() {
   const bar = ring && ring.querySelector('.wk-ring-bar');
   if (!bar) return;
   const { nearDone, nearTotal } = computeNearProgress(_currentData.courses || [], _currentData.assignments || {});
-  const target = RING_C * (1 - (nearTotal > 0 ? nearDone / nearTotal : 0));
+  const target = ringOffset(nearDone, nearTotal);
   const prevOffset = parseFloat(getComputedStyle(bar).strokeDashoffset);
+  const allDone = nearTotal > 0 && nearDone === nearTotal;
+  if (!allDone) bar.classList.remove('is-full');   // 回到 dash：停在兩端相碰的位置，與實心圓幾乎同形，再往回縮
   bar.style.strokeDashoffset = `${target}`;
   const prevDone = _prevRingDone;
   _prevRingDone = nearDone;
@@ -3273,9 +3285,15 @@ function updateWeekRing() {
     b.classList.add('tick');
   }
   const cap = ring.querySelector('.wk-ring-cap');
-  if (allDone && prevDone !== null && prevDone < nearTotal) {
-    whenRingLands(bar, prevOffset, target, () => celebrateRingArrival(ring));   // cap 由慶祝換字
-  } else if (cap && !(allDone && prevDone === nearTotal)) {
+  const celebrating = allDone && prevDone !== null && prevDone < nearTotal;
+  if (allDone) {
+    // 弧兩端相碰後換成實心圓（沒有 dash 接縫）；剛全部完成的那一次同時慶祝（cap 由慶祝換字）
+    whenRingLands(bar, prevOffset, target, () => {
+      bar.classList.add('is-full');
+      if (celebrating) celebrateRingArrival(ring);
+    });
+  }
+  if (!celebrating && cap && !(allDone && prevDone === nearTotal)) {
     // 已經全部完成時（之後落地的是非近期卡）不碰 cap：它要嘛已是「全部完成」，要嘛正等弧落地的慶祝換字淡入，
     // 這裡先換會讓「全部完成」在弧合攏前就出現、慶祝時再閃一次
     cap.textContent = tr(allDone ? 'weekAllDoneLabel' : 'weekDoneLabel');
