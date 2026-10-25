@@ -258,7 +258,7 @@ const I18N = {
     // 新手卡片（只剩一頁）：開發者的話＋釘選 popup；按鈕接互動導覽
     wIntroTitle: '世界是一個巨大的 TODO list，以表達遊子思鄉之情',
     wIntroHere: '應該在這（應該喔）',   // 卡片外手繪箭頭指向瀏覽器右上角（擴充功能圖示）旁的字
-    wIntroBody: '釘選瀏覽器右上角的 popup，那個很好用',
+    wIntroBody: '釘一下 popup，那個很好用',
     wBtnTour: '開始導覽 →',
   },
   'zh-CN': {
@@ -424,7 +424,7 @@ const I18N = {
     wBtnDone: '开始使用',
     wIntroTitle: '世界是一个巨大的 TODO list，以表达游子思乡之情',
     wIntroHere: '应该在这（应该哦）',
-    wIntroBody: '把浏览器右上角的 popup 固定起来，那个很好用',
+    wIntroBody: '固定一下 popup，那个很好用',
     wBtnTour: '开始导览 →',
   },
   en: {
@@ -565,9 +565,9 @@ const I18N = {
     wTitle3: 'Pin Due to Toolbar',
     wBody3: 'Pin it and tap the icon to see your 7-day tasks at a glance',
     wBody3Joke: "(it's for the dumpling dipped in vinegar, btw)",
-    wIntroLi1: 'Click the <strong>puzzle icon</strong> at the top right of your browser',
-    wIntroLi2: 'Find <strong>Due</strong> and click its <strong>pin icon</strong>',
-    wIntroLi3: 'Questions? Mail me at <a class="welcome-inline-link" href="mailto:0610raymond@gmail.com">0610raymond@gmail.com</a>',
+    wIntroLi1: 'Click the <strong>puzzle icon</strong> (top right)',
+    wIntroLi2: 'Find <strong>Due</strong>, click the <strong>pin</strong>',
+    wIntroLi3: 'Questions? <a class="welcome-inline-link" href="mailto:0610raymond@gmail.com">0610raymond@gmail.com</a>',
     wTitle4: 'Organize by dragging',
     wBody4: 'Due tucks exams and attendance items away below<br>drag finished work down to mark it done',
     wStep4Li1: 'Open any <strong>course page</strong>, grab an assignment\'s <strong>⠿</strong> and drop it into <strong>Hidden</strong> at the bottom to mark it done; drag it back to the list to undo',
@@ -588,10 +588,10 @@ const I18N = {
     wBtnPrev: 'Back',
     wBtnNext: 'Next',
     wBtnDone: 'Start Using Due',
-    wIntroTitle: 'The world is one giant to-do list, written to express a wanderer’s homesickness',
-    wIntroHere: 'Should be up here (probably)',
-    wIntroBody: 'Pin the popup at the top right of your browser. It’s really handy',
-    wBtnTour: 'Start the tour →',
+    wIntroTitle: 'The world is one big to-do list, written in homesickness',
+    wIntroHere: 'Up here (probably)',
+    wIntroBody: 'Pin the popup. It’s handy',
+    wBtnTour: 'Start tour →',
   },
 };
 

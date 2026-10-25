@@ -2597,16 +2597,22 @@
       stroke-width: 6;
     }
 
+    /* 跟手繪箭頭同一種手寫感：中文翩翩體（macOS）→ 楷體（Windows）；英文 Noteworthy／Bradley Hand → Segoe Print。
+       不用 italic（中文沒有真斜體，瀏覽器硬拉斜很醜） */
     .welcome-pin-arrow-label {
       fill: var(--orange);
       stroke: var(--bg);
       stroke-width: 4px;
       stroke-linejoin: round;
       paint-order: stroke;
-      font-family: 'Source Serif 4', Georgia, serif;
-      font-style: italic;
-      font-size: 16px;
+      font-family: 'HanziPen TC', 'HanziPen SC', 'Kaiti TC', 'KaiTi', 'BiauKai', 'Noteworthy', 'Bradley Hand', 'Segoe Print', cursive;
+      font-size: 18px;
       dominant-baseline: middle;
+    }
+
+    html[lang="en"] .welcome-pin-arrow-label {
+      font-family: 'Noteworthy', 'Bradley Hand', 'Segoe Print', cursive;
+      stroke-width: 2.5px;   /* 英文手寫字筆畫細，描邊太粗會變空心字 */
     }
 
     .welcome-dot {
@@ -5298,7 +5304,7 @@
             <div class="welcome-title" id="wstep-1-title">世界是一個巨大的 TODO list，以表達遊子思鄉之情</div>
             <div class="welcome-body split" style="flex:1">
               <div class="welcome-body-text">
-                <span id="wstep-1-body">釘選瀏覽器右上角的 popup，那個很好用</span>
+                <span id="wstep-1-body">釘一下 popup，那個很好用</span>
                 <ul class="welcome-inst-list">
                   <div style="margin-bottom: 15px;"></div>
                   <li><span class="welcome-inst-num">1</span><span class="welcome-inst-text" id="wstep-1-li1">點擊瀏覽器右上角的<strong>拼圖</strong></span></li>
