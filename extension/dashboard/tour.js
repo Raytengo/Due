@@ -21,8 +21,8 @@
       next: '下一步',
       done: '開始使用',
       close: '結束導覽',
-      syncTitle: '先連上 Canvas',
-      syncBody: '點這裡登入學校的 Canvas，同步完會自己跳回來',
+      syncTitle: '選學校，連上 Canvas',
+      syncBody: '選好你的學校，點「前往 Canvas」登入，同步完會自己跳回來',
       courseTitle: '點一門課',
       courseBody: '作業和評分比重都在裡面',
       renameTitle: '改成符合人性的名字',
@@ -39,8 +39,8 @@
       next: '下一步',
       done: '开始使用',
       close: '结束导览',
-      syncTitle: '先连上 Canvas',
-      syncBody: '点这里登录学校的 Canvas，同步完会自己跳回来',
+      syncTitle: '选学校，连上 Canvas',
+      syncBody: '选好你的学校，点“前往 Canvas”登录，同步完会自己跳回来',
       courseTitle: '点一门课',
       courseBody: '作业和评分比重都在里面',
       renameTitle: '改成符合人性的名字',
@@ -57,8 +57,8 @@
       next: 'Next',
       done: 'Get started',
       close: 'End tour',
-      syncTitle: 'Connect Canvas first',
-      syncBody: 'Sign in here. We’ll sync and bring you back',
+      syncTitle: 'Pick your school, connect Canvas',
+      syncBody: 'Choose your school, then open Canvas and sign in. We’ll sync and bring you back',
       courseTitle: 'Open a course',
       courseBody: 'Assignments and grade weights live here',
       renameTitle: 'Give it a human name',
@@ -77,16 +77,24 @@
   const visible = (n) => !!n && n.getClientRects().length > 0;
   const DETAIL = '#course-detail-container';
   const inCourseDetail = () => visible(q(`${DETAIL} .course-detail-view`));
-  // 優先挑還有待辦的課（課程詳情裡才有可以勾、可以拖的列）
+  // 挑待辦最多的課（側欄徽章數字＝詳情清單的列數；is-placeholder＝0 件）：勾完成、拖曳兩步都要有列可用，
+  // 勾掉一件之後還得剩一件給拖曳，所以件數越多越好；平手取側欄靠前的。全部都是 0 件就只能挑第一門（後面的步驟會被跳過）
   function pickCourse() {
     const items = [...document.querySelectorAll('#course-nav .nav-course-item')];
-    return items.find((b) => !b.querySelector('.nav-course-badge.is-placeholder')) || items[0] || null;
+    const pending = (b) => {
+      const badge = b.querySelector('.nav-course-badge');
+      return badge && !badge.classList.contains('is-placeholder') ? parseInt(badge.textContent, 10) || 0 : 0;
+    };
+    return items.reduce((best, b) => (best && pending(best) >= pending(b) ? best : b), null);
   }
   function openCourse() {
     if (inCourseDetail()) return;
     const c = pickCourse();
     if (c) c.click();
   }
+  const currentLastSync = () => (typeof _currentData !== 'undefined' && _currentData ? _currentData.lastSync || null : null);
+  // 課程詳情已經畫出來、清單裡卻一列作業都沒有：勾完成／拖曳這兩步永遠等不到目標，不必空等 2 秒
+  const detailHasNoRows = () => inCourseDetail() && !q(FIRST_ROW);
   const FIRST_ROW = `${DETAIL} .detail-assignments-list .assignment-item`;
   const lastRow = () => {
     const rows = document.querySelectorAll(FIRST_ROW);
@@ -108,6 +116,8 @@
   //   interactive：亮框內可不可以點（預設可以）；reveal：這一步期間加在 <html> 上的 class（亮出平常藏著的控制項）
   //   spot：使用者要點／要拖的那個小東西 → 主亮處改成圍著它的小圓（target 只用來等畫面、捲動）
   //   point：另外挖一個虛線框「指給你看」；pointLive：這個洞也是可以操作的地方（實線亮框、點擊放行）
+  //   abortWhen(state)：每幀檢查，成立就結束整趟導覽；giveUp()：等目標出現時成立就不再等、直接跳過這一步
+  //   noNext：不顯示「下一步」鈕（只能做完這一步才前進；✕ 仍可結束）
   //   skipIf()：開導覽時成立就整步拿掉（不算進編號）
   //   doneWhen()：每幀檢查，成立就自動下一步（等的是頁面外發生的事，例如去 Canvas 登入後同步完成）
   //   resolve(state)：依這一趟的狀況換文案／目標
@@ -116,8 +126,11 @@
       // 第一次（還沒同步、沒有課）：亮空狀態的「前往 Canvas」。登入後 Canvas 自動同步、分頁自動跳回（openCanvasTab 的武裝），
       // 側欄出現課程就自動下一步；已經有資料的人開導覽時就拿掉這一步（不佔 n / N 的編號）
       key: 'sync',
-      target: '#empty-open-canvas',
-      spot: '#empty-open-canvas',
+      // 亮「學校選單＋前往 Canvas」整塊（選單展開時連清單一起，不然點不到選項）；按鈕必須排第一個（它不在就整步不顯示）
+      target: ['#empty-open-canvas', '.school-pick', '.school-pick-pop'],
+      noNext: true,
+      // 這趟導覽期間同步完成了、卻沒有任何進行中的課 → 後面的步驟都沒東西可示範，直接結束（空狀態自己會說明）
+      abortWhen: (st) => currentLastSync() !== st.lastSyncAtStart && !(_currentData.courses || []).length,
       skipIf: () => !!q('#course-nav .nav-course-item'),
       doneWhen: () => !!q('#course-nav .nav-course-item'),
     },
@@ -144,6 +157,7 @@
       key: 'check',
       target: FIRST_ROW,
       spot: firstRowCheck,
+      giveUp: detailHasNoRows,
       before: openCourse,
       advanceEvent: 'complete',
     },
@@ -154,6 +168,7 @@
       spot: lastRowGrip,
       point: `${DETAIL} .archive-items`,
       scrollTo: `${DETAIL} .archive-items`,
+      giveUp: detailHasNoRows,
       before: openCourse,
       advanceEvent: 'drag',
     },
@@ -327,6 +342,7 @@
     pop.querySelector('#tour-body').textContent = t(`${textKey}Body`);
 
     pop.querySelector('.tour-next-label').textContent = last ? t('done') : t('next');
+    pop.querySelector('.tour-next').hidden = !!cur.noNext;   // 這一步只能靠做完前進（例如去 Canvas 登入同步），不給跳過
     setReveal(cur.reveal);
     _state.root.classList.toggle('has-point', !!cur.point);
     _state.root.classList.toggle('point-live', !!cur.pointLive);
@@ -430,7 +446,8 @@
   function frame() {
     if (!_state) return;
     if (!_state.moving && _state.cur) {
-      if (_state.cur.doneWhen && _state.cur.doneWhen()) advance(SETTLE_MS);
+      if (_state.cur.abortWhen && _state.cur.abortWhen(_state)) end();
+      else if (_state.cur.doneWhen && _state.cur.doneWhen()) advance(SETTLE_MS);
       else {
         const r = rectOf(_state.cur.target);
         if (r) place(r);
@@ -443,6 +460,8 @@
     const t0 = Date.now();
     while (_state && Date.now() - t0 < WAIT_MAX_MS) {
       if (rectOf(getSpec().target, { clip: false })) return true;
+      const gu = getSpec().giveUp;
+      if (gu && gu()) return false;
       await sleep(60);
     }
     return !!(_state && rectOf(getSpec().target, { clip: false }));
@@ -469,6 +488,7 @@
       const idx = i;
       if (await waitForTarget(() => spec(steps[idx]))) { cur = spec(steps[i]); break; }
       if (!_state || token !== _state.token) return;
+      steps.splice(i--, 1);   // 這一步沒東西可示範：整步拿掉，n / N 的編號不跳號
     }
     if (!_state || token !== _state.token) return;
     if (i >= steps.length) { end(); return; }
@@ -568,7 +588,7 @@
     const parts = build();
     _state = {
       i: from, cur: null, raf: 0, token: 0, lastKey: '', moving: false, programmatic: false,
-      reveal: null, allow: [], steps, ...parts,
+      reveal: null, allow: [], steps, lastSyncAtStart: currentLastSync(), ...parts,
     };
     GUARDED.forEach((type) => window.addEventListener(type, onGuard, true));
     document.addEventListener('click', onClick, true);
