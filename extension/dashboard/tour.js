@@ -4,7 +4,8 @@
 //   （點擊類看 advanceOn；改名／勾完成／拖曳這種要等結果的，聽 dashboard.js 的 due:action 事件）
 // - 「下一步」跳過這一步（需要換畫面的由導覽代點，next）；右上角 ✕ 與 Esc 結束
 // - 有些步驟要先到某個畫面（before：例如先打開一門課），導覽代點側欄後等目標出現才顯示
-// - 變暗用 SVG mask 挖洞：主亮框之外可以再挖一個「指給你看」的洞（point），配一條手繪繞圈箭頭
+// - 要點／要拖的地方（spot）挖成一個小圓、外圈一直往外擴散；只看不點的步驟（⚙）是圓角方框
+// - 變暗用 SVG mask 挖洞：主亮處之外可以再挖一個虛線框（point：拖曳的目的地、AI 權重會填的地方），AI 那步再配手繪繞圈箭頭
 // - 亮框以外擋住點擊（四塊透明 blocker 圍住主亮框）；interactive:false 的步驟連亮框本身也擋
 // - 目標每幀重新查詢、重新量位置（側欄、詳情會整段重建，active 底色會滑），不快取節點
 // - 自帶三語字串；依賴（執行期才用到）：_uiLanguage、announce、reduceMotion（dashboard.js 全域，皆有 typeof 守衛）
@@ -100,6 +101,18 @@
     return r ? r.querySelector('.drag-grip') : null;
   };
   const doneHasRows = () => !!q(`${DETAIL} .done-items .assignment-item`);
+  // 「已完成」區裡這一趟剛勾掉的那一列的握把（找不到就第一列）
+  const justDoneGrip = () => {
+    const id = _state && _state.completedId;
+    const css = (v) => ((window.CSS && CSS.escape) ? CSS.escape(String(v)) : String(v));
+    const chk = id != null ? q(`${DETAIL} .done-items .assignment-check[data-assignment-id="${css(id)}"]`) : null;
+    const row = chk ? chk.closest('.assignment-item') : q(`${DETAIL} .done-items .assignment-item`);
+    return row ? row.querySelector('.drag-grip') : null;
+  };
+  const firstRowCheck = () => {
+    const row = q(FIRST_ROW);
+    return row ? row.querySelector('.assignment-check') : null;
+  };
   // 「已完成」區預設收著：要從裡面拖東西出來得先打開
   function openDoneFold() {
     openCourse();
@@ -115,18 +128,23 @@
   //   advanceOn：使用者點到它（closest）就前進；advanceEvent：收到這個 due:action 就前進
   //   next：按「下一步」時導覽代做的事；before：顯示這一步前要先到的畫面
   //   interactive：亮框內可不可以點（預設可以）；reveal：這一步期間加在 <html> 上的 class（亮出平常藏著的控制項）
-  //   point：另外挖一個洞「指給你看」，配手繪箭頭與 pointLabel；settle：before 之後先等多久再捲動（等展開動畫）
+  //   spot：使用者要點／要拖的那個小東西 → 主亮處改成圍著它的小圓（target 只用來等畫面、捲動）
+  //   point：另外挖一個虛線框「指給你看」；pointArrow：再從說明框畫一條手繪繞圈箭頭過去，旁邊寫 pointLabel
+  //   settle：before 之後先等多久再捲動（等展開動畫）
   //   resolve(state)：依這一趟的狀況換文案／目標（例：剛勾過一項 → 拖曳那步改成「把它拖回來」）
   const STEPS = [
     {
       key: 'course',
       target: pickCourse,
+      spot: pickCourse,
       advanceOn: '#course-nav .nav-course-item',
       next: openCourse,
     },
     {
       key: 'rename',
-      target: [`${DETAIL} .detail-name-text`, `${DETAIL} .btn-rename-course`],
+      // 點了鉛筆，課名換成輸入框 → 亮處改成整個輸入框（不然正在打的字在暗處）
+      target: [() => q(`${DETAIL} .course-rename-input`) || q(`${DETAIL} .detail-name-text`), `${DETAIL} .btn-rename-course`],
+      spot: () => (q(`${DETAIL} .course-rename-input`) ? null : q(`${DETAIL} .btn-rename-course`)),
       before: openCourse,
       reveal: 'tour-reveal-rename',
       advanceEvent: 'rename',
@@ -134,6 +152,7 @@
     {
       key: 'check',
       target: FIRST_ROW,
+      spot: firstRowCheck,
       before: openCourse,
       advanceEvent: 'complete',
     },
@@ -148,6 +167,8 @@
             before: openDoneFold,
             settle: 400,   // 等「已完成」展開完（--t-disclosure）再捲，不然捲到的是展開前的位置
             target: [`${DETAIL} .done-items`, lastRow],
+            spot: justDoneGrip,
+            point: `${DETAIL} .detail-assignments-list`,   // 拖回這裡
             scrollTo: `${DETAIL} .done-items`,
           };
         }
@@ -155,6 +176,8 @@
         return {
           textKey: 'drag',
           target: [lastRowGrip, `${DETAIL} .done-items`, `${DETAIL} .hidden-items`],
+          spot: lastRowGrip,
+          point: [`${DETAIL} .done-items`, `${DETAIL} .hidden-items`],   // 拖到這兩區
           scrollTo: `${DETAIL} .hidden-items`,
         };
       },
@@ -165,11 +188,14 @@
       before: openCourse,
       interactive: false,
       point: `${DETAIL} .detail-left-panel`,
+      pointArrow: true,
       pointLabel: 'aiPoint',
     },
   ];
 
   const PAD = 6;              // 亮框比目標大一圈
+  const SPOT_MIN = 38;        // 小圓的直徑：圍住要點的東西，但不小於這個、不大於 SPOT_MAX
+  const SPOT_MAX = 56;
   const GAP = 18;             // 說明框與亮框的距離
   const EDGE = 14;            // 說明框離視窗邊緣的最小距離
   const SETTLE_MS = 380;      // 點了／代點之後等頁面換完（頁面切換淡入、課程 morph）
@@ -291,7 +317,6 @@
     pop.setAttribute('aria-describedby', 'tour-body');
     pop.tabIndex = -1;
     pop.innerHTML = `
-      <div class="tour-progress" aria-hidden="true"><span class="tour-progress-bar"></span></div>
       <div class="tour-arrow" aria-hidden="true"></div>
       <div class="tour-head">
         <span class="tour-counter"></span>
@@ -347,15 +372,16 @@
     pop.querySelector('.tour-hint').hidden = !actionable;
     pop.querySelector('.tour-hint-text').textContent = t('autoNext');
     pop.querySelector('.tour-next-label').textContent = last ? t('done') : t('next');
-    pop.querySelector('.tour-progress-bar').style.width = `${((i + 1) / steps.length) * 100}%`;
-    _state.sketchLabel.textContent = cur.pointLabel ? t(cur.pointLabel) : '';
+    _state.sketchLabel.textContent = cur.pointArrow && cur.pointLabel ? t(cur.pointLabel) : '';
     setReveal(cur.reveal);
     _state.root.classList.toggle('is-blocking', cur.interactive === false);
     _state.root.classList.toggle('is-actionable', actionable);
     _state.root.classList.toggle('has-point', !!cur.point);
+    _state.root.classList.toggle('has-arrow', !!cur.pointArrow);
   }
 
-  function setRect(el, x, y, w, h) {
+  function setRect(el, x, y, w, h, rx = 10) {
+    el.style.setProperty('rx', `${rx}px`);
     el.style.setProperty('x', `${x}px`);
     el.style.setProperty('y', `${y}px`);
     el.style.setProperty('width', `${Math.max(0, w)}px`);
@@ -370,6 +396,14 @@
   }
 
   const clampN = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
+
+  // 圍住要點的東西的小圓（外接正方形）：直徑＝東西的長邊加一圈，夾在 SPOT_MIN～SPOT_MAX
+  function spotBox(r) {
+    const cx = (r.left + r.right) / 2;
+    const cy = (r.top + r.bottom) / 2;
+    const d = clampN(Math.max(r.right - r.left, r.bottom - r.top) + 18, SPOT_MIN, SPOT_MAX);
+    return { x: cx - d / 2, y: cy - d / 2, w: d, h: d };
+  }
 
   // 手繪繞圈箭頭：從說明框邊緣出發，途中繞一個小圈，落在「指給你看」的框邊；箭頭兩撇順著最後的切線
   function drawSketch(popBox, b) {
@@ -443,17 +477,22 @@
     const { ring, ring2, hole, hole2, pop, blockers, cur } = _state;
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    const { x, y, w, h } = padded(r, vw, vh);
+    const sr = cur.spot ? rectOf(cur.spot) : null;
+    const { x, y, w, h } = sr ? spotBox(sr) : padded(r, vw, vh);
+    const round = sr ? w / 2 : 10;
+    _state.root.classList.toggle('is-spot', !!sr);   // spot 可能中途消失（改名輸入框出現）→ 換回圓角方框
+    // 說明框以整個目標（例如這一列）為基準擺在外側，不蓋住同一列的其他內容；箭頭仍對著亮處的中線
+    const anchor = sr ? padded(r, vw, vh) : { x, y, w, h };
     const pr = cur.point ? rectOf(cur.point) : null;
     const b = pr ? padded(pr, vw, vh) : null;
     const pw = pop.offsetWidth;
     const ph = pop.offsetHeight;
-    const key = [x, y, w, h, vw, vh, pw, ph, ...(b ? [b.x, b.y, b.w, b.h] : [])].map(Math.round).join(',');
+    const key = [x, y, w, h, anchor.x, anchor.y, anchor.w, anchor.h, vw, vh, pw, ph, ...(b ? [b.x, b.y, b.w, b.h] : [])].map(Math.round).join(',');
     if (key === _state.lastKey) return;
     _state.lastKey = key;
 
-    setRect(hole, x, y, w, h);
-    Object.assign(ring.style, { left: `${x}px`, top: `${y}px`, width: `${w}px`, height: `${h}px` });
+    setRect(hole, x, y, w, h, round);
+    Object.assign(ring.style, { left: `${x}px`, top: `${y}px`, width: `${w}px`, height: `${h}px`, borderRadius: `${round}px` });
     if (b) {
       setRect(hole2, b.x, b.y, b.w, b.h);
       Object.assign(ring2.style, { left: `${b.x}px`, top: `${b.y}px`, width: `${b.w}px`, height: `${b.h}px` });
@@ -470,23 +509,26 @@
     // 說明框：右 → 左 → 下 → 上，都放不下（目標幾乎佔滿畫面）就放在目標內的右下角、不畫箭頭
     const clampX = (v) => clampN(v, EDGE, vw - pw - EDGE);
     const clampY = (v) => clampN(v, EDGE, vh - ph - EDGE);
+    const A = anchor;
+    const cx = x + w / 2;   // 亮處中心（箭頭對準這裡）
+    const cy = y + h / 2;
     let side;
     let px;
     let py;
-    if (x + w + GAP + pw <= vw - EDGE) { side = 'right'; px = x + w + GAP; py = clampY(y + h / 2 - ph / 2); }
-    else if (x - GAP - pw >= EDGE) { side = 'left'; px = x - GAP - pw; py = clampY(y + h / 2 - ph / 2); }
-    else if (y + h + GAP + ph <= vh - EDGE) { side = 'bottom'; py = y + h + GAP; px = clampX(x + w / 2 - pw / 2); }
-    else if (y - GAP - ph >= EDGE) { side = 'top'; py = y - GAP - ph; px = clampX(x + w / 2 - pw / 2); }
-    else { side = 'inside'; px = clampX(x + w - pw - 24); py = clampY(y + h - ph - 24); }
+    if (A.x + A.w + GAP + pw <= vw - EDGE) { side = 'right'; px = A.x + A.w + GAP; py = clampY(cy - ph / 2); }
+    else if (A.x - GAP - pw >= EDGE) { side = 'left'; px = A.x - GAP - pw; py = clampY(cy - ph / 2); }
+    else if (A.y + A.h + GAP + ph <= vh - EDGE) { side = 'bottom'; py = A.y + A.h + GAP; px = clampX(cx - pw / 2); }
+    else if (A.y - GAP - ph >= EDGE) { side = 'top'; py = A.y - GAP - ph; px = clampX(cx - pw / 2); }
+    else { side = 'inside'; px = clampX(A.x + A.w - pw - 24); py = clampY(A.y + A.h - ph - 24); }
     pop.dataset.side = side;
     pop.style.left = `${px}px`;
     pop.style.top = `${py}px`;
     if (side === 'left' || side === 'right') {
-      pop.style.setProperty('--arrow-y', `${clampN(y + h / 2 - py, 20, ph - 20)}px`);
+      pop.style.setProperty('--arrow-y', `${clampN(cy - py, 20, ph - 20)}px`);
     } else if (side === 'top' || side === 'bottom') {
-      pop.style.setProperty('--arrow-x', `${clampN(x + w / 2 - px, 20, pw - 20)}px`);
+      pop.style.setProperty('--arrow-x', `${clampN(cx - px, 20, pw - 20)}px`);
     }
-    if (b) drawSketch({ x: px, y: py, w: pw, h: ph }, b);
+    if (b && cur.pointArrow) drawSketch({ x: px, y: py, w: pw, h: ph }, b);
   }
 
   function frame() {
@@ -545,7 +587,7 @@
     _state.moving = false;
     const r = rectOf(_state.cur.target);
     if (r) place(r);
-    if (_state.cur.point) playSketch();
+    if (_state.cur.pointArrow) playSketch();
     _state.root.classList.remove('is-moving');
     _state.pop.focus({ preventScroll: true });
     const textKey = _state.cur.textKey || _state.cur.key;
@@ -591,7 +633,10 @@
   function onAction(e) {
     if (!_state || !_state.cur) return;
     const type = e.detail && e.detail.type;
-    if (type === 'complete') _state.didComplete = true;   // 拖曳那步據此改成「把它拖回來」
+    if (type === 'complete') {   // 拖曳那步據此改成「把它拖回來」，並亮這一列的握把
+      _state.didComplete = true;
+      _state.completedId = e.detail.id;
+    }
     if (_state.moving || type !== _state.cur.advanceEvent) return;
     advance(type === 'rename' ? SETTLE_MS : EVENT_SETTLE_MS);
   }
@@ -617,7 +662,7 @@
     const parts = build();
     _state = {
       i: from, cur: null, raf: 0, token: 0, lastKey: '', moving: false, programmatic: false,
-      reveal: null, didComplete: false, steps, ...parts,
+      reveal: null, didComplete: false, completedId: null, steps, ...parts,
     };
     document.addEventListener('click', onClick, true);
     document.addEventListener('keydown', onKey, true);

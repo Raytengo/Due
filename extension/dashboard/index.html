@@ -487,7 +487,7 @@
     }
 
     .tour-hole {
-      transition: x var(--t-disclosure), y var(--t-disclosure), width var(--t-disclosure), height var(--t-disclosure);
+      transition: x var(--t-disclosure), y var(--t-disclosure), width var(--t-disclosure), height var(--t-disclosure), rx var(--t-disclosure);
     }
 
     /* 亮框：框內透明、看得到底下真的介面；細橘線外加一圈淡橘光暈 */
@@ -496,7 +496,13 @@
       border-radius: 10px;
       box-shadow: 0 0 0 1.5px var(--orange), 0 0 0 6px rgba(217, 119, 87, 0.16);
       pointer-events: none;
-      transition: left var(--t-disclosure), top var(--t-disclosure), width var(--t-disclosure), height var(--t-disclosure);
+      transition: left var(--t-disclosure), top var(--t-disclosure), width var(--t-disclosure), height var(--t-disclosure),
+        border-radius var(--t-disclosure);
+    }
+
+    /* 要點／要拖的小圓：亮處本身就是那個圓，外圈一直往外擴散，像在說「點這裡」 */
+    .tour-root.is-spot .tour-ring {
+      box-shadow: 0 0 0 2px var(--orange), 0 0 0 7px rgba(217, 119, 87, 0.2);
     }
 
     /* 「指給你看」的第二個洞：虛線框，不是要點的地方 */
@@ -524,7 +530,7 @@
       opacity: 0;
     }
 
-    .tour-root.has-point .tour-sketch {
+    .tour-root.has-arrow .tour-sketch {
       opacity: 1;
     }
 
@@ -568,18 +574,18 @@
       pointer-events: auto;
     }
 
-    /* 可以直接點亮起來的地方前進：亮框外緣一圈慢慢擴散的光，提示「點這裡」 */
-    .tour-root.is-actionable .tour-ring::after {
+    .tour-root.is-spot .tour-ring::after {
       content: '';
       position: absolute;
-      inset: -1.5px;
+      inset: -2px;
+      border: 2px solid var(--orange);
       border-radius: inherit;
-      animation: tour-pulse 1.8s var(--ease-out) infinite;
+      animation: tour-ripple 1.6s var(--ease-out) infinite;
     }
 
-    @keyframes tour-pulse {
-      from { box-shadow: 0 0 0 0 rgba(217, 119, 87, 0.45); }
-      to { box-shadow: 0 0 0 12px rgba(217, 119, 87, 0); }
+    @keyframes tour-ripple {
+      from { scale: 1; opacity: 0.7; }
+      to { scale: 1.7; opacity: 0; }
     }
 
     .tour-pop {
@@ -609,25 +615,6 @@
     .tour-root.no-anim .tour-hole,
     .tour-root.no-anim .tour-pop {
       transition: none;
-    }
-
-    /* 頂端進度條：一眼看出走到哪 */
-    .tour-progress {
-      position: absolute;
-      top: 0;
-      left: 10px;
-      right: 10px;
-      height: 2px;
-      background: var(--border);
-      border-radius: 0 0 2px 2px;
-      overflow: hidden;
-    }
-
-    .tour-progress-bar {
-      display: block;
-      height: 100%;
-      background: var(--orange);
-      transition: width var(--t-disclosure);
     }
 
     /* 箭頭：轉 45° 的方塊，貼在靠亮框的那一側，對齊亮框中線（--arrow-y／--arrow-x） */
@@ -5141,8 +5128,9 @@
         translate: none;
       }
 
-      .tour-root.is-actionable .tour-ring::after {
+      .tour-root.is-spot .tour-ring::after {
         animation: none;
+        opacity: 0;
       }
 
       :root {

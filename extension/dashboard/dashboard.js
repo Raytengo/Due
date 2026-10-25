@@ -2871,7 +2871,7 @@ function showGridView() {
 
 // ── 課程重命名（inline edit）──
 // 使用者完成了某個操作 → 發 due:action（互動導覽 tour.js 聽這個「做完就自動到下一步」；沒人聽就沒事）
-// type：'rename'（詳情改課名提交）｜'complete'（詳情列勾完成落地）｜'drag'（拖曳／鍵盤移動落地，detail.to＝落到哪一區）
+// type：'rename'（詳情改課名提交）｜'complete'（詳情列勾完成落地，detail.id）｜'drag'（拖曳／鍵盤移動落地，detail.to＝落到哪一區）
 function emitDueAction(type, extra = {}) {
   document.dispatchEvent(new CustomEvent('due:action', { detail: { type, ...extra } }));
 }
@@ -3132,7 +3132,7 @@ function finishComplete(item, id, cid) {
   const list = item.closest('.detail-assignments-list');
   const view = item.closest('.course-detail-view');
   if (!item.isConnected || !list || !view) return;  // 撤銷窗內整段重繪過（換課等）→ 節點已不在畫面上
-  emitDueAction('complete');
+  emitDueAction('complete', { id });
   const scroller = scrollParentOf(item);
 
   // ① 焦點交接：下一列，沒有就上一列，再沒有就清單標題（#1）
