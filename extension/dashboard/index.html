@@ -322,7 +322,7 @@
       background: transparent;
       width: 100%;
       text-align: left;
-      transition: background-color var(--t-color), scale var(--spring-press);
+      transition: background-color var(--t-color), color var(--t-color), scale var(--spring-press);
       position: relative;
       user-select: none;   /* 雙擊重命名時不選取課名文字 */
     }
@@ -922,6 +922,8 @@
       letter-spacing: 0.08em;
       color: var(--muted);
       margin-top: 6px;
+      position: relative;
+      top: 6px;   /* 只把說明字往下挪，分子位置不動 */
     }
 
     /* 分級摘要：可點列，跳到右側對應區塊 */
@@ -1206,11 +1208,10 @@
       border-bottom: none;
     }
 
-    /* 已完成列淡化（「已完成」區＋已隱藏區裡已完成的列）：只套在內容上，不整列 opacity——整列會疊乘到
+    /* 已完成列淡化（下方「已隱藏」區裡已完成的列）：只套在內容上，不整列 opacity——整列會疊乘到
        拖曳握把與操作鈕（握把曾只剩約 1.6:1，QA #79）。用變數讓拖曳 clone／殘影歸零淡化，
        維持舊外觀（clone 全不透明、殘影只吃 .drag-source 的 0.3）*/
-    .assignment-item.submitted,
-    .hidden-item-row.submitted {
+    .assignment-item.submitted {
       --done-fade: 0.45;
     }
 
@@ -1222,10 +1223,7 @@
     .assignment-item.submitted > .assignment-check,
     .assignment-item.submitted .assignment-title > span:first-child,
     .assignment-item.submitted .assignment-left > :not(.assignment-title),
-    .assignment-item.submitted .assignment-right > :not(.custom-actions-row),
-    .hidden-item-row.submitted .hidden-item-title > span:first-child,
-    .hidden-item-row.submitted .hidden-item-left > :not(.hidden-item-title),
-    .hidden-item-row.submitted .hidden-item-right > :not(.custom-actions-row) {
+    .assignment-item.submitted .assignment-right > :not(.custom-actions-row) {
       opacity: var(--done-fade);
     }
 
@@ -1402,8 +1400,7 @@
       color: var(--dark);
     }
 
-    .assignment-title > span:first-child,
-    .hidden-item-title > span:first-child {
+    .assignment-title > span:first-child {
       min-width: 0;
       white-space: nowrap;
       overflow: hidden;
@@ -3404,9 +3401,8 @@
       font-size: 13px;
     }
 
-    /* ── 作業清單下方的兩個收合區（spec 2026-10-25-drop-submitted-filter）──
-       .done-items：已完成（沒隱藏）；.hidden-items：已隱藏（自動隱藏的考試・簽到＋手動拖進來的作業，不分完成與否）。
-       開關、箭頭、清單共用 .fold-* */
+    /* ── 作業清單下方的「已隱藏」收合區（.archive-items，spec 2026-10-25-drop-submitted-filter）──
+       已完成＋被隱藏（自動隱藏的考試・簽到、手動隱藏的作業）合成一區；開關、箭頭、清單用 .fold-* */
     .detail-fold {
       margin-top: 12px;
       padding-top: 10px;
@@ -3459,26 +3455,7 @@
       padding-top: 4px;
     }
 
-    /* 隱藏列不整列降透明：淡化只靠較小字級＋標題改 --mid＋分組/時間標籤 0.75（見下），不疊乘到握把與操作鈕（QA #79） */
-    .hidden-item-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 0;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .hidden-item-row:last-child {
-      border-bottom: none;
-    }
-
-    /* 分組/時間標籤是次要資訊：略降透明；已完成的隱藏列改由 --done-fade 覆寫（同元素覆寫，不疊乘） */
-    .hidden-item-row .assignment-group,
-    .hidden-item-row .due-label {
-      opacity: 0.75;
-    }
-
-    /* ── 拖曳隱藏／取消隱藏（作業清單 ↔ 已隱藏區；pointer 自繪拖曳，見 spec 2026-07-22、2026-10-23）── */
+    /* ── 拖曳（作業清單 ↔ 下方「已隱藏」區；pointer 自繪拖曳，見 spec 2026-07-22、2026-10-25）── */
     /* 握把：緊跟作業名稱後，唯一拖曳起點；靜止 0.75 對 --bg 約 3.2:1（UI 元件 ≥3:1，QA #79） */
     .drag-grip {
       flex: 0 0 auto;
@@ -3500,7 +3477,6 @@
 
     @media (hover: hover) and (pointer: fine) {
       /* 滑過該列握把全亮（靜止 0.75 之上，QA #79） */
-      .hidden-item-row:hover .drag-grip,
       .assignment-item:hover .drag-grip {
         opacity: 1;
       }
@@ -3514,18 +3490,13 @@
     /* 鍵盤焦點在該列（:has(:focus-visible)＝只算鍵盤）時握把跟 hover 一樣亮起；
        握把本身拿到焦點時全亮、第一幀就到位（#6 會把它改成 button）；
        觸控時以 0.85 常駐（#11） */
-    :is(.hidden-item-row, .assignment-item):has(:focus-visible) .drag-grip {
+    .assignment-item:has(:focus-visible) .drag-grip {
       opacity: 1;
     }
 
-    :is(.hidden-item-row, .assignment-item) .drag-grip:focus-visible {
+    .assignment-item .drag-grip:focus-visible {
       opacity: 1;
       transition: none;
-    }
-
-    /* 握把拿到鍵盤焦點時整列維持不透明，焦點框才不會跟著被淡掉（#6；已隱藏列現已不整列降透明（QA #79），此條為保險） */
-    .hidden-item-row:has(.drag-grip:focus-visible) {
-      opacity: 1;
     }
 
     @media not all and (hover: hover) and (pointer: fine) {
@@ -3613,7 +3584,8 @@
       line-height: 1.6;
       white-space: nowrap;
     }
-    .detail-fold.drop-active::after { padding: 8px 0 2px; }
+    /* 收合區拖曳中不展開（spec 2026-10-25），放置框只有標題一行太小、不好瞄準 → 提示字上下多留空間 */
+    .detail-fold.drop-active::after { padding: 18px 0 14px; }
 
 
     /* 落點：clone 飛入、快到時與落地列交叉淡換（settleClone 以 inline opacity 處理，#41），落地後淡橘閃一下 */
@@ -3643,32 +3615,6 @@
       color: var(--mid);
       text-align: center;
       padding: 10px 0;
-    }
-
-    .hidden-item-left {
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-      flex: 1;
-      min-width: 0;
-    }
-
-    .hidden-item-title {
-      display: flex;
-      align-items: center;
-      gap: 7px;
-      min-width: 0;
-      font-size: 14px;
-      color: var(--mid);
-    }
-
-    .hidden-item-right {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-      gap: 4px;
-      margin-left: 20px;
-      flex-shrink: 0;
     }
 
     /* ── View Transitions — Card ↔ Detail Morph ──
@@ -4694,8 +4640,7 @@
         padding-left: 16px;
         padding-right: 16px;
       }
-      .assignment-right,
-      .hidden-item-right {
+      .assignment-right {
         margin-left: 12px;
       }
       .detail-card-bottom .due-label {
