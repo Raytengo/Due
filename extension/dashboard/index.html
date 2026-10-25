@@ -2579,32 +2579,18 @@
       pointer-events: none;
     }
 
-    .welcome-pin-arrow-line,
-    .welcome-pin-arrow-halo {
-      fill: none;
-      stroke-linecap: round;
-      stroke-linejoin: round;
-    }
-
     .welcome-pin-arrow-line {
+      fill: none;
       stroke: var(--orange);
       stroke-width: 2;
-    }
-
-    .welcome-pin-arrow-halo {
-      stroke: var(--bg);
-      stroke-opacity: 0.55;
-      stroke-width: 6;
+      stroke-linecap: round;
+      stroke-linejoin: round;
     }
 
     /* 跟手繪箭頭同一種手寫感：中文翩翩體（macOS）→ 楷體（Windows）；英文 Noteworthy／Bradley Hand → Segoe Print。
        不用 italic（中文沒有真斜體，瀏覽器硬拉斜很醜） */
     .welcome-pin-arrow-label {
       fill: var(--orange);
-      stroke: var(--bg);
-      stroke-width: 4px;
-      stroke-linejoin: round;
-      paint-order: stroke;
       font-family: 'HanziPen TC', 'HanziPen SC', 'Kaiti TC', 'KaiTi', 'BiauKai', 'Noteworthy', 'Bradley Hand', 'Segoe Print', cursive;
       font-size: 18px;
       dominant-baseline: middle;
@@ -2612,7 +2598,6 @@
 
     html[lang="en"] .welcome-pin-arrow-label {
       font-family: 'Noteworthy', 'Bradley Hand', 'Segoe Print', cursive;
-      stroke-width: 2.5px;   /* 英文手寫字筆畫細，描邊太粗會變空心字 */
     }
 
     .welcome-dot {
@@ -5279,7 +5264,6 @@
   <div class="welcome-overlay" id="welcome-overlay">
     <!-- 手繪箭頭：從卡片右上角指向瀏覽器右上角（擴充功能圖示的位置），由 drawWelcomePinArrow 擺 -->
     <svg class="welcome-pin-arrow" id="welcome-pin-arrow" aria-hidden="true">
-      <path class="welcome-pin-arrow-halo"></path>
       <path class="welcome-pin-arrow-line"></path>
       <path class="welcome-pin-arrow-line welcome-pin-arrow-head"></path>
       <text class="welcome-pin-arrow-label"></text>

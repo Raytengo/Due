@@ -5215,13 +5215,14 @@ function _welcomeSyncSlides(n) {
   if (area) area.scrollLeft = 0;
 }
 
-// 卡片外的手繪箭頭：從卡片右上角往右鼓一道弧，指向瀏覽器右上角（擴充功能圖示所在，在頁面外的工具列上）。
+// 卡片外的手繪箭頭：從卡片右上角往左鼓一道弧（先往上、再往右拐），指向瀏覽器右上角（擴充功能圖示所在，在頁面外的工具列上）；
+// 字放在弧線右邊（弧往左鼓，右邊才空得出來）。
 // 用卡片的 offset 量（不受進場縮放影響）；卡片貼太近頂端畫不下就不畫。play：開卡片時從起點畫到終點（減少動態：直接出現）
 function drawWelcomePinArrow({ play = false } = {}) {
   const svg = document.getElementById('welcome-pin-arrow');
   const card = document.querySelector('#welcome-overlay .welcome-card');
   if (!svg || !card) return;
-  const [halo, line, head] = svg.querySelectorAll('path');
+  const [line, head] = svg.querySelectorAll('path');
   const label = svg.querySelector('text');
   const vw = window.innerWidth;
   const sx = card.offsetLeft + card.offsetWidth - 70;
@@ -5230,22 +5231,21 @@ function drawWelcomePinArrow({ play = false } = {}) {
   const ey = 14;
   const L = Math.hypot(ex - sx, ey - sy);
   if (sy - ey < 50 || L < 60) {
-    [halo, line, head].forEach((p) => p.setAttribute('d', ''));
+    [line, head].forEach((p) => p.setAttribute('d', ''));
     label.textContent = '';
     return;
   }
   const f = (v) => v.toFixed(1);
   const ux = (ex - sx) / L;
   const uy = (ey - sy) / L;
-  let px = -uy;   // 往右鼓（先往右、再往上指進工具列）
+  let px = -uy;   // 往左鼓（先往上、再往右拐進工具列），右邊留給字
   let py = ux;
-  if (px < 0) { px = -px; py = -py; }
-  const bow = Math.min(L * 0.3, 70, Math.max(0, vw - Math.max(sx, ex) - 16));
+  if (px > 0) { px = -px; py = -py; }
+  const bow = Math.min(L * 0.3, 70);
   const c1 = { x: sx + ux * L * 0.2 + px * bow, y: sy + uy * L * 0.2 + py * bow };
   const c2 = { x: sx + ux * L * 0.8 + px * bow, y: sy + uy * L * 0.8 + py * bow };
   const d = `M ${f(sx)} ${f(sy)} C ${f(c1.x)} ${f(c1.y)} ${f(c2.x)} ${f(c2.y)} ${f(ex)} ${f(ey)}`;
   line.setAttribute('d', d);
-  halo.setAttribute('d', d);
   const tl = Math.hypot(ex - c2.x, ey - c2.y) || 1;
   const tx = (ex - c2.x) / tl;
   const ty = (ey - c2.y) / tl;
@@ -5254,16 +5254,21 @@ function drawWelcomePinArrow({ play = false } = {}) {
     return `${f(ex - (tx * Math.cos(a) - ty * Math.sin(a)) * 11)} ${f(ey - (tx * Math.sin(a) + ty * Math.cos(a)) * 11)}`;
   };
   head.setAttribute('d', `M ${wing(30)} L ${f(ex)} ${f(ey)} L ${wing(-30)}`);
+  // 字：弧線中段的右邊（貝茲曲線 t=0.5 的點往右 18px），放不下就往左收到視窗內
   label.textContent = tr('wIntroHere');
-  label.setAttribute('x', f(ex - 18));
-  label.setAttribute('y', f(ey + 24));
-  label.setAttribute('text-anchor', 'end');
+  const mx = 0.125 * sx + 0.375 * c1.x + 0.375 * c2.x + 0.125 * ex;
+  const my = 0.125 * sy + 0.375 * c1.y + 0.375 * c2.y + 0.125 * ey;
+  label.setAttribute('text-anchor', 'start');
+  label.setAttribute('y', f(my));
+  label.setAttribute('x', f(mx + 18));
+  const lw = label.getComputedTextLength ? label.getComputedTextLength() : 0;
+  if (mx + 18 + lw > vw - 12) label.setAttribute('x', f(Math.max(12, vw - 12 - lw)));
   if (!play || reduceMotion()) return;
   const len = line.getTotalLength();
-  [halo, line].forEach((p) => p.animate(
+  line.animate(
     [{ strokeDasharray: `${len}`, strokeDashoffset: `${len}` }, { strokeDasharray: `${len}`, strokeDashoffset: '0' }],
     { duration: 700, delay: 350, easing: 'cubic-bezier(0.65, 0, 0.35, 1)', fill: 'backwards' },
-  ));
+  );
   [head, label].forEach((p) => p.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 250, delay: 1000, fill: 'backwards' }));
 }
 window.addEventListener('resize', () => {
