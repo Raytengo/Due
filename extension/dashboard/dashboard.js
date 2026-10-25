@@ -792,6 +792,8 @@ function applyUILanguage() {
   document.querySelectorAll('#menu-language-submenu [data-lang]').forEach((b) => {
     b.setAttribute('aria-checked', String(b.dataset.lang === _uiLanguage));
   });
+  // AI 設定 modal 與選單項自帶三語字串：每次換語言（含啟動、教學語言鈕）都要跟著換，否則停在繁中或落後一步
+  if (typeof DueAiSettings !== 'undefined') DueAiSettings.applyLanguage(_uiLanguage);
 }
 
 // ── 語言子選單（#10／N1）──
@@ -844,7 +846,6 @@ function openLanguageSubmenu({ focusItem = false } = {}) {
     const first = submenu.querySelector('[role="menuitemradio"]');
     if (first) first.focus();
   }
-  if (typeof DueAiSettings !== 'undefined') DueAiSettings.applyLanguage(_uiLanguage);
 }
 
 function closeLanguageSubmenu({ refocus = false } = {}) {
@@ -4616,7 +4617,7 @@ document.getElementById('custom-assignment-cancel')?.addEventListener('click', (
 // ── 點背景關閉 modal：按下（pointerdown）、放開（pointerup）與 click 都落在背景本身才算 ──
 // 按下與放開落在不同元素時，click 會派發到兩者的共同祖先 overlay（target 也是 overlay）：
 // 在對話框內按下、拖曳選字到背景放開，或反過來在背景按下、拖進對話框才放開，只看 click 都會把 modal
-// 連同未存的輸入一起關掉（QA P2-9）。點背景仍會關閉的 overlay（確認／教學／AI 設定——AI 設定在 aiSettings.js 綁定）共用；新增作業／權重不吃背景點擊（N2）
+// 連同未存的輸入一起關掉（QA P2-9）。點背景仍會關閉的 overlay（確認／教學／學期成績／AI 設定——AI 設定在 aiSettings.js 綁定）共用；新增作業／權重不吃背景點擊（N2）
 function trackBackdropPress(overlay) {
   if (!overlay || overlay._backdropTracked) return;
   overlay._backdropTracked = true;
@@ -4815,8 +4816,14 @@ document.getElementById('grades-list').addEventListener('click', (e) => {
   closeGradesOverview();
   showCourseDetail(courseId);
   if (currentView !== 'course' || currentCourseId !== courseId) return;
-  const calc = document.querySelector('#course-detail-container .grade-calc');
+  const container = document.getElementById('course-detail-container');
+  const calc = container.querySelector('.grade-calc');
   if (calc) calc.classList.add('open');
+  // 關 modal 時 setupModalA11y 的 MutationObserver 會在 microtask 把焦點還給側欄「成績」，蓋掉 showCourseDetail
+  // 放到詳情標題的焦點（#2）；排在它後面的 microtask 再放一次
+  queueMicrotask(() => {
+    if (currentView === 'course' && currentCourseId === courseId) focusDetailHeading(container);
+  });
 });
 
 const _gradesOverlay = document.getElementById('grades-overlay');
@@ -5132,11 +5139,9 @@ if (menuOpenTutorial) {
 const menuAiSettings = document.getElementById('menu-ai-settings');
 if (menuAiSettings) {
   menuAiSettings.addEventListener('click', () => {
+    // 同「使用教學」：先收選單（語言子選單一起收、焦點還給 ⚙），modal 的 focus trap 記下的觸發元素才是 ⚙
+    closeSettingsMenu();
     if (typeof DueAiSettings !== 'undefined') DueAiSettings.open();
-    if (settingsMenu) settingsMenu.classList.remove('open');
-    if (settingsMenuBtn) settingsMenuBtn.classList.remove('open');
-    const menuLanguageLabel = document.getElementById('menu-language-label');
-    if (menuLanguageLabel) menuLanguageLabel.classList.remove('submenu-open');
   });
 }
 

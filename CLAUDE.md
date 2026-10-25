@@ -341,9 +341,9 @@ sidebar（300px）+ main-content（flex:1）
 - 新增／編輯存檔後（`afterCustomSaved` → `refreshView` → `landCustomAssignment`）：落點捲進可視範圍、淡入＋上移 8px 落地（#48）；編輯後焦點回到重建後的同一顆「編輯」鈕
 
 **Modal 共通：**
-- **點背景**：確認框與教學點背景會關，但要「按下（pointerdown）、放開（pointerup）與 click 都在背景本身」（`trackBackdropPress`／`isBackdropClick`）——按下與放開在不同元素時 click 會派發到共同祖先 overlay，所以在對話框內按下、拖曳選字到背景放開，或反過來從背景拖進對話框放開，都不會關掉 modal（QA P2-9）。**新增／編輯作業與權重編輯器點背景一律不關**（N2，比 P2-9 更嚴），只用 ✕、取消、Esc
+- **點背景**：確認框、教學、AI 分析設定（`aiSettings.js` 綁定）、學期成績點背景會關，但要「按下（pointerdown）、放開（pointerup）與 click 都在背景本身」（`trackBackdropPress`／`isBackdropClick`）——按下與放開在不同元素時 click 會派發到共同祖先 overlay，所以在對話框內按下、拖曳選字到背景放開，或反過來從背景拖進對話框放開，都不會關掉 modal（QA P2-9）。**新增／編輯作業與權重編輯器點背景一律不關**（N2，比 P2-9 更嚴），只用 ✕、取消、Esc
 - **草稿（N2）**：新增／編輯作業與權重編輯器裡已輸入的內容是草稿（只在記憶體，`_customDraft`／`_weightDraft`）：✕ 與 Esc 關掉時保留，重開「同一個」視窗才還原——key 由 `customAssignments.js` 決定（`formDraftKey`：新增一律 `new`、編輯 `edit:<id>`；`weightDraftKey(courseId)`；`draftValuesFor` 比對，含測試），開別筆作業或別門課的權重就重新開始；「取消」、儲存、權重的「還原 Canvas 權重」丟掉草稿
-- **進出場（#29）**：四個 overlay 的背景雙向淡入淡出（`--t-overlay`），卡片進場 `--t-dialog-fade`＋`--spring-dialog`、關閉走 `--t-dismiss`；關閉中的 overlay inert。Esc 一次只關最上層（確認框 → 新增作業 → 權重 → 教學），組字中的 Esc 不算
+- **進出場（#29）**：六個 overlay（新增作業、權重、確認、教學、AI 分析設定、學期成績）的背景雙向淡入淡出（`--t-overlay`），卡片進場 `--t-dialog-fade`＋`--spring-dialog`、關閉走 `--t-dismiss`；關閉中的 overlay inert。Esc 一次只關最上層（確認框 → AI 分析設定 → 新增作業 → 權重 → 學期成績 → 教學），組字中的 Esc 不算
 - 文案插入使用者字串（作業名、課名）一律用函式型替換 `.replace('{name}', () => s)`，避免 `$&`／`$$` 被 `String.replace` 展開
 
 **完成標記（手動，雙向）：**

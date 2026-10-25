@@ -1938,25 +1938,25 @@
       overflow: hidden;
     }
 
-    /* ── 四個 modal 的卡片進出場（#29，modal recipe）──
+    /* ── 六個 modal 的卡片進出場（#29，modal recipe；AI 設定與學期成績在合併 2.5.0 時接上）──
        進場：淡入 transition.dialogFade＋從 0.96 放大到位 spring.dialog（起點見 @starting-style）；
        出場：倒著走、比進場快——transition.dismiss（200ms ease.away）淡出並縮回 0.96，背景再用 transition.overlay 淡回透明。
        overlay 的 display 延後到背景淡完才 none（allow-discrete），出場中的 overlay 由 setupModalA11y 設 inert，接不到焦點與點擊。
        減少動態：--modal-from 為 none（檔尾 media 區塊），只淡入淡出、不縮放（連 @starting-style 一起生效） */
-    :is(.welcome-card, .custom-assignment-modal, .weight-edit-modal, .confirm-modal) {
+    :is(.welcome-card, .custom-assignment-modal, .weight-edit-modal, .confirm-modal, .ai-settings-modal, .grades-modal) {
       opacity: 0;
       transform: var(--modal-from);
       transition: opacity var(--t-dismiss), transform var(--t-dismiss);
     }
 
-    .open > :is(.welcome-card, .custom-assignment-modal, .weight-edit-modal, .confirm-modal) {
+    .open > :is(.welcome-card, .custom-assignment-modal, .weight-edit-modal, .confirm-modal, .ai-settings-modal, .grades-modal) {
       opacity: 1;
       transform: none;
       transition: opacity var(--t-dialog-fade), transform var(--spring-dialog);
     }
 
     @starting-style {
-      .open > :is(.welcome-card, .custom-assignment-modal, .weight-edit-modal, .confirm-modal) {
+      .open > :is(.welcome-card, .custom-assignment-modal, .weight-edit-modal, .confirm-modal, .ai-settings-modal, .grades-modal) {
         opacity: 0;
         transform: var(--modal-from);
       }
@@ -3923,14 +3923,24 @@
     .grades-overlay {
       position: fixed;
       inset: 0;
-      background: rgba(0,0,0,0.35);
+      background-color: transparent;
       display: none;
       align-items: center;
       justify-content: center;
       z-index: 1000;
+      transition: background-color var(--t-overlay), display var(--t-overlay) allow-discrete;   /* 背景淡入淡出（#29，同其他 modal） */
     }
 
-    .grades-overlay.open { display: flex; }
+    .grades-overlay.open {
+      display: flex;
+      background-color: rgba(0, 0, 0, 0.35);
+    }
+
+    @starting-style {
+      .grades-overlay.open {
+        background-color: transparent;
+      }
+    }
 
     .grades-modal {
       background: var(--bg);
@@ -4167,14 +4177,24 @@
     .ai-settings-overlay {
       position: fixed;
       inset: 0;
-      background: rgba(0,0,0,0.35);
+      background-color: transparent;
       display: none;
       align-items: center;
       justify-content: center;
       z-index: 1000;            /* 低於 .confirm-overlay(3000)：清除紀錄的確認框要疊在上面 */
+      transition: background-color var(--t-overlay), display var(--t-overlay) allow-discrete;   /* 背景淡入淡出（#29，同其他 modal） */
     }
 
-    .ai-settings-overlay.open { display: flex; }
+    .ai-settings-overlay.open {
+      display: flex;
+      background-color: rgba(0, 0, 0, 0.35);
+    }
+
+    @starting-style {
+      .ai-settings-overlay.open {
+        background-color: transparent;
+      }
+    }
 
     .ai-settings-modal {
       background: var(--bg);
