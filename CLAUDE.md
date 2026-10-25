@@ -41,6 +41,9 @@ cc/
         ├── aiSettings.js          ← AI 分析設定 modal（自帶三語字串；只寫 aiConfig）
         ├── taskRules.js           ← 共用規則：考試/簽到判定（結構規則優先＋名稱備援）、緊急度色階、逾期窗（含測試，popup 共用）
         ├── completion.js          ← 完成標記單一真相來源：isDone / setDone（勾選寫入入口）/ toggleManualDone（含測試）
+        ├── schools.js             ← 學校選單純規則：清單建索引、搜尋排序（中文別名）、貼上網址轉 origin（含測試）
+        ├── schools.json           ← Canvas 官方「找學校」API 的 *.instructure.com 快照（[[subdomain, name], …]），由 scripts/build-schools.py 重建
+        ├── schoolPickerUi.js      ← 空狀態「你的學校」combobox 的 DOM（可搜尋下拉；第一次 mount 才抓 schools.json）
         ├── customAssignments.js   ← 自訂作業建立與合併、modal 草稿 key（含測試）
         ├── gradeCalc.js           ← 成績計算純規則：權重來源、自訂權重的作業歸類、加權分數（含測試；計算器與學期成績總覽共用）
         └── descSanitizer.js       ← 作業描述 HTML 白名單 sanitize（含測試）
@@ -105,6 +108,7 @@ GET /api/v1/accounts/self、/api/v1/accounts/:account_id
   "customWeights": { "courseId": [{ "name": "Homework", "weight": 30 }] },
   "gradeItemMap": { "courseId": { "assignmentId": "Homework | null" } },
   "courseNames": { "courseId": "自訂名稱" },
+  "pickedCanvasOrigin": "https://ln.instructure.com",
   "uiLanguage": "zh-TW",
   "showClaudeUsageInPopup": true,
   "claudeOrgId": "...",
@@ -379,7 +383,9 @@ sidebar（300px）+ main-content（flex:1）
 
 **同步按鈕（`setSyncStatus`，#30）：** 閒置／三點／「✓ 已同步」／「同步失敗」四個標籤一開始就疊在同一格（`.sync-swap`），換狀態只改 `data-status`，CSS 原地 opacity＋blur 淡換（按鈕不變寬）；「✓ 已同步」停 1.5 秒（`SYNC_DONE_MS`）、「同步失敗」停 2.5 秒（`SYNC_ERROR_MS`，期間 disabled）再回閒置；結果經 `announce` 念出。`SYNC` 回 `success:false`（整體失敗，例如課程清單 401）或訊息通道錯誤 → 錯誤態（錯誤代碼橫幅屬 QA P0-3，決策不做）；部分失敗（`success:true`＋`failedCourses`，QA P0-1）仍是「✓ 已同步」；成功且已有資料 → 不立即重繪，交給 `requestRefresh()`（等 UI 閒置才原地重繪，同步期間勾的撤銷窗不被截斷）；首次同步（無資料）→ 同步期間畫 skeleton，結束後 `loadData()`
 
-**空狀態（`renderEmptyState`，QA P2-6）：** 沒有課程時區分「從未同步」（無 `lastSync`：`emptyNeverTitle/Body`）與「已同步但沒有進行中的課程」（有 `lastSync`、courses 空：`emptyNoCoursesTitle/Body`，說明 Due 只抓進行中的課程）。header 照常顯示「學校 · N 分鐘前同步／尚未同步」。主要動作「前往 Canvas」（`openCanvasTab`，與教學的登入連結共用：點擊當下讀 storage 的 `canvasBaseUrl`，沒有就開 HKUST(GZ) 並附其他學校說明；從未同步時同教學「武裝」自動跳回）。`loadData` 的空分支把 `_currentData` 換成只有同步狀態（側欄計數與課程列不留上一份資料的殘影）、回到學期待辦（`currentPage='week'`），並以 `setNoCoursesMode(true)` 停用「+ 新增作業」「課程」「成績」（title 說明 `needCourses`）；有資料時 `render()` 解除
+**空狀態的「你的學校」選單（2026-10-26）：** 沒有 `canvasBaseUrl`（還沒偵測到學校）時，空狀態在「前往 Canvas」上方多一個 combobox（`schoolPickerUi.js`，ARIA editable combobox：↑↓／Enter／Esc／Tab、IME 組字中不攔）。欄位預設 HKUST(GZ)（`DueSchools.DEFAULT_SUB`；現有使用者幾乎都是它，導覽第一步亮的按鈕也不必先等人選）；點開先列「常用」（HKUST(GZ)／CityU(DG)／嶺南／演藝）再列全部約 6,700 所（分批畫，捲到底補），打字即時篩選——詞首比字中優先，任一詞都要符合，常用學校有中文別名（打「港科廣」「岭南大学」找得到）；貼上 Canvas 網址（`https://x.instructure.com/…`）清單有就指到那所、沒有就出「使用 x.instructure.com」（快照會漏新學校）。清單底部固定一行說明：網址不是 `.instructure.com` 的學校（canvas.ust.hk 等）目前不支援，不假裝能選。選定後寫 `pickedCanvasOrigin`（只有 dashboard 寫），`openCanvasTab` 用它開分頁（`canvasBaseUrl` 優先；storage 值一律過 `DueSchools.parseInstructure`，非法就退回預設）；**background 完全沒動**——開了該校 Canvas、登入後走既有的首次偵測（`users/self` 確認→採用→同步）。已有 `canvasBaseUrl` 的空狀態（放假沒課）不顯示選單。schools.json 的重建：`python3 scripts/build-schools.py`（約 110 頁；只留 `isCanvasHost` 認得的網域、同網域多入口留一個名字、濾掉測試／數字開頭的帳號）。`#empty-open-canvas` 的 id 不能改（導覽 sync 步驟亮它）
+
+**空狀態（`renderEmptyState`，QA P2-6）：** 沒有課程時區分「從未同步」（無 `lastSync`：`emptyNeverTitle/Body`）與「已同步但沒有進行中的課程」（有 `lastSync`、courses 空：`emptyNoCoursesTitle/Body`，說明 Due 只抓進行中的課程）。header 照常顯示「學校 · N 分鐘前同步／尚未同步」。主要動作「前往 Canvas」（`openCanvasTab`，與教學的登入連結共用：點擊當下讀 storage 的 `canvasBaseUrl`，沒有就開上方選單選的學校（沒選過＝HKUST(GZ)）；從未同步時同教學「武裝」自動跳回）。`loadData` 的空分支把 `_currentData` 換成只有同步狀態（側欄計數與課程列不留上一份資料的殘影）、回到學期待辦（`currentPage='week'`），並以 `setNoCoursesMode(true)` 停用「+ 新增作業」「課程」「成績」（title 說明 `needCourses`）；有資料時 `render()` 解除
 
 **側欄「偵測到另一個 Canvas」提示（`#canvas-candidate`，QA P1-9）：** 同步鍵上方一行安靜的提示。`loadData` 讀 `canvasBaseCandidate`（另存 `_canvasCandidate`，不進 `_currentData`），常駐 `storage.onChanged` 看到 `canvasBaseCandidate` 變動時只重畫這一行（`setCanvasCandidate`，不排整頁重繪）；`canvasBaseUrl` 屬於同步 key（`LIVE_SYNC_KEYS`），外部變更照常排整頁重繪（`requestRefresh`），並順手重畫這一行（`renderCanvasCandidate`）；候選存在且 `origin !== canvasBaseUrl` 才顯示（空狀態也顯示——放假沒課的學校同樣可能偵測到別校），host 顯示 `URL.host`、title 為完整 origin。「切換到這裡」送 `SET_CANVAS_BASE`：等待期間兩鈕停用、文字換 `canvasCandidateSwitching`（期間任何重畫都不解除）；成功 → 收起提示並 `loadData()`；失敗 → 提示保留、下方 `#canvas-candidate-error` 依回應的 `reason` 顯示說明：`'not-logged-in'` → `canvasCandidateFailed`（請先登入該 Canvas）；其餘（含訊息通道錯誤、沒有 reason）→ `canvasCandidateSyncFailed`（請稍後再試）；`_canvasCandidateError` 存原因字串，再按切換或候選換成別的網址時清除。「忽略」送 `IGNORE_CANVAS_BASE` 並立即收起。i18n：`canvasCandidateLabel`／`Switch`／`Switching`／`Ignore`／`Failed`／`SyncFailed`
 

@@ -1923,6 +1923,193 @@
       color: var(--mid);
     }
 
+    /* ── 空狀態「你的學校」選單（schoolPickerUi.js；沒有學校網址時才出現）──
+       可搜尋的 combobox：欄位沿用輸入框語彙（surface 底、1px 邊、focus 變橘且第一幀到位），
+       清單是唯一浮起來的東西，所以只有它有陰影；選中列右側橘勾，鍵盤／滑鼠停留列用 surface 底 */
+    .school-pick {
+      width: min(420px, 100%);
+      margin: 28px auto 0;
+      text-align: left;
+    }
+
+    .school-pick-label {
+      display: block;
+      margin-bottom: 8px;
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--mid);
+    }
+
+    .school-pick-field {
+      position: relative;
+    }
+
+    .school-pick-input {
+      width: 100%;
+      height: 46px;
+      padding: 0 40px 0 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface);
+      color: var(--dark);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 15px;
+      text-overflow: ellipsis;
+      outline: none;
+      transition: border-color var(--t-color);
+    }
+
+    .school-pick-input::placeholder {
+      color: var(--mid);
+    }
+
+    .school-pick-input:focus,
+    .school-pick-field.is-open .school-pick-input {
+      border-color: var(--orange);
+      transition: none;
+    }
+
+    .school-pick-chev {
+      position: absolute;
+      top: 17px;
+      right: 15px;
+      color: var(--mid);
+      cursor: pointer;
+      transition: rotate var(--t-menu);
+    }
+
+    .school-pick-field.is-open .school-pick-chev {
+      rotate: 180deg;
+    }
+
+    .school-pick-pop {
+      position: absolute;
+      z-index: 20;
+      top: calc(100% + 6px);
+      left: 0;
+      right: 0;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg);
+      box-shadow: 0 10px 28px rgba(20, 20, 19, 0.1);
+      transform-origin: top center;
+      animation: school-pop-in var(--t-menu) both;
+    }
+
+    .school-pick-pop[hidden] {
+      display: none;
+    }
+
+    @keyframes school-pop-in {
+      from {
+        opacity: 0;
+        translate: 0 -4px;
+        scale: 0.985;
+      }
+    }
+
+    .school-pick-list {
+      max-height: 292px;
+      margin: 0;
+      padding: 6px;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      list-style: none;
+    }
+
+    .school-pick-group {
+      padding: 10px 10px 4px;
+      font-family: 'DM Mono', monospace;
+      font-size: 10.5px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--mid);
+    }
+
+    .school-pick-group:first-child {
+      padding-top: 6px;
+    }
+
+    .school-opt {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 9px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .school-opt.is-active {
+      background: var(--surface);
+    }
+
+    .school-opt-main {
+      display: flex;
+      flex: 1;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+
+    .school-opt-name {
+      font-size: 14px;
+      line-height: 1.35;
+      color: var(--dark);
+    }
+
+    .school-opt-host {
+      font-family: 'DM Mono', monospace;
+      font-size: 11.5px;
+      color: var(--mid);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .school-opt.is-custom .school-opt-name {
+      font-family: 'DM Mono', monospace;
+      font-size: 13px;
+    }
+
+    .school-opt-check {
+      flex: none;
+      color: var(--orange);
+      opacity: 0;
+    }
+
+    .school-opt.is-selected .school-opt-check {
+      opacity: 1;
+    }
+
+    .school-pick-note {
+      padding: 18px 12px;
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--mid);
+      text-align: center;
+    }
+
+    .school-pick-foot {
+      padding: 10px 14px;
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+      font-size: 12px;
+      line-height: 1.55;
+      color: var(--mid);
+    }
+
+    .school-pick-host {
+      margin-top: 8px;
+      min-height: 16px;
+      font-family: 'DM Mono', monospace;
+      font-size: 12px;
+      color: var(--mid);
+      overflow-wrap: anywhere;
+    }
+
     /* ── Grade Calculator ── */
     .grade-calc {
       border: 1px solid var(--border);
@@ -5081,6 +5268,21 @@
     }
 
     @media (prefers-reduced-motion: reduce) {
+      /* 學校選單：清單只淡入、不位移縮放；箭頭直接翻 */
+      .school-pick-pop {
+        animation-name: school-pop-fade;
+      }
+
+      .school-pick-chev {
+        transition: none;
+      }
+
+      @keyframes school-pop-fade {
+        from {
+          opacity: 0;
+        }
+      }
+
       .tour-ring,
       .tour-pop {
         transition: opacity var(--t-fade);
@@ -5470,6 +5672,8 @@
   <script src="descSanitizer.js"></script>
   <script src="gradeCalc.js"></script>
   <script src="../ai/gradingRules.js"></script>
+  <script src="schools.js"></script>
+  <script src="schoolPickerUi.js"></script>
   <script src="dashboard.js"></script>
   <script src="aiSettings.js"></script>
   <script src="tour.js"></script>
