@@ -787,6 +787,7 @@ function applyUILanguage() {
   });
   // AI 設定 modal 與選單項自帶三語字串：每次換語言（含啟動、教學語言鈕）都要跟著換，否則停在繁中或落後一步
   if (typeof DueAiSettings !== 'undefined') DueAiSettings.applyLanguage(_uiLanguage);
+  if (typeof DueTour !== 'undefined') DueTour.applyLanguage();
 }
 
 // ── 語言子選單（#10／N1）──
@@ -5142,8 +5143,16 @@ if (menuOpenTutorial) {
     // 先收選單（焦點還給 ⚙）再開教學：教學的 focus trap 會把當下的焦點記成觸發元素、關閉時還給它——
     // 記到的要是 ⚙，而不是馬上變 display:none 的「使用教學」
     closeSettingsMenu();
-    openWelcomeModal();
+    // 原型：使用教學改成互動導覽（tour.js）；舊的 5 頁教學 modal 先留著（首次安裝仍會開）
+    if (typeof DueTour !== 'undefined') DueTour.start();
+    else openWelcomeModal();
   });
+}
+
+// ?tour=1：直接開互動導覽（dev harness 對齊效果用）
+// tour.js 在 dashboard.js 之後才載入：到 timer 裡才查得到 DueTour
+if (new URLSearchParams(location.search).get('tour') === '1') {
+  setTimeout(() => { if (typeof DueTour !== 'undefined') DueTour.start(); }, 600);   // 也等第一次 render 把側欄課程列畫出來
 }
 
 const menuAiSettings = document.getElementById('menu-ai-settings');

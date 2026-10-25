@@ -448,6 +448,152 @@
       color: var(--overdue);
     }
 
+    /* ── 互動導覽（tour.js）：變暗＋亮框＋說明框；亮框以外由四塊透明 blocker 擋點擊 ── */
+    .tour-root {
+      position: fixed;
+      inset: 0;
+      z-index: 9000;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity var(--t-overlay);
+    }
+
+    .tour-root.is-open {
+      opacity: 1;
+    }
+
+    .tour-block {
+      position: fixed;
+      pointer-events: auto;
+    }
+
+    /* 亮框：外面一圈超大陰影就是變暗的背景，亮框本身透明、看得到底下真的介面 */
+    .tour-ring {
+      position: fixed;
+      border-radius: 8px;
+      box-shadow: 0 0 0 2px var(--orange), 0 0 0 200vmax rgba(20, 20, 19, 0.45);
+      pointer-events: none;
+      transition: left var(--t-disclosure), top var(--t-disclosure), width var(--t-disclosure), height var(--t-disclosure);
+    }
+
+    .tour-pop {
+      position: fixed;
+      width: 280px;
+      padding: 16px 18px 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg);
+      box-shadow: 0 8px 28px rgba(20, 20, 19, 0.18);
+      color: var(--dark);
+      pointer-events: auto;
+      transition: left var(--t-disclosure), top var(--t-disclosure), opacity var(--t-fade);
+    }
+
+    .tour-pop:focus {
+      outline: none;
+    }
+
+    /* 點了亮起來的元素 → 說明框先淡出，移到下一步的位置後再淡入 */
+    .tour-root.is-advancing .tour-pop {
+      opacity: 0;
+    }
+
+    .tour-root.no-anim .tour-ring,
+    .tour-root.no-anim .tour-pop {
+      transition: none;
+    }
+
+    /* 箭頭：一個轉 45° 的方塊，貼在說明框靠亮框的那一側，垂直對齊亮框中線（--arrow-y） */
+    .tour-arrow {
+      position: absolute;
+      top: var(--arrow-y, 50%);
+      width: 10px;
+      height: 10px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      rotate: 45deg;
+      translate: 0 -50%;
+    }
+
+    .tour-pop[data-side="right"] .tour-arrow {
+      left: -6px;
+      border-top: none;
+      border-right: none;
+    }
+
+    .tour-pop[data-side="left"] .tour-arrow {
+      right: -6px;
+      border-bottom: none;
+      border-left: none;
+    }
+
+    .tour-counter {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      color: var(--mid);
+      margin-bottom: 6px;
+    }
+
+    .tour-title {
+      font-family: 'Source Serif 4', Georgia, serif;
+      font-size: 17px;
+      font-weight: 400;
+      margin-bottom: 6px;
+    }
+
+    .tour-body {
+      font-size: 13px;
+      font-weight: 300;
+      line-height: 1.65;
+      color: var(--muted);
+    }
+
+    .tour-hint {
+      margin-top: 10px;
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.03em;
+      color: var(--orange);
+    }
+
+    .tour-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 14px;
+      margin-top: 12px;
+    }
+
+    .tour-actions button {
+      border: none;
+      background: none;
+      cursor: pointer;
+      padding: 2px 0;
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.03em;
+      color: var(--muted);
+      transition: color var(--t-color), scale var(--spring-press);
+    }
+
+    .tour-actions .tour-done {
+      color: var(--orange);
+    }
+
+    .tour-actions button[hidden] {
+      display: none;
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+      .tour-actions button:hover {
+        color: var(--dark);
+      }
+    }
+
+    .tour-actions button:active {
+      scale: var(--scale-press);
+    }
+
     .btn-sync {
       flex: 1;
       font-family: 'DM Mono', monospace;
@@ -4779,6 +4925,11 @@
     }
 
     @media (prefers-reduced-motion: reduce) {
+      .tour-ring,
+      .tour-pop {
+        transition: opacity var(--t-fade);
+      }
+
       :root {
         --lift: 0px;
         --scale-press: 1;
@@ -5360,6 +5511,7 @@
   <script src="../ai/gradingRules.js"></script>
   <script src="dashboard.js"></script>
   <script src="aiSettings.js"></script>
+  <script src="tour.js"></script>
 </body>
 
 </html>
