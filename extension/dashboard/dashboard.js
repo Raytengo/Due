@@ -223,7 +223,6 @@ const I18N = {
     wTitle2: '登入 Canvas（必須）',
     wBody2: 'Due 透過你的 Canvas 登入狀態同步資料，不需要額外設定或 Token。',
     wStep2Li1: '登入 <a class="welcome-inline-link" id="welcome-canvas-link">{canvas} ↗</a>（點一下，同步完成會自動帶你回來）',
-    wCanvasDefaultSchool: 'HKUST(GZ) Canvas',
     wCanvasOtherSchool: '其他學校：打開你學校的 Canvas（網址結尾是 .instructure.com）並登入，Due 會自動偵測',
     wStep2Li2: 'Due 會<strong>在你每次打開Canvas時自動更新</strong>你的所有課程與作業',
     wStep2Li3: '點擊工具列或進入 Dashboard 都可以看到相關資訊',
@@ -391,7 +390,6 @@ const I18N = {
     wTitle2: '登录 Canvas（必须）',
     wBody2: 'Due 通过你的 Canvas 登录状态同步数据，无需额外设置或 Token。',
     wStep2Li1: '登录 <a class="welcome-inline-link" id="welcome-canvas-link">{canvas} ↗</a>（点一下，同步完成后会自动带你回来）',
-    wCanvasDefaultSchool: 'HKUST(GZ) Canvas',
     wCanvasOtherSchool: '其他学校：打开你学校的 Canvas（网址结尾是 .instructure.com）并登录，Due 会自动识别',
     wStep2Li2: 'Due 会<strong>在每次打开 Canvas 时自动更新</strong>你的所有课程和作业',
     wStep2Li3: '点击工具栏图标或进入 Dashboard 即可查看',
@@ -557,7 +555,6 @@ const I18N = {
     wTitle2: 'Log in to Canvas (Required)',
     wBody2: 'Due syncs data using your Canvas login session — no extra setup or tokens needed.',
     wStep2Li1: 'Log in to <a class="welcome-inline-link" id="welcome-canvas-link">{canvas} ↗</a> (click it — you\'ll be brought back automatically once syncing finishes)',
-    wCanvasDefaultSchool: 'HKUST(GZ) Canvas',
     wCanvasOtherSchool: 'Other school? Open your school\'s Canvas (its address ends in .instructure.com) and log in — Due detects it automatically',
     wStep2Li2: 'Due <strong>auto-syncs all your courses and assignments</strong> every time you open Canvas',
     wStep2Li3: 'Click the toolbar icon or open Dashboard to view your tasks',
@@ -4949,12 +4946,11 @@ function renderEmptyState() {
   if (!main) return;
   const { lastSync, canvasBaseUrl } = _currentData;
   const synced = !!lastSync;
-  const label = canvasBaseUrl ? 'Canvas' : tr('wCanvasDefaultSchool');
   main.innerHTML = `
     <div class="state-msg">
       <div class="big">${esc(tr(synced ? 'emptyNoCoursesTitle' : 'emptyNeverTitle'))}</div>
       <div class="body">${esc(tr(synced ? 'emptyNoCoursesBody' : 'emptyNeverBody'))}</div>
-      <button type="button" class="state-msg-action" id="empty-open-canvas">${esc(tr('emptyOpenCanvas').replace('{canvas}', () => label))}</button>
+      <button type="button" class="state-msg-action" id="empty-open-canvas">${esc(tr('emptyOpenCanvas').replace('{canvas}', () => 'Canvas'))}</button>
       ${canvasBaseUrl ? '' : `<div class="state-msg-sub">${esc(tr('wCanvasOtherSchool'))}</div>`}
     </div>`;
 }
