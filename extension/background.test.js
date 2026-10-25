@@ -47,7 +47,7 @@ function makeFetch(routes, { delayMs = 1 } = {}) {
 // getFails：第一個 callback 式 get 回呼 undefined（模擬 storage 錯誤 / runtime.lastError）
 // tabsQuery／executeScript：Claude 用量（SYNC_CLAUDE_USAGE）測試用，覆寫找 claude.ai 分頁與分頁內執行的結果
 // setFailsIf(obj)：回 true 的 set 整筆不寫入並 reject（模擬超過 QUOTA_BYTES 等寫入失敗）
-function loadBackground({ stored = {}, storageDelayMs = 0, fetch, getFails = false, tabsQuery, executeScript, setFailsIf }) {
+function loadBackground({ stored = {}, storageDelayMs = 0, fetch, getFails = false, tabsQuery, executeScript, setFailsIf, aiHandler }) {
   const store = structuredClone(stored);
   const listeners = { message: [], nav: [] };
   const callbackErrors = [];   // 比照 Chrome：回呼內 throw 只會被記下，不會傳回呼叫端
@@ -122,26 +122,31 @@ function loadBackground({ stored = {}, storageDelayMs = 0, fetch, getFails = fal
     chrome, fetch, console: quiet, setTimeout: fastTimeout, clearTimeout, URL,
     importScripts: () => { },
     scheduleGradingAnalysis: (base) => { scheduled.push(base); },
-    handleAiMessage: (message, sendResponse, base) => { aiMessages.push({ type: message.type, base }); sendResponse({ success: true }); return true; },
+    handleAiMessage: (message, sendResponse, base) => {
+      aiMessages.push({ type: message.type, base });
+      if (aiHandler) return aiHandler(message, sendResponse, base);
+      sendResponse({ success: true });
+      return false;
+    },
   });
   vm.runInContext(SOURCE, ctx);
   // 回應物件建在 vm realm（Array 原型不同），轉回本 realm 才能 deepStrictEqual
   // 1.5 秒沒回應 → { timeout: true }（掛住的 handler 要讓測試失敗，而不是讓整個測試卡死）
   const send = (msg) => Promise.race([
     new Promise((resolve) => {
-      listeners.message.forEach((fn) => fn(msg, {}, (r) => resolve(JSON.parse(JSON.stringify(r)))));
+      listeners.message.forEach((fn) => fn(msg, {}, (r) => resolve(r === undefined ? undefined : JSON.parse(JSON.stringify(r)))));
     }),
     sleep(1500).then(() => ({ timeout: true })),
   ]);
   const navigate = (url) => Promise.all(listeners.nav.map((fn) => fn({ frameId: 0, url })));
   // 等頂層 storage 回填完成＝已暖機的 SW（只有冷啟動測試不呼叫）
   const warm = () => sleep(storageDelayMs + 5);
-  // dashboard「清除本機資料」（clearLocalData）：除 uiLanguage 外全部經 storage.local.remove 刪掉
-  const clearLocalData = async () => {
+  // storage 被清掉（例如在 chrome://extensions 清除擴充功能資料）：除 uiLanguage 外全部經 storage.local.remove 刪掉
+  const clearStorage = async () => {
     await remove(Object.keys(store).filter((k) => k !== 'uiLanguage'));
     await sleep(1);   // 等 onChanged 送達
   };
-  return { store, send, navigate, warm, callbackErrors, clearLocalData, setLog, scheduled, aiMessages };
+  return { store, send, navigate, warm, callbackErrors, clearStorage, setLog, scheduled, aiMessages };
 }
 
 const course = (id) => ({ id, name: `Course ${id}`, workflow_state: 'available', account_id: null });
@@ -453,13 +458,13 @@ test('舊版被改成 www.instructure.com 的 canvasBaseUrl → 回到已登入�
 });
 
 // ── A4（QA P2-7）：assignment_groups 不再重複存整包作業 ──
-// ── QA #152：清除本機資料後，仍活著的 SW 不能沿用記憶體裡的網址／節流時間戳 ──
-test('清除本機資料（SW 仍活著）→ 回到 Canvas 不被 5 分鐘節流擋掉，重新偵測並同步，canvasBaseUrl 一併寫回', async () => {
+// ── QA #152：storage 被清掉後，仍活著的 SW 不能沿用記憶體裡的網址／節流時間戳 ──
+test('storage 被清掉（SW 仍活著）→ 回到 Canvas 不被 5 分鐘節流擋掉，重新偵測並同步，canvasBaseUrl 一併寫回', async () => {
   const { fetch } = makeFetch(originRoutes(BASE, [101, 102]));
   const bg = loadBackground({ stored: { canvasBaseUrl: BASE, uiLanguage: 'en' }, fetch });
   await bg.warm();
   assert.equal((await bg.send({ type: 'SYNC' })).success, true);
-  await bg.clearLocalData();
+  await bg.clearStorage();
   assert.deepEqual(Object.keys(bg.store), ['uiLanguage']);
   await bg.navigate(`${BASE}/courses`);
   await sleep(60);
@@ -477,13 +482,13 @@ test('同步寫入 lastSync 時一併寫入 canvasBaseUrl（storage 裡的網址
   assert.equal(bg.store.canvasBaseUrl, BASE);
 });
 
-test('清除本機資料時有同步進行中 → 那場同步的結果丟棄不寫回（不讓剛清掉的資料復活）', async () => {
+test('storage 被清掉時有同步進行中 → 那場同步的結果丟棄不寫回（不讓剛清掉的資料復活）', async () => {
   const { fetch } = makeFetch([coursesRoute([101]), ...okCourseRoutes], { delayMs: 15 });
   const bg = loadBackground({ stored: { canvasBaseUrl: BASE, uiLanguage: 'en' }, fetch });
   await bg.warm();
   const syncP = bg.send({ type: 'SYNC' });
   await sleep(5);
-  await bg.clearLocalData();
+  await bg.clearStorage();
   await syncP;
   assert.deepEqual(Object.keys(bg.store), ['uiLanguage'], `store=${JSON.stringify(Object.keys(bg.store))}`);
 });
@@ -742,14 +747,14 @@ test('SET_CANVAS_BASE 成功時只清「仍是新網址」的候選：切換途�
   assert.equal(bg.store.canvasBaseCandidate && bg.store.canvasBaseCandidate.origin, THIRD, '第三間的候選被切換結尾刪掉');
 });
 
-test('SET_CANVAS_BASE 進行中「清除本機資料」→ 切換作廢：回 success:false／sync-failed，不把新網址／新資料寫回', async () => {
+test('SET_CANVAS_BASE 進行中 storage 被清掉 → 切換作廢：回 success:false／sync-failed，不把新網址／新資料寫回', async () => {
   const many = Array.from({ length: 12 }, (_, i) => 701 + i);
   const { fetch, stats } = makeFetch([...originRoutes(BASE, [101]), ...originRoutes(OTHER, many)], { delayMs: 10 });
   const bg = loadBackground({ stored: { ...oldSchool(), canvasBaseCandidate: candidateOf(OTHER) }, fetch });
   await bg.warm();
   const p = bg.send({ type: 'SET_CANVAS_BASE', origin: OTHER });
   await until(() => stats.calls.some((u) => u.startsWith(OTHER) && /\/assignments\?/.test(u)));
-  await bg.clearLocalData();
+  await bg.clearStorage();
   const resp = await p;
   assert.equal(resp.success, false, `作廢的切換不能回成功（dashboard 會收起提示）：${JSON.stringify(resp)}`);
   assert.equal(resp.reason, 'sync-failed');
@@ -926,6 +931,22 @@ test('AI 排程：同步途中網址被換掉、舊網址那批結果作廢 → 
   await first;
   await sleep(120);
   assert.ok(!bg.scheduled.includes(BASE), `不該用舊網址排程：${JSON.stringify([...bg.scheduled])}`);
+});
+
+test('AI 訊息：SW 冷啟動、storage 還沒回填 → 等讀回學校網址再交給 handleAiMessage', async () => {
+  const { fetch } = makeFetch([]);
+  const bg = loadBackground({ stored: { canvasBaseUrl: BASE }, storageDelayMs: 30, fetch });
+  const resp = await bg.send({ type: 'AI_RUN_NOW' });
+  assert.equal(resp.success, true, `resp=${JSON.stringify(resp)}`);
+  assert.deepEqual(bg.aiMessages.map((m) => m.base), [BASE]);
+});
+
+test('AI 訊息：handleAiMessage 不認得、也沒回應的 AI_ 訊息 → 仍會關掉通道（回 undefined），不讓呼叫端等到逾時', async () => {
+  const { fetch } = makeFetch([]);
+  const bg = loadBackground({ stored: { canvasBaseUrl: BASE }, fetch, aiHandler: () => false });
+  await bg.warm();
+  const resp = await bg.send({ type: 'AI_UNKNOWN' });
+  assert.notEqual(resp && resp.timeout, true, `resp=${JSON.stringify(resp)}`);
 });
 
 (async () => {

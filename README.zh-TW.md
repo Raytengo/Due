@@ -125,5 +125,5 @@ extension/
 ---
 
 <div align="center">
-<sub>版本 2.1.0 · <a href="LICENSE">MIT License</a></sub>
+<sub>版本 2.5.0 · <a href="LICENSE">MIT License</a></sub>
 </div>

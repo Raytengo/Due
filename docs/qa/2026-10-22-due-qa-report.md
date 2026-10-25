@@ -304,11 +304,11 @@ COMP 5567 已隱藏區：`Midterm Exam`（還沒考）在未完成視圖有握�
 | P1-4 | 已修 | `DueCompletion.setDone` 為唯一寫入入口，以畫面顯示狀態決定方向、結果恆為最小覆蓋，dashboard 與 popup 共用（測試覆蓋）。 |
 | P1-5 | 不修（決策） | 時間標籤格式與門檻不動；只有純字串部分隨 P3 i18n 修了（簡中「h后」、英文單複數、英文半形括號）。 |
 | P1-6 | 已修 | 自訂作業不套名稱分類器：不自動隱藏、不被當考試自動完成、不用考試紫，仍可手動拖進已隱藏區。 |
-| P1-7 | 已修 | popup 載入 `customAssignments.js` 並合併自訂作業，點自訂作業開 Dashboard。 |
+| P1-7 | 已修 | popup 載入 `customAssignments.js` 並合併自訂作業，點自訂作業開 Dashboard。（v2.1 在 9/3 也修了同一件事，合併時保留 QA 版：寫入走 read-modify-write、套用跟 dashboard 一樣的隱藏規則。） |
 | P1-8 | 已修 | 「← 返回」只在 top-level 綁一次，重繪不再累積 listener。 |
 | P1-9 | 已修 | background 已排除 www／status／community／support／info 與 beta／test，換網址前確認已登入，已確認學校（有 `lastSync`）時只記 `canvasBaseCandidate`、不切換。dashboard 側欄同步鍵上方顯示「偵測到另一個 Canvas：host」＋「切換到這裡／忽略」（後續批次 A2）：「切換到這裡」送 `SET_CANVAS_BASE`，background 先確認已登入、為新網址同步，成功後網址與新資料**同一次寫入**（原子切換；任何一步失敗，舊網址、舊資料、候選都不動），失敗依 `reason` 顯示「請先登入該 Canvas」或「請稍後再試」；「忽略」送 `IGNORE_CANVAS_BASE`，之後不再提示該網址。 |
 | P1-10 | 已修 | ≤1100px 課程詳情改上下堆疊，681–1280px 作業名至少約 6em；≤680px 英文名稱只剩約 2em，沒處理。 |
-| P1-11 | 不修（決策） | claude.ai 用量功能保留原樣（決策 2）；只順手修了 ↻ 失敗的提示（P3）。 |
+| P1-11 | 不修（決策）；隱私權政策部分已由 v2.1 解決 | claude.ai 用量功能保留原樣（決策 2）；只順手修了 ↻ 失敗的提示（P3）。v2.1.0 的 `privacy-policy.md` 已改為現況：寫明 claude.ai 用量、AI 分析送出的內容與每個權限的用途。 |
 
 ### P2
 
@@ -372,7 +372,7 @@ COMP 5567 已隱藏區：`Midterm Exam`（還沒考）在未完成視圖有握�
 | 安全：`window.open` 沒加 `noopener` | 已修 | 已加。 |
 | 安全：sanitizer 把 mailto／頁內錨點變純文字 | 已修 | mailto 保留、錨點轉成內部標記並攔截捲動。 |
 | 安全：inline `onerror` 在 MV3 下是死碼 | 已修 | 改由 JS 處理圖片載入失敗。 |
-| 隱私：共用 Chrome 設定檔沒有資料隔離 | 已修 | 設定選單新增「清除本機資料…」（保留語言）。 |
+| 隱私：共用 Chrome 設定檔沒有資料隔離 | 不修（決策，2026-10-24） | 曾在設定選單加「清除本機資料…」，合併 v2.1 時依 owner 決定移除（用不到）；background 的自我修復保留——在 chrome://extensions 清除資料時，記憶體裡的學校網址跟著歸零。 |
 | 進度環「本週完成」文案誤導 | 已修 | 改「近期完成」，aria-label／title 寫出範圍。 |
 | 同步每次打 `/accounts/self` 與每個 account_id | 已修 | 同一網址已有校名就沿用，否則最多 2 個請求。 |
 | Claude ↻ 失敗沒回饋 | 已修 | 依 reason 顯示 `claudeRefreshMissing`／`claudeRefreshFailed`，4 秒後清空。 |
@@ -417,3 +417,20 @@ COMP 5567 已隱藏區：`Midterm Exam`（還沒考）在未完成視圖有握�
   1. 約 3.6 小時後（跨過午夜）截止的作業顯示「1天後」——屬 P1-5 時間標籤，決策不修。
   2. 候選提示在「切換成功」或「忽略」後收起時，隱藏中的按鈕仍停在「切換中…」／停用狀態；下次候選出現時會整行重畫，使用者看不到，沒處理。
 - **環境**：任務原本指定的 8766 沒有在跑；這一回合用 `.claude/launch.json` 的 `due-static`（`node dev/serve.js`，port 8765，根目錄就是本 repo，已比對提供的是目前檔案）。
+
+## 合併 v2.1.0（2026-10-24）
+
+QA 分支原本建在 v2.0.0（7/23）上。合併時才發現 `origin/master` 已有 v2.1.0（9/3 開發、10/24 由 PR #6 合入）：AI 評分比重分析（`extension/ai/`、AI 設定 modal、optional 權限、隱私權政策更新）＋ v2.0.1 教學語言切換。處理方式：
+
+- **rebase**：QA commit 改接到 v2.1.0（`0912faf`）之後；8 個檔、20 處文字衝突依 owner 在本機合併檢查頁（`dev/merge-review/`）的選擇解掉。
+- **版號**：2.5.0（owner 決定）。
+- **邏輯對齊**（沒有文字衝突、但兩邊規則會打架的地方）：
+  - 同步成功寫入後才排程 AI 分析，用這場同步的網址；切換學校成功也排一次（測試：`background.test.js` 的「AI 排程」4 條）。
+  - AI 判斷「已有 Canvas 權重」時看課程有沒有關掉依組別加權，與 QA #93 一致（`gradingRules.test.js` 新增 3 條）。
+  - background 收到 `AI_*` 訊息先等學校網址從 storage 讀回（同 P0-4 的冷啟動修正；`background.test.js` 新增 2 條）。
+  - AI 權重寫入後的畫面重繪交給 QA 的常駐 `storage.onChanged`；`GRADING_WEIGHTS_UPDATED` 只刷新 AI modal 狀態列（避免重繪兩次、保留展開狀態）。
+  - AI 設定 modal 接上 QA 的 modal 機制：點背景關閉要按下與放開都在背景、自動更新的閒置判斷、IME 組字時 Esc 不關。
+  - 刪光權重後 AI 重跑：維持 v2.1 行為（owner 決定）。
+- **「清除本機資料」移除**：見上方 P3 表格。
+- **不在本次 QA 範圍**：`extension/ai/` 與 AI 設定 modal 是合併後才進來的，這份報告沒有稽核；另做一輪 AI 功能 QA（只出報告）。
+

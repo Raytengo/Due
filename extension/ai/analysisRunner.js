@@ -16,7 +16,7 @@ const AI_MAX_TOKENS_MAIN = 8192;  // 主分析：要留得下 thinking ＋ 完�
 const AI_MAX_TOKENS_SMALL = 512;  // 測試連線／挑檔：正文極短，但仍要留 thinking 空間
 const MAX_LINKED_PDFS = 5;        // 大綱頁可能連結很多檔案，位元組上限只擋使用不擋下載
 
-// 同步完成後由 syncAll 呼叫：不 await、不阻塞 SYNC 回應、不持有 _syncing
+// 同步資料寫入成功後由 runSync 以該場同步的網址呼叫：不 await、不阻塞 SYNC 回應、不佔用同步排程
 function scheduleGradingAnalysis(baseUrl) {
   setTimeout(() => {
     runPendingGradingAnalysis(baseUrl).catch((err) => console.error('[Due][AI] 分析失敗:', err));
@@ -62,6 +62,7 @@ async function runPendingGradingAnalysis(baseUrlHint) {
     const now = Date.now();
     const todo = courses
       .filter((c) => DueGradingRules.shouldAnalyze({
+        course: c,
         courseId: c.id,
         customWeights: data.customWeights || {},
         groups: (data.assignmentGroups || {})[c.id] || [],
@@ -355,6 +356,7 @@ async function aiGetStatus() {
   const courses = (Array.isArray(data.courses) ? data.courses : []).map((c) => {
     const record = records[c.id];
     const status = DueGradingRules.courseStatus({
+      course: c,
       courseId: c.id,
       customWeights: data.customWeights || {},
       groups: (data.assignmentGroups || {})[c.id] || [],

@@ -334,4 +334,24 @@ test('constants: 上限值', () => {
   assert.equal(R.MAX_EXTRACTED_TEXT_CHARS, 30000);
 });
 
+// ── 課程關掉「依組別加權」（apply_assignment_group_weights === false）：殘留的 group_weight 不算 Canvas 權重 ──
+// 與 dashboard 的 courseUsesGroupWeights 一致（QA #93）：那種課圓餅顯示「沒有評分資訊」，AI 要能補上
+test('shouldAnalyze: 課程關掉依組別加權、只剩殘留 group_weight → 照跑', () => {
+  const groups = [{ name: 'A', group_weight: 60 }, { name: 'B', group_weight: 40 }];
+  assert.equal(R.shouldAnalyze({ ...base, groups, course: { id: 7, apply_assignment_group_weights: false } }).run, true);
+});
+
+test('shouldAnalyze: 課程有開依組別加權（或欄位缺漏）＋ group_weight → 不跑', () => {
+  const groups = [{ name: 'A', group_weight: 60 }];
+  assert.equal(R.shouldAnalyze({ ...base, groups, course: { id: 7, apply_assignment_group_weights: true } }).run, false);
+  assert.equal(R.shouldAnalyze({ ...base, groups, course: { id: 7 } }).run, false);
+  assert.equal(R.shouldAnalyze({ ...base, groups }).run, false);
+});
+
+test('courseStatus: 課程關掉依組別加權、沒有紀錄 → pending（不是 skipped）', () => {
+  const groups = [{ name: 'A', group_weight: 60 }];
+  assert.equal(R.courseStatus({ courseId: 7, customWeights: {}, groups, record: undefined, course: { id: 7, apply_assignment_group_weights: false } }), 'pending');
+  assert.equal(R.courseStatus({ courseId: 7, customWeights: {}, groups, record: undefined, course: { id: 7 } }), 'skipped');
+});
+
 console.log('ALL gradingRules TESTS PASSED');

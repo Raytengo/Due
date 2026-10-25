@@ -41,7 +41,7 @@ const _ready = new Promise((resolve) => {
   }
 });
 
-// storage 被清掉（dashboard「清除本機資料」，QA #152）→ 記憶體裡的網址／節流時間戳跟著歸零。
+// storage 被清掉（例如在 chrome://extensions 清除擴充功能資料，QA #152）→ 記憶體裡的網址／節流時間戳跟著歸零。
 // 否則這個仍活著的 SW 回到 Canvas 會被 5 分鐘節流擋掉，之後同步出的資料也不再帶 canvasBaseUrl。
 // 歸零後下次造訪 Canvas 走「首次偵測」：確認已登入 → 採用並立即同步，等同全新安裝；
 // 清除當下若有同步進行中，runSync 結尾的 BASE_URL !== base 檢查會丟棄那批結果，剛清掉的資料不會被寫回。
@@ -234,7 +234,15 @@ chrome.webNavigation
 // ── Message handlers ──
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message && typeof message.type === 'string' && message.type.startsWith('AI_')) {
-    return handleAiMessage(message, sendResponse, BASE_URL);
+    // 先等 storage 回填學校網址（SW 剛被這則訊息喚醒時 BASE_URL 可能還是空的，見 _ready）。
+    // 改成非同步後一定要回應：handleAiMessage 回 false 且沒呼叫 sendResponse（不認得的 AI_ 訊息）→ 補回 undefined 關掉通道
+    _ready.then(() => {
+      let responded = false;
+      const respond = (r) => { responded = true; sendResponse(r); };
+      const isAsync = handleAiMessage(message, respond, BASE_URL);
+      if (!isAsync && !responded) sendResponse(undefined);
+    });
+    return true;
   }
 
   if (message.type === 'SYNC') {
@@ -585,7 +593,7 @@ async function runSync(base, { adopt = false } = {}) {
     }
   });
 
-  // 同步途中網址已被換掉（首次偵測採用新網址／清除本機資料／別的切換先成功）→ 這批結果作廢不寫；
+  // 同步途中網址已被換掉（首次偵測採用新網址／storage 被清掉／別的切換先成功）→ 這批結果作廢不寫；
   // 新網址那場同步由 syncBase 接在這場之後跑。切換同步作廢時 throw（SET_CANVAS_BASE 回 success:false）
   if (BASE_URL !== expectedBase) {
     console.log('[Due] 同步期間 Canvas 網址已變更，丟棄這次結果:', base);
@@ -609,7 +617,7 @@ async function runSync(base, { adopt = false } = {}) {
     });
   } catch (err) {
     // 寫入失敗（例如超過 QUOTA_BYTES）：storage 仍是舊校 → 記憶體也退回舊校，否則之後的同步都打新校、
-    // 回到舊校反而被記成候選。期間網址若已被別處改掉（例如清除本機資料歸零）就不動
+    // 回到舊校反而被記成候選。期間網址若已被別處改掉（例如 storage 被清掉而歸零）就不動
     if (adopt && BASE_URL === base) BASE_URL = expectedBase;
     throw err;
   }

@@ -131,5 +131,5 @@ For the full architecture, data model, and design system, see [`CLAUDE.md`](CLAU
 ---
 
 <div align="center">
-<sub>Version 2.1.0 · <a href="LICENSE">MIT License</a></sub>
+<sub>Version 2.5.0 · <a href="LICENSE">MIT License</a></sub>
 </div>

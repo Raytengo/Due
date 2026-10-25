@@ -54,11 +54,6 @@ const I18N = {
     menuUsageHide: '隱藏 Popup Claude 用量',
     settingsTitle: '設定',
     loading: '載入中…',
-    // 設定選單：清除本機資料（QA #152）
-    menuClearData: '清除本機資料…',
-    clearDataTitle: '清除本機資料',
-    clearDataMessage: '會刪除這個瀏覽器裡 Due 的所有資料：同步的課程與作業、完成與隱藏標記、成績計算器分數、自訂作業、課程改名與權重。介面語言會保留，下次打開 Canvas 時會重新同步。此動作無法復原。',
-    clearDataConfirm: '清除',
     // formatDue
     noDueDate: '無截止日期',
     // 逾期文案與稽核入口（2026-07）
@@ -216,10 +211,6 @@ const I18N = {
     menuUsageHide: '隐藏 Popup Claude 用量',
     settingsTitle: '设置',
     loading: '加载中…',
-    menuClearData: '清除本地数据…',
-    clearDataTitle: '清除本地数据',
-    clearDataMessage: '会删除这个浏览器里 Due 的所有数据：同步的课程和作业、完成与隐藏标记、成绩计算器分数、自定义作业、课程改名和权重。界面语言会保留，下次打开 Canvas 时会重新同步。此操作无法撤销。',
-    clearDataConfirm: '清除',
     noDueDate: '无截止日期',
     overdueToday: '今天到期',
     overdueDaysLabel: '逾{n}天',
@@ -361,10 +352,6 @@ const I18N = {
     menuUsageHide: 'Hide Claude usage in popup',
     settingsTitle: 'Settings',
     loading: 'Loading…',
-    menuClearData: 'Clear local data…',
-    clearDataTitle: 'Clear local data',
-    clearDataMessage: "This deletes all of Due's data in this browser: synced courses and assignments, done and hidden marks, grade calculator scores, custom assignments, course names and weights. Your language setting is kept, and Due syncs again the next time you open Canvas. This can't be undone.",
-    clearDataConfirm: 'Clear',
     noDueDate: 'No due date',
     overdueToday: 'due today',
     overdueDaysLabel: '{n}d late',
@@ -626,7 +613,6 @@ function applyUILanguage() {
     settingsBtn.title = tr('settingsTitle');
     settingsBtn.setAttribute('aria-label', tr('settingsTitle'));
   }
-  setText('menu-clear-data', 'menuClearData');
   if (_noCoursesMode) setNoCoursesMode(true);   // 停用鈕的說明 tooltip 跟著換語言
   applyWelcomeTranslations();
   const tutorialBtn = document.getElementById('menu-open-tutorial');
@@ -3545,7 +3531,7 @@ document.getElementById('custom-assignment-cancel')?.addEventListener('click', c
 // ── 點背景關閉 modal：按下（pointerdown）、放開（pointerup）與 click 都落在背景本身才算 ──
 // 按下與放開落在不同元素時，click 會派發到兩者的共同祖先 overlay（target 也是 overlay）：
 // 在對話框內按下、拖曳選字到背景放開，或反過來在背景按下、拖進對話框才放開，只看 click 都會把 modal
-// 連同未存的輸入一起關掉（QA P2-9）。四個 overlay（新增作業／權重／確認／教學）共用
+// 連同未存的輸入一起關掉（QA P2-9）。五個 overlay（新增作業／權重／確認／教學／AI 設定）共用；AI 設定在 aiSettings.js 綁定
 function trackBackdropPress(overlay) {
   if (!overlay || overlay._backdropTracked) return;
   overlay._backdropTracked = true;
@@ -3909,32 +3895,6 @@ if (menuAiSettings) {
   });
 }
 
-// ── 清除本機資料（QA #152：共用 Chrome 設定檔時，上一位使用者的標記／分數／自訂作業會留給下一位）──
-// 確認後刪掉 chrome.storage.local 裡 Due 的所有資料（只保留介面語言），再重新載入成空狀態
-function clearLocalData() {
-  chrome.storage.local.get(null, (all) => {
-    const keys = Object.keys(all || {}).filter((k) => k !== 'uiLanguage');
-    const reload = () => location.reload();
-    if (!keys.length) { reload(); return; }
-    chrome.storage.local.remove(keys, () => {
-      const err = chrome.runtime && chrome.runtime.lastError;
-      if (err) console.error('[Due] 清除本機資料失敗:', err.message);
-      reload();
-    });
-  });
-}
-
-document.getElementById('menu-clear-data')?.addEventListener('click', () => {
-  if (settingsMenu) settingsMenu.classList.remove('open');
-  if (settingsMenuBtn) settingsMenuBtn.classList.remove('open');
-  openConfirmDialog({
-    title: tr('clearDataTitle'),
-    message: tr('clearDataMessage'),
-    confirmLabel: tr('clearDataConfirm'),
-    onConfirm: clearLocalData,
-  });
-});
-
 // ── Welcome Modal ──
 let _welcomeStep = 1;
 let _welcomeCanvasBase = null;   // 已偵測到的學校 Canvas 網址（開教學時從 storage 讀；尚未同步時 _currentData 是空的）
@@ -4103,7 +4063,7 @@ const REFRESH_RETRY_MS = 800;             // 非閒置時隔一段再試
 const META_TICK_MS = 60 * 1000;           // header「N 分鐘前」每分鐘重算
 const STALE_ON_SHOW_MS = 60 * 1000;       // 分頁回到前景：距上次 render 超過此值就重繪
 const IDLE_RERENDER_MS = 5 * 60 * 1000;   // 前景時每 5 分鐘重繪一次（逾期分組、7/30 天邊界、考試結束都隨時間變）
-const MODAL_OVERLAY_IDS = ['custom-assignment-overlay', 'weight-edit-overlay', 'welcome-overlay', 'confirm-overlay'];
+const MODAL_OVERLAY_IDS = ['custom-assignment-overlay', 'weight-edit-overlay', 'welcome-overlay', 'confirm-overlay', 'ai-settings-overlay'];
 const MORPH_STALE_MS = 2000;              // view-transition-name 殘留超過此值視為已結束
 let _refreshPending = false;
 let _refreshTimer = 0;
@@ -4555,12 +4515,12 @@ _weightOverlay.addEventListener('click', (e) => {
   if (isBackdropClick(_weightOverlay, e)) _weightOverlay.classList.remove('open');
 });
 
-// ── Esc 關閉最上層 overlay（一次只關一個；優先序：新增作業 → 權重 → 教學）──
+// ── Esc 關閉最上層 overlay（一次只關一個；優先序見 closers）──
 // 註：課程重命名 inline input 自帶 Escape 處理，且重命名時無 overlay 開著，兩者不衝突
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
   if (isImeComposing(e)) return;   // 組字中的 Esc 是取消候選字，不關 modal（連同未存輸入，QA P2-14）
-  // 優先序：確認框 → 新增/編輯作業 → 權重 → 教學（一次只關最上層；經 close 函式一併清狀態）
+  // 優先序：確認框 → AI 設定 → 新增/編輯作業 → 權重 → 教學（一次只關最上層；經 close 函式一併清狀態）
   const closers = [
     ['confirm-overlay', closeConfirmDialog],
     ['ai-settings-overlay', () => { if (typeof DueAiSettings !== 'undefined') DueAiSettings.close(); }],
@@ -4577,7 +4537,7 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// ── Modal 無障礙：focus trap ＋ 開啟聚焦第一元素 ＋ 關閉還原焦點到觸發元素（四個 overlay 共用）──
+// ── Modal 無障礙：focus trap ＋ 開啟聚焦第一元素 ＋ 關閉還原焦點到觸發元素（五個 overlay 共用）──
 function _focusablesIn(container) {
   const sel = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
   // inert 子樹（教學畫面外的投影片）不可聚焦，不算進 trap 的頭尾

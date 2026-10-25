@@ -506,6 +506,28 @@ const run = (base) => sandbox.runPendingGradingAnalysis(base);
     assert.equal(st.pdfPermission, false);
   });
 
+  // 課程關掉「依組別加權」：殘留的 group_weight 不算 Canvas 權重（QA #93）——要靠 runner 把 course 帶進規則
+  const WEIGHTS_OFF = () => ({
+    aiConfig: { provider: 'gemini', apiKey: 'k' },
+    courses: [{ id: 960, name: 'C10', apply_assignment_group_weights: false }],
+    assignmentGroups: { 960: [{ id: 1, name: 'Homework', group_weight: 40 }, { id: 2, name: 'Exam', group_weight: 60 }] },
+    customWeights: {},
+  });
+
+  await test('課程關掉依組別加權、只有殘留 group_weight → 照樣分析並寫入權重', async () => {
+    reset(WEIGHTS_OFF(), { syllabus: SYLLABUS_HTML });
+    await run(BASE);
+    assert.equal(S.llm.length, 1);
+    assert.equal(S.store.gradingAnalysis[960].status, 'done');
+    assert.deepEqual(plain(S.store.customWeights[960]), WEIGHTS);
+  });
+
+  await test('AI_GET_STATUS：關掉依組別加權的課回報 pending，不是 skipped', async () => {
+    reset(WEIGHTS_OFF());
+    const resp = await new Promise((resolve) => sandbox.handleAiMessage({ type: 'AI_GET_STATUS' }, resolve, BASE));
+    assert.equal(resp.courses.find((c) => c.courseId === 960).status, 'pending');
+  });
+
   console.log('ALL analysisRunner TESTS PASSED');
 })().catch((err) => {
   console.error(err);

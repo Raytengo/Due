@@ -390,8 +390,12 @@
 
     $('ai-cancel-btn').addEventListener('click', close);
 
+    // 點背景關閉：按下與放開都在背景才算（dashboard.js 的 trackBackdropPress／isBackdropClick，QA P2-9）——
+    // 在 API key 欄位拖曳選字、放開在背景上，不會把 modal 連同未存的設定一起關掉
+    if (typeof trackBackdropPress === 'function') trackBackdropPress(overlay);
     overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) close();
+      if (e.target !== overlay) return;
+      if (typeof isBackdropClick !== 'function' || isBackdropClick(overlay, e)) close();
     });
   }
 

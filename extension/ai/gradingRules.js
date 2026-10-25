@@ -95,7 +95,10 @@
   }
 
   // ── 只跑一次規則 ──
-  function hasCanvasWeights(groups) {
+  // 課程關掉「依組別加權」（apply_assignment_group_weights === false）時殘留的 group_weight 不算數：
+  // 與 dashboard 的 courseUsesGroupWeights 一致（QA #93），那種課圓餅顯示「沒有評分資訊」，要讓 AI 補上
+  function hasCanvasWeights(groups, course) {
+    if (course && course.apply_assignment_group_weights === false) return false;
     return Array.isArray(groups) && groups.some((g) => g && Number(g.group_weight) > 0);
   }
 
@@ -103,10 +106,10 @@
   // 不特別擋「record.status === done」：done 之所以不重跑，是因為 done 一定會把權重寫進
   // customWeights，下面的 hasCustomWeights 就會擋掉；使用者按「還原 Canvas 權重」把
   // customWeights 清空後，這裡會自然放行重跑，不需要另外清「分析紀錄」
-  function shouldAnalyze({ courseId, customWeights, groups, record }) {
+  function shouldAnalyze({ courseId, customWeights, groups, record, course }) {
     const cw = customWeights && customWeights[courseId];
     if (Array.isArray(cw) && cw.length > 0) return { run: false, reason: 'hasCustomWeights' };
-    if (hasCanvasWeights(groups)) return { run: false, reason: 'hasCanvasWeights' };
+    if (hasCanvasWeights(groups, course)) return { run: false, reason: 'hasCanvasWeights' };
     return { run: true, reason: record ? 'retry' : 'first' };
   }
 
@@ -136,13 +139,13 @@
   // modal 狀態列用：done | notFound | error | skipped | pending
   // 「還會不會再跑」跟「上次結果是什麼」是兩件事——沒有冷卻期後 shouldAnalyze 對任何未 done
   // 的紀錄都回 run:true，所以這裡不能再借用它的結果來判斷顯示，直接看 record 本身
-  function courseStatus({ courseId, customWeights, groups, record }) {
+  function courseStatus({ courseId, customWeights, groups, record, course }) {
     // done 要最先判斷：AI 分析成功後權重就寫進 customWeights，這門課從此也會落入下面的
     // hasCustomWeights 分支，先判斷 record.status 才不會把「AI 分析完成」誤顯示成「使用者手動設定」
     if (record && record.status === 'done') return 'done';
     const cw = customWeights && customWeights[courseId];
     if (Array.isArray(cw) && cw.length > 0) return 'skipped';
-    if (hasCanvasWeights(groups)) return 'skipped';
+    if (hasCanvasWeights(groups, course)) return 'skipped';
     if (!record) return 'pending';
     if (record.status === 'notFound' || record.status === 'error') return record.status;
     return 'skipped'; // 髒紀錄（未知 status）：modal 只認得固定幾種
