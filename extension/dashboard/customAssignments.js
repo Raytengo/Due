@@ -157,11 +157,31 @@
     return merged;
   }
 
+  // ── 表單草稿（N2）──
+  // ✕／Esc 關掉視窗時保留已輸入的內容（只存在記憶體），重開「同一個」視窗才還原；送出或按「取消」才丟掉。
+  // 「同一個」＝同一個 key：新增作業一律 'new'；編輯作業 'edit:<id>'（開別筆就重新開始）；
+  // 權重視窗用 weightDraftKey(courseId)（開別門課就重新開始）
+  function formDraftKey(editing) {
+    return editing && editing.id != null ? `edit:${editing.id}` : 'new';
+  }
+
+  function weightDraftKey(courseId) {
+    return `weight:${courseId}`;
+  }
+
+  // draft：{ key, values } 或 null；key 相同才回傳 values，否則 null（＝重新開始）
+  function draftValuesFor(draft, key) {
+    return draft && draft.key === key ? draft.values : null;
+  }
+
   return {
     CUSTOM_PREFIX,
     MIN_DUE_YEAR,
     MAX_DUE_YEAR,
     createCustomAssignment,
+    draftValuesFor,
+    formDraftKey,
+    weightDraftKey,
     updateCustomAssignment,
     isValidDueLocalValue,
     getDefaultDueLocalValue,

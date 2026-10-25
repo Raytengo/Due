@@ -24,6 +24,7 @@ cc/
 ├── CLAUDE.md
 └── extension/
     ├── manifest.json              ← 擴充功能設定（Manifest V3；LLM 不佔必要權限，PDF 下載走 optional_host_permissions）
+    ├── _locales/{en,zh_TW,zh_CN}/messages.json ← 只放擴充功能名稱與摘要（extName／extDescription），商店名稱與摘要也來自這裡；介面字串仍在各頁的 I18N
     ├── background.js              ← Service worker：Canvas API 同步 + Claude 用量；importScripts 載入 ai/ 三檔
     ├── background.test.js         ← background.js 測試（vm 載入 + stub chrome/fetch）
     ├── ai/
@@ -40,7 +41,7 @@ cc/
         ├── aiSettings.js          ← AI 分析設定 modal（自帶三語字串；只寫 aiConfig）
         ├── taskRules.js           ← 共用規則：考試/簽到判定（結構規則優先＋名稱備援）、緊急度色階、逾期窗（含測試，popup 共用）
         ├── completion.js          ← 完成標記單一真相來源：isDone / setDone（勾選寫入入口）/ toggleManualDone（含測試）
-        ├── customAssignments.js   ← 自訂作業建立與合併（含測試）
+        ├── customAssignments.js   ← 自訂作業建立與合併、modal 草稿 key（含測試）
         ├── gradeCalc.js           ← 成績計算純規則：權重來源、自訂權重的作業歸類、加權分數（含測試；計算器與學期成績總覽共用）
         └── descSanitizer.js       ← 作業描述 HTML 白名單 sanitize（含測試）
 ```
@@ -52,6 +53,7 @@ cc/
 ### Chrome 擴充功能
 
 - **Manifest Version**：3（必須用 V3）
+- **名稱與摘要在地化**：`name`／`description` 是 `__MSG_extName__`／`__MSG_extDescription__`，`default_locale: "en"`；改名稱或商店摘要就改三份 `_locales/*/messages.json`（名稱上限 75、摘要上限 132 字元），要發新版本才會到商店。商店的詳細說明與素材文案在 `docs/store-listing.md`
 - **Permissions**：`storage`、`tabs`、`webNavigation`、`scripting`
 - **Host Permissions**：`https://*.instructure.com/*`、`https://claude.ai/*`（後者供 popup 的 Claude 用量顯示與 content script）
 - **Optional Host Permissions**：`https://*.canvas-user-content.com/*`（AI 分析下載 Canvas PDF 用；所有供應商都會請求）、`https://integrate.api.nvidia.com/*`（僅選 NVIDIA NIM 供應商時用）；兩者都在儲存 AI 設定時才請求。LLM 端點原則上靠供應商 CORS、不佔必要權限，NVIDIA 是唯一例外（見 AI 章節）
@@ -154,7 +156,7 @@ GET /api/v1/accounts/self、/api/v1/accounts/:account_id
 - 邊框用細線（1px），圓角保守（4–8px）
 - 一律 light mode（深色模式已於 2026-07-23 移除；`darkMode` 舊 key 殘留無害，不主動清除）
 - Section 標題用 DM Mono 小字大寫間距
-- 動畫克制：卡片 hover 用 `translateY(-2px)`，轉場用 View Transitions API
+- 動畫克制：時長／曲線一律取 `:root` 動效 token（見下方「動效規範」），不在呼叫端手寫；卡片 hover 上浮 `translate: 0 var(--lift)`（-2px，`--spring-highlight`），課程卡 ↔ 詳情轉場用 View Transitions API
 
 ### 截止日期顏色規則
 
@@ -169,6 +171,19 @@ GET /api/v1/accounts/self、/api/v1/accounts/:account_id
 - 無截止日期／已完成：class: `due-none`
 - **已完成且時間已過 → 不顯示任何時間標籤**（`dueLabelFor`；已繳交視圖／已隱藏列適用——過去的事無需再標「逾X天」）；緊急件數（詳情 header／grid 卡 badge）一律排除已完成，已繳交視圖不會出現「N件緊急」
 - 時間標籤括號內不留空格：`8月4日（2天後）`、`7月2日（逾20天）`（`daysLater`／`overdueDaysLabel` 為 `{n}` 模板，與 popup 一致）；括號樣式由 `dueWithRel` 模板決定——中文全形 `{date}（{rel}）`、英文半形 `{date} ({rel})`（`Oct 23 (1 day left)`）。英文單複數走 `daysLaterOne`／`daysLater`（`daysLaterText`），當天的小時標籤走 `hoursLater`（簡中 `h后`）；門檻與單位不變
+
+### 動效規範（2026-10-23 動效審查）
+
+來源：`docs/motion-review-2026-10-22.md`（52 條，依 Animate UI skill 規則）＋實作 spec `docs/superpowers/specs/2026-10-23-motion-review-implementation-design.md`。除 #16（卡片↔詳情 morph 的文字拉扯）外全做；#7 只做作業描述；#21 重新設計；N1（語言子選單點擊開關）、N2（modal 不吃背景點擊＋草稿）為新增。
+
+- **Token（#39）**：`index.html`／`popup.html` 的 `:root` 定義 `--ease-*`（color／out／soft／in-out／ring／draw／away）、`--t-*`（color 200、fade 200、swap 150、reveal 300、menu 220、disclosure 350、check 300、overlay 400、dialog-fade 400、dismiss 200 ms）、`--spring-press`／`--spring-highlight`／`--reflow`／`--spring-selection`／`--spring-dialog`（spring 轉好的 CSS `linear()`）、`--ring`／`--ring-tick`（進度環，使用者拍板的 0.8s `cubic-bezier(0.16,1,0.3,1)`，只命名不改值）、`--lift`（-2px）、`--scale-press` 0.97／`--scale-choice` 0.985／`--scale-menu` 0.9（popup 只帶用得到的子集，同名同值）。`dashboard.js` 的 `MOTION` 是 JS 鏡像（每個 token 為 `{duration, easing}`，WAAPI 直接當 options；`cssTransition(prop, token)` 產 inline transition 字串；setTimeout 讀 `.duration`）——**改一邊要改另一邊**，呼叫端不另寫時長
+- **減少動態**：JS 一律問 `reduceMotion()`（每次即時讀 media query，系統設定中途切換也跟得上）；CSS 在 `index.html` 檔尾一個 `prefers-reduced-motion` 區塊。詳見下方 Dashboard「減少動態效果」
+- **觸發 transition 不用 rAF**：要「先套起點再過渡」時用 forced reflow（`el.getBoundingClientRect()`）提交起點——背景分頁的 rAF 會暫停
+- **hover 一律包在 `@media (hover: hover) and (pointer: fine)`**（#11）：觸控時不會黏住上浮／halo／握把；改名鉛筆在 `:focus-visible` 時也出現，握把在該列有鍵盤焦點（`:has(:focus-visible)`）時亮起，沒有精細指標的裝置兩者靜止時就顯示
+- **焦點框不過渡**（#26）：不用 `transition: all`；`outline` 不列進任何 transition（聚焦那一幀就完整）；輸入框的 focus 邊框第一幀到位。週卡、popup 勾選圈的捲動容器留出焦點框空間（#4）
+- **按壓回饋（#24）**：`:active` → 按鈕 `scale: var(--scale-press)`、整張卡片／整列 `var(--scale-choice)`，都走 `--spring-press`；用獨立的 `scale` 屬性（不蓋掉 hover 的 `translate`、鉛筆的 `translateY(-50%)`、FLIP／出場層的 WAAPI transform）。勾選圈（用填色回應）、拖曳握把（grabbing 游標）、設定選單項目（highlight）不縮；卡片／列用 `:has()` 擋掉「按的是裡面的按鈕卻整張一起縮」（含觸控 tap 時剛變 disabled 的分頁鈕）；鍵盤 Enter／Space 走 click() 不觸發 `:active`。減少動態：兩個 scale token 為 1
+- **hover（#25／#37）**：課程卡與週卡同一組 card recipe——框與陰影走 `--t-color`，上浮 `translate` 走 `--spring-highlight`（滑鼠離開立即 retarget）；週卡 `cursor: pointer`，離場中（`.bursting`）不上浮。作業列的 hover 底色畫在不影響版面的 `::before`（拖曳、離場、落點閃示期間關掉）；確認框按鈕、已隱藏區短註、新增作業 ✕／取消／儲存、權重 ✕、成績計算器標題、教學圓點都有 hover 過渡。完成的卡／列進出場層前由 `freezeHoverLook()` 把當下的 hover 樣子釘成 inline，離場第一幀不會切回靜止樣式
+- **螢幕閱讀器播報（#3）**：`index.html` 常駐 `#a11y-status`（`role=status`、`aria-live=polite`）＋`announce(text)`：先清空、50ms 後寫入（同一句連播也會重念；短時間連續呼叫只念最後一句）。只用動效呈現的結果——完成、撤銷、全部完成、同步結果、拖曳升降級——都要經它念出（i18n `a11y*` key，三語）
 
 ---
 
@@ -217,14 +232,21 @@ GET /api/v1/accounts/self、/api/v1/accounts/:account_id
 
 ### popup.html / popup.js
 
-- 7 天待辦快速預覽：顯示所有 7 天內到期的未繳作業清單
+- 7 天待辦快速預覽：顯示所有 7 天內到期的未繳作業清單；超過 3 筆內部捲動，捲動區高度由 `fitTaskListHeight` 量到第 3 筆下緣（扣掉其下框線，底下已有 `.divider`），不露半列；渲染、字型載入完成、勾完成收合後都重量（列高因課名折行／分組小標題而不固定）。量的是「收合完成後」的版面（`measureTaskListFit` 用離屏複本、去掉 `.collapsing`，不碰真實清單以免中斷進行中的過渡）：收合開始時清單高度就沿 `--reflow` 與列同步變到終點（`fitTaskListHeight(true)`），收完時只有最後一筆收合的列重量一次——連勾兩筆不會先縮後撐、勾掉唯一逾期項不會一幀跳 50px
 - **含自訂作業**（QA P1-7）：`popup.html` 載入 `dashboard/customAssignments.js`，`loadData` 以 `mergeAssignmentMaps` 合併 Canvas ∪ 自訂作業，規則與 dashboard 相同（掛在已不在 `courses` 的課上的自訂作業不列）；自訂作業沒有 Canvas 頁，點擊改開 Dashboard
 - 隱藏規則同 dashboard：hideable＝`!_isCustom && (isExam || isAttendance)`（`taskRules.isHideable`），hideable 的看 `manualShown`、其餘看 `manualHidden`；自訂作業名稱含 Quiz/Midterm/簽到也照樣列
 - 每筆任務顯示：緊急程度色點、作業名稱、**課程名稱**（支援自訂名稱）、剩餘時間
 - 置頂「已逾期」區（30 天窗內逾期未繳；緊急度色階與 dashboard 統一，皆走 `taskRules.urgency`）
 - 每筆可勾完成（1.5 秒撤銷窗口；與 dashboard 同一寫入入口 `DueCompletion.setDone`，經 `writeDone` read-modify-write——已繳但被標回未完成者勾完成是清掉 `manualUndone`，不是寫 `manualDone`）
+  - 撤銷窗（`makeTaskItem` 內的 `enterUndo`／`cancelUndo`／`finalize`）：勾選圈填綠、勾號在填色後畫出（clip-path，`--t-check`，#46）；3px 倒數條 `.complete-countdown` absolute 疊在列內底部（列高 0px 變化，#23）；badge 的到期文字與「↩ 撤銷」兩個標籤疊在同一格、opacity＋blur 2px 交叉淡換，寬度先釘住再 150ms 滑到目標寬度（名稱截斷點不跳，#36）。窗口內點整列（含名稱）＝撤銷；鍵盤在同一顆勾選圈按 Enter／Space＝撤銷
+  - 窗口結束（`finalize`）：撤銷窗立刻關閉（`leaving`，之後的點擊與按鍵不再改狀態，列設 inert，#14）→ 焦點交給下一列（沒有就上一列）的勾選圈，清單空了交給「開啟 Dashboard」（`handOffFocus`，#1）→ 10 顆碎點從勾選圈中心迸出（body 下的 fixed 圖層）→ 列與變空的組標題一起收合（淡出與高度用不同曲線，transitionend 移除，#35）；最後一筆收掉時空狀態淡入
+  - 勾選圈 16px，另有隱形擴大熱區約 26px（差一點沒點中不會落到列上去開 Canvas，#22）
+- **「今天到期」badge（#21 重新設計 C1，設計稿 `dev/flame-redesign/`）**：實心紅底 `--urgent: #c4381e`＋白字＋白色單色火焰，沒有漸層與光暈；火焰 `flame-hop` 1.1s ease-in-out infinite（往上竄→落下微壓扁，底部為原點）；減少動態時火焰停住
 - 支援 UI 語言（跟隨 Dashboard 設定；`applyUILanguage` 同步設 `<html lang>`）
 - Claude 用量 ↻ 失敗時，header 下方 `#claude-usage-note`（`role=status`）顯示 `claudeRefreshMissing`（reason `no-tab`）或 `claudeRefreshFailed`，4 秒後清空；舊用量保留
+- ↻ 忙碌時圖示旋轉、`aria-disabled`（不用 disabled，焦點留在按鈕上）；手動重新整理成功時 chip 文字 blur 交換一次（#49）。**重新整理用量不重建任務清單**（不再 `loadData()`），進行中的撤銷窗不會被砍掉（#40）
+- 打開 popup 只讀一次 storage（`POPUP_KEYS`）：語言、用量顯示設定與清單在同一個 callback 一起套上，不會先翻一次預設 UI（#51）；沒有進場動畫
+- hover 只在 `(hover: hover) and (pointer: fine)` 下作用；頂部兩顆按鈕按下只縮放、hover 不上浮（#24）；減少動態：收合只淡出、沒有碎點、火焰停住、↻ 改脈動、按壓不縮放、badge 寬度直接到位
 - 開啟 Dashboard 按鈕（同步狀態／上次同步時間目前不顯示——同步錯誤 UI 屬 QA P0-3，決策不做）
 
 > 註：popup 的完成勾選、置頂逾期區與統一色階由並行工作完成；上述為行為說明。
@@ -243,23 +265,25 @@ sidebar（300px）+ main-content（flex:1）
 │  同步/設定            │
 ```
 
-> 主導航（`.side-nav`）：`學期待辦`／`課程` 為兩個頁面（互斥 active，切換帶水平 slide），`已繳交` 為過濾切換（`showSubmitted`，開啟時獨立高亮）。三者右側各顯示數量（待辦數／課程數／已完成數）。第四顆 `成績`（`#nav-grades`，`aria-haspopup="dialog"`）不是頁面：開「學期成績」modal（見下方），不 active、沒有計數，沒有課程時與課程／已繳交一起停用（`setNoCoursesMode`）。active 狀態、數量與頂部 `#page-title` 由 `updateSideNav()` 統一更新；在課程詳情頁點 `學期待辦`／`課程` 會先退出詳情再切換（見 `goToPage()`）。頂部 `.page-tabs` 只保留頁面標題（詳情模式下由 CSS 隱藏，改顯示返回鍵）與「新增作業」。
+> 主導航（`.side-nav`）：`學期待辦`／`課程` 為兩個頁面（互斥 active，切換時新頁淡入，見「頁面切換動畫」），`已繳交` 為過濾切換（`showSubmitted`，開啟時獨立高亮）。三者右側各顯示數量（待辦數／課程數／已完成數）。第四顆 `成績`（`#nav-grades`，`aria-haspopup="dialog"`）不是頁面：開「學期成績」modal（見下方），不 active、沒有計數，沒有課程時與課程／已繳交一起停用（`setNoCoursesMode`）。active 狀態、數量與頂部 `#page-title` 由 `updateSideNav()` 統一更新；在課程詳情頁點 `學期待辦`／`課程` 會先退出詳情再切換（見 `goToPage()`）。頂部 `.page-tabs` 只保留頁面標題（詳情模式下由 CSS 隱藏，改顯示返回鍵）與「新增作業」。
+>
+> **滑動 indicator（#47）**：學期待辦／課程的 active 底色是同一塊 `#side-nav-indicator`（`updateSideNav` → `placeSideNavIndicator`／`placeIndicatorAt` 寫 `--y`／`--h`），換項時沿 `--spring-selection` 滑過去；沒有 active 項（課程詳情、已繳交）→ `.is-off` 原地淡出、位置不動；恢復時先 `transition:none` 寫到新項位置、forced reflow 後才移除 `.is-off`——在新位置原地淡入，不從舊位置滑來。頁面載入（含 reload 還原課程頁／已繳交／詳情）直接到位、項目本身的過渡先關掉，不會出現兩塊高亮。按下 active 項時 indicator 跟著縮（`--scale-choice`）。減少動態：直接跳
 >
 > **已繳交固定用各課程 grid 版面**：`render()` 選版面的條件為 `currentPage === 'week' && !showSubmitted` 才走週待辦（圓餅圖）版面，否則一律 `renderCardGrid()`。因此不論從「學期待辦」或「課程」頁開啟已繳交，都顯示各課程 grid；關閉後回到原本所在頁面。
 
 **學期待辦頁（Week）：**
 - 左側「本週概覽」面板（頂部對齊，`.week-left`）：
   - **進度環**（`.wk-ring`，SVG stroke 綠色弧）：近期完成度 `nearDone/nearTotal`；範圍＝逾期窗（30 天）∪ 未來 7 天（`isNearAssignment`），分母含已完成項，現算；中央顯示 `X/Y` + 「近期完成」（`weekDoneLabel`；不是「本週」——範圍含 30 天內的逾期，QA #14），`role="img"`，aria-label 與 title 寫出範圍（`weekRingScope`）
-  - **分級摘要**（`.wk-breakdown` / `.wk-sum-row`）：逾期/7天內/8-30天/30天以上 的未完成數，色碼（逾期紅底凸顯），只顯示 count>0；每列為 `<button>`，點擊/Enter/Space 捲動右側清單到對應區塊（`data-scroll-group` ↔ `.week-group[data-group]`，手動算位移用 `scrollTo` smooth）
+  - **分級摘要**（`.wk-breakdown` / `.wk-sum-row`）：逾期/7天內/8-30天/30天以上 的未完成數，色碼（逾期紅底凸顯），只顯示 count>0；每列為 `<button>`，點擊/Enter/Space 捲動右側清單到對應區塊（`data-scroll-group` ↔ `.week-group[data-group]`，手動算位移用 `scrollTo` smooth；減少動態時瞬間捲動），捲動的同時焦點移到目標組標題（#33）
   - （舊 conic 圓餅 `.week-pie`/`.week-legend` 已移除）
 - 右側：2 欄 task cards，依緊急度分區塊顯示（`.week-group[data-group]`）；分組委派 `taskRules.urgency`
 - **置頂「已逾期 (N)」區**（紅橘 `color-overdue`）：只收 30 天窗內逾期未繳（`taskRules.isWithinOverdueWindow`），排序最近錯過的在最上；窗外逾期不進待辦（只在課程詳情可見），側欄待辦數（`updateSideNav` weekCount）＝未來三組＋窗內逾期，與列表一致
-- 每張週卡片右上角有完成勾選圈（含逾期卡）：勾選走 1.5 秒撤銷窗口＋碎點爆（`beginCompleteWeek`／`cancelCompleteWeek`／`finishCompleteWeek`，與課程詳情列共用 `COMPLETE_*` 常數與 `spawnBurstDots`），窗口內點卡片任意處可取消
-- 點擊 task card（非勾選圈、非撤銷窗口）→ View Transitions API morph 展開對應課程詳情
+- 每張週卡片右上角有完成勾選圈（含逾期卡）：勾選走 1.5 秒撤銷窗口 → 就地離場（`beginCompleteWeek`／`cancelCompleteWeek`／`finishCompleteWeek`，與課程詳情列共用撤銷窗視覺、出場層、FLIP 補位與碎點，見下方「完成標記」），窗口內點卡片任意處可取消
+- 點擊 task card（非勾選圈、非撤銷窗口）→ View Transitions API morph 展開對應課程詳情（課名對課名配對，作業名不命名，#17）
 
 **課程頁（Courses）：**
 - 3 欄課程卡片 grid，依最近截止日期排序
-- 每張卡片顯示：課程代碼、**課程名稱**、緊急件數 badge、最多 3 筆作業（含分頁）
+- 每張卡片顯示：課程代碼、**課程名稱**、緊急件數 badge、最多 3 筆作業（含分頁）；換頁時卡片高度不變（3 列的 min-height，同一排下面的卡不再移動），列以 opacity＋blur 原地交換（#31）
 - 課程卡片點擊 → View Transitions API morph 動畫展開為詳情頁
 
 **課程詳情頁（Course Detail）：**
@@ -272,12 +296,14 @@ sidebar（300px）+ main-content（flex:1）
   - **課程關掉「依組別加權」**（`course.apply_assignment_group_weights === false`）→ 殘留的 `group_weight` 一律忽略（`courseUsesGroupWeights`）：圓餅、計算器、編輯器預填都視為不加權（QA #93）
 - 右下：成績計算器（accordion）+ 作業清單
   - 成績計算器：輸入分數即時計算加權總分；**Canvas 已評分自動預填**（可改可清；清空會記住 → `scores[id]=null`），詳見下方「成績計算器」
-  - 作業列表：點擊行展開描述，點擊作業名稱文字開新分頁跳轉 Canvas（`window.open(url, '_blank', 'noopener')`，切斷 opener，QA #154）
+  - 作業列表：點擊行展開描述，點擊作業名稱文字開新分頁跳轉 Canvas（`window.open(url, '_blank', 'noopener')`，切斷 opener，QA #154）。描述可用鍵盤展開：左欄蓋一顆透明、不吃指標的 `<button class="assignment-desc-toggle">`（Tab 停得到，Enter／Space 的 click 冒泡到列走同一個開關；`aria-expanded`／`aria-controls` 由 `toggleAssignmentDesc` 同步，#7）；成績計算器標題維持原樣（#7 縮小範圍）
+  - **展開面板共用 disclosure 過渡**（#28）：作業描述、成績計算器、已隱藏清單都是 height 0 ↔ auto（`.detail-right-panel` 的 `interpolate-size: allow-keywords`，Chrome 129+；更舊的版本高度直接跳、淡入仍有效）＋opacity＋2px blur，與 chevron 同一條 `--t-disclosure`；收合時 `visibility:hidden`（裡面的連結／輸入框不在 Tab 順序；打開那一邊 0s 立即可聚焦）。即時刷新等重繪後還原「本來就開著」的面板用 `openPanelInstant`（先關過渡、forced reflow 提交終點），不重播展開
   - 描述 HTML 走 `descSanitizer`（`hrefKind`）：`http(s)` 開新分頁、`mailto:` 保留為可點連結（不開分頁）、頁內錨點 `#xxx` 保留——來源元素的 `id`／`<a name>` 轉成空的 `<a data-desc-anchor>` 標記（不沿用 id，避免撞名／DOM clobbering），點擊由 `#course-detail-container` 委派攔截、捲到同一則描述內的標記（不改網址：hash 變動會觸發 popstate 把詳情退回清單）；`javascript:`／`data:`／相對路徑／`//host` 一律拿掉 href（QA #158）
   - **窄視窗（≤1100px）上下堆疊**：圓餅＋圖例縮成一列在上（圓餅 104px），作業清單用滿寬度、仍由 `.detail-right-panel` 捲動（拖曳邊緣捲動、重繪還原捲動依賴它）；≤767px 收窄下半部左右留白（28→16px）、列內名稱與截止標籤間距（20→12px）、截止標籤 14→13px；≤680px 改整個下半部一起捲動。681–1280px 三語言下被截斷的作業名至少約 6em（QA P1-10；實測英文 681px 6.9em、700px 8.1em、1101px 6.1em）；≤680px 側欄仍佔 240px，英文名稱只剩約 2em，未處理
   - 作業列最左有完成勾選圈（見下方「完成標記」）
   - 清單底部「已隱藏 N 項」區（`renderHiddenItemsSection`）：收的是**自動隱藏的考試/簽到（未升級）＋手動拖進來的一般作業**（`isHidden`）。**跟隨作業清單的完成過濾**（spec 2026-10-23 hidden-section-follows-filter，取代 7/22 same-bucket 鎖定列）：待辦視圖只列未完成的隱藏項、已繳交視圖只列已完成的（`isDone(a) === showSubmitted`）；N＝本視圖列出的數量，另一桶有 M>0 項時展開鈕後接短註（`hiddenItemsOtherDone`「另 M 項已完成，在『已繳交』中」／`hiddenItemsOtherPending`「另 M 項未完成，在待辦中」）。精簡列：作業名可跳 Canvas＋分組名＋due 標籤（考試顯 `due-exam` 紫），標題 `--mid`、分組/due 標籤 0.75、**不整列降透明**（避免把握把對比疊乘稀釋），**不顯示任何分數**；隱藏的自訂作業同樣有編輯/刪除鈕（`customActionsHtml`，與主清單共用）。只要該課有作業就恆存在（作降級放置目標），N=0 時顯示空狀態文字；預設收合、開合不持久化（但在詳情內切換「已繳交」與即時刷新會保留開合與右欄捲動，見 `captureViewState`）
-  - **拖曳隱藏／取消隱藏**（`manualShown`／`manualHidden`，見 spec 2026-07-22 與 2026-10-23）：**看得到就能拖**——已隱藏區每一列、作業清單每一列都有握把，沒有鎖住的列。隱藏列拖進作業清單＝取消隱藏（考試/簽到寫 `manualShown`＝「升級」為一般可操作作業，可勾/可點、考試仍紫；一般作業清 `manualHidden`），清單列拖進已隱藏區＝隱藏（反向寫入），統一走 `setItemHiddenByDrag(id, makeHidden, courseId)`。升級為逐項手動覆蓋，**視同一般作業出現在所有視圖**（學期待辦進度環/分級/計數、課程 grid、popup）。判定：`isHidden(a) = isHideable(a) ? !isManuallyShown(a) : isManuallyHidden(a)`；此規則同時套用於 `applyFilters`、`updateSideNav` 計數、`computeNearProgress` 進度環、popup `getTasks`。拖曳為 **Pointer Events 自繪引擎**（`setupHideablePromoteDrag`／`trackDragFrom`；原生 HTML5 DnD 啟動層在部分環境不觸發已棄用）：名稱正後方的 grip 為唯一拖曳起點（4px 閾值內視為點擊；靜止透明度 0.75，對 `--bg` 約 3.2:1——**已完成列的淡化只套在內容上**〔`.submitted` → `--done-fade: .45` 套在勾選圈/標題文字/分組/右欄，不含握把與自訂作業操作鈕；已繳交視圖的隱藏列同樣帶 `.submitted`〕，不整列 `opacity`，故主清單、已隱藏列、兩個視圖的握把都維持此對比；拖曳 clone／殘影把 `--done-fade` 歸 1），拿起後浮動 clone（`.drag-clone` 陰影＋微傾）跟隨游標；**沒有插入讓位動畫**（`.drag-shift`／`--drag-gap` 已於 cd2180e 移除），放開後依 due 排序重繪、clone 飛入真實位置並 `drag-arrived` 閃示；Esc／界外放開飛回原位；邊緣自動捲動；drop 目標 `.drop-active`／`.drop-hover` ＋ `data-drophint` 提示
+  - **拖曳隱藏／取消隱藏**（`manualShown`／`manualHidden`，見 spec 2026-07-22 與 2026-10-23）：**看得到就能拖**——已隱藏區每一列、作業清單每一列都有握把，沒有鎖住的列。隱藏列拖進作業清單＝取消隱藏（考試/簽到寫 `manualShown`＝「升級」為一般可操作作業，可勾/可點、考試仍紫；一般作業清 `manualHidden`），清單列拖進已隱藏區＝隱藏（反向寫入），統一走 `setItemHiddenByDrag(id, makeHidden, courseId)`。升級為逐項手動覆蓋，**視同一般作業出現在所有視圖**（學期待辦進度環/分級/計數、課程 grid、popup）。判定：`isHidden(a) = isHideable(a) ? !isManuallyShown(a) : isManuallyHidden(a)`；此規則同時套用於 `applyFilters`、`updateSideNav` 計數、`computeNearProgress` 進度環、popup `getTasks`。拖曳為 **Pointer Events 自繪引擎**（`setupHideablePromoteDrag`／`trackDragFrom`；原生 HTML5 DnD 啟動層在部分環境不觸發已棄用）：名稱正後方的 grip 為唯一拖曳起點（4px 閾值內視為點擊；靜止透明度 0.75，對 `--bg` 約 3.2:1——**已完成列的淡化只套在內容上**〔`.submitted` → `--done-fade: .45` 套在勾選圈/標題文字/分組/右欄，不含握把與自訂作業操作鈕；已繳交視圖的隱藏列同樣帶 `.submitted`〕，不整列 `opacity`，故主清單、已隱藏列、兩個視圖的握把都維持此對比；拖曳 clone／殘影把 `--done-fade` 歸 1），拿起後浮動 clone（`.drag-clone` 陰影＋微傾，clone 內文字留在原位不跳、清單不被下推，#41；clone inert＋`aria-hidden`）跟隨游標；**沒有插入讓位動畫**（`.drag-shift`／`--drag-gap` 已於 cd2180e 移除），放開後依 due 排序重繪、clone **只飛 transform**（`--reflow`，寬高不動）到真實位置，快到時與落地列交叉淡換（`settleClone`，各 200ms、150ms 起交疊；兩種列形狀不在最後一幀硬切）並 `drag-arrived` 閃示；Esc／界外放開飛回原位（原列從殘影 0.3 淡回）；邊緣自動捲動；drop 目標 `.drop-active`／`.drop-hover` ＋ `data-drophint` 提示。減少動態：clone 只平移、落地原地交叉淡換不飛行
+  - **拖曳的鍵盤路徑（#6）**：握把是 `<button class="drag-grip">`（aria-label `a11yShowItem`／`a11yHideItem` 說明按下去會移到哪），Enter／Space 直接把該項移到另一區——`keyboardMove` 建一個「已拿起、已在目標上」的 ctx（不掛 `_dragCtx`），走與放開滑鼠相同的 `commitDrag` → `settleClone`，動效一致；焦點跟到落地後那一列的握把（`focusAfterMove`），結果經 `announce` 念出；按住不放的 repeat 不重複移動。已隱藏區開關 `.hidden-items-toggle` 帶 `aria-expanded`／`aria-controls`（`setHiddenItemsOpen`）
   - 拖曳健壯性：寫入綁定**拖曳開始時的課程**（`ctx.courseId`，不讀當下 `currentCourseId`）；`showGridView`／`goToPage`／`switchPage`／`showCourseDetail`／`popstate` 與重繪前一律 `abortActiveDrag()`（clone 直接移除、不寫入）；放開時放置目標已不在 DOM 或已換課 → 當取消。落點當下重新判定完成桶（拖曳中考試剛結束等時間差）：照樣寫入並重繪，若該項已不屬於目前視圖則 clone 原地淡出
 
 **成績計算器（Canvas 預填 + 三態）：**
@@ -300,7 +326,7 @@ sidebar（300px）+ main-content（flex:1）
 - 不算學期平均（Canvas API 拿不到學分）；Canvas 沒開加權也沒有自訂權重的課維持「沒有評分比重」，不用總配分硬算
 
 **課程自訂名稱：**
-- 課程詳情頁的課程名稱旁有鉛筆圖示（hover 顯示）
+- 課程詳情頁的課程名稱旁有鉛筆圖示（hover 或鍵盤 `:focus-visible` 時顯示；沒有精細指標的裝置靜止就顯示；有 `aria-label`，#5／#11）；改名後鉛筆跟到新標題尾端，進入編輯時底線不增加標題高度（#34）
 - 點擊鉛筆 → inline 輸入框，Enter 儲存、Escape 取消；**IME 組字中的 Enter／Esc 不算**（`isImeComposing`：`isComposing` 或 keyCode 229，側欄雙擊重命名同；全域 Esc 關 modal 也排除組字，QA P2-14）
 - 失焦提交走 `commitOnBlur`（queueMicrotask 後再判斷）：輸入框若是被重繪整段換掉（Chrome 移除聚焦元素時同步發 blur，當下仍 `isConnected`）→ 放棄這次編輯、不寫入半截名稱（QA #159）；使用者點別處 → 照常提交。不可改成 setTimeout：快速點擊時 click 觸發的重繪會排在 timer 前面，正常改名會被當成放棄
 - 提交後側欄只就地更新（詳情改名 → `setNavCourseNameText`；側欄改名 → 只把輸入框換回該課按鈕，`navCourseItemHtml`＋`bindNavCourseItem`），不整段 `renderNav`——失焦發生在別課按鈕的 mousedown，整段重建會吞掉隨後的 click、切不了課（QA #166）
@@ -312,20 +338,28 @@ sidebar（300px）+ main-content（flex:1）
 - 建立／編輯經 `createCustomAssignment`／`updateCustomAssignment`；錯誤帶 `code`：`name_required` → 「請輸入作業名稱」、`invalid_due` → 「截止日期無效」（Chrome 年欄位可打到 6 位數、或只打兩位數成 0026 年；合理年份 2000–9999，`isValidDueLocalValue`，QA #161）。截止日期欄另設 `min`/`max`，Chrome 年欄位打滿 4 位數就自動跳到月
 - 存檔後（`afterCustomSaved`）若作業落在目前畫面看不到的地方，底部 toast（`showToast`，`#due-toast` role=status，4 秒淡出）說明去處：完成桶不符（`customSavedInPending`／`customSavedInSubmitted`）→ 詳情頁在別門課（`customSavedInCourse`）→ 清單頁被收進已隱藏區（`customSavedInHidden`）→ 週待辦的 30 天逾期窗外（`customSavedPastWindow`）；看得到就不提示（`customPlacementNote`，QA #162）
 - 描述是純文字：escape 後以 `.assignment-desc-inner.is-plain`（`white-space: pre-wrap`）保留換行，不走 `DueDescSanitizer`（只給 Canvas 的 HTML 描述用，QA #155）
-- 刪除：確認框帶作業名稱（`confirmDeleteCustomNamed`）；同一次寫入連同 `manualDone`／`manualUndone`／`manualShown`／`manualHidden`／`scores` 裡該 id 的 key 一起清掉（只寫實際含該 id 的 map，QA #172）
+- 刪除：確認框帶作業名稱（`confirmDeleteCustomNamed`）；同一次寫入連同 `manualDone`／`manualUndone`／`manualShown`／`manualHidden`／`scores` 裡該 id 的 key 一起清掉（只寫實際含該 id 的 map，QA #172）；刪除後空隙以 FLIP 收合（`detailFlipSnapshot`／`detailFlipPlay`），焦點交給鄰居（#8／#48）
+- 送出失敗（#38）：錯誤文字寫進 `#custom-assignment-error`（`role=alert`，欄位 `aria-describedby` 指向它）、出錯欄位 `aria-invalid` 轉紅框（名稱或截止日期，`showCustomFormError(code)`）、焦點回到該欄、欄位搖一次（`SHAKE_KEYFRAMES`，`MOTION.shake`，減少動態不搖）；開始打字即清掉錯誤狀態。空名稱由原生 `required` 擋，只有空白的名稱才走 `name_required`
+- 新增／編輯存檔後（`afterCustomSaved` → `refreshView` → `landCustomAssignment`）：落點捲進可視範圍、淡入＋上移 8px 落地（#48）；編輯後焦點回到重建後的同一顆「編輯」鈕
 
-**Modal 共通：** 點背景關閉要「按下（pointerdown）、放開（pointerup）與 click 都在背景本身」（`trackBackdropPress`／`isBackdropClick`，新增作業／權重／確認／教學四個 overlay 共用）——按下與放開在不同元素時 click 會派發到共同祖先 overlay，所以在對話框內按下、拖曳選字到背景放開，或反過來從背景拖進對話框放開，都不會關掉 modal（QA P2-9）。文案插入使用者字串（作業名、課名）一律用函式型替換 `.replace('{name}', () => s)`，避免 `$&`／`$$` 被 `String.replace` 展開
+**Modal 共通：**
+- **點背景**：確認框、教學、AI 分析設定（`aiSettings.js` 綁定）、學期成績點背景會關，但要「按下（pointerdown）、放開（pointerup）與 click 都在背景本身」（`trackBackdropPress`／`isBackdropClick`）——按下與放開在不同元素時 click 會派發到共同祖先 overlay，所以在對話框內按下、拖曳選字到背景放開，或反過來從背景拖進對話框放開，都不會關掉 modal（QA P2-9）。**新增／編輯作業與權重編輯器點背景一律不關**（N2，比 P2-9 更嚴），只用 ✕、取消、Esc
+- **草稿（N2）**：新增／編輯作業與權重編輯器裡已輸入的內容是草稿（只在記憶體，`_customDraft`／`_weightDraft`）：✕ 與 Esc 關掉時保留，重開「同一個」視窗才還原——key 由 `customAssignments.js` 決定（`formDraftKey`：新增一律 `new`、編輯 `edit:<id>`；`weightDraftKey(courseId)`；`draftValuesFor` 比對，含測試），開別筆作業或別門課的權重就重新開始；「取消」、儲存、權重的「還原 Canvas 權重」丟掉草稿
+- **進出場（#29）**：六個 overlay（新增作業、權重、確認、教學、AI 分析設定、學期成績）的背景雙向淡入淡出（`--t-overlay`），卡片進場 `--t-dialog-fade`＋`--spring-dialog`、關閉走 `--t-dismiss`；關閉中的 overlay inert。Esc 一次只關最上層（確認框 → AI 分析設定 → 新增作業 → 權重 → 學期成績 → 教學），組字中的 Esc 不算
+- 文案插入使用者字串（作業名、課名）一律用函式型替換 `.replace('{name}', () => s)`，避免 `$&`／`$$` 被 `String.replace` 展開
 
 **完成標記（手動，雙向）：**
 - 每個作業列最左有一個勾選圈，所有作業皆可雙向切換完成/未完成，獨立於 Canvas 繳交狀態
 - 判斷公式 `isDone = (isExternallyDone && !manualUndone[id]) || manualDone[id]`，單一真相來源在 `dashboard/completion.js`（含單元測試）；`isExternallyDone = Canvas 已繳 ∨ 考試已結束`（`taskRules.isExamConcluded`：考試 due 一過即不可再行動，與已繳歸同一完成桶，不進待辦/逾期——還沒考的考試才進未完成，見 spec 2026-07-22；**要交東西的考試不適用**：`submission_types` 含交件型（`DELIVERABLE_TYPES`，見下方「全域篩選邏輯」）的 take-home 考試 `isExam` 本身就是 false（結構規則），截止後照一般作業算逾期、未繳就進已逾期，不會自動完成；`isExamConcluded` 內另有同一判斷作防線（QA P0-2）；無截止日／日期無效也不算考完；自訂作業不算考試，不適用）
 - **寫入單一入口 `DueCompletion.setDone(maps, a, done)`**（dashboard 勾選圈／撤銷、popup 勾選／撤銷共用；QA P1-4）：目標狀態取**畫面顯示的狀態**的反面（勾選圈 `data-done`，`toggleCompletion(id, cid, shownDone)`；不用點擊當下重算的 `isDone`——render 後作業可能已變外部完成〔升級考試時間到、同步已併入但重繪延後〕，重算會把看起來未勾的一點反向寫成未完成），再依**點擊當下**的 `isExternallyDone(a)` 決定用哪張 map 表達，另一張同 id 一律清掉 → 結果恆為最小覆蓋：完成＝外部完成則兩張都不留／否則只留 `manualDone`；未完成＝外部完成則只留 `manualUndone`／否則兩張都不留。外部完成者標回未完成會回到待辦清單（popup 同步），「已繳交」badge 仍顯示 Canvas 事實。勾選圈不再帶 `data-ext-done`（render 時的外部事實會過期：先手動勾完成、之後 Canvas 才記錄繳交或考試時間過了）
-- 待辦視圖勾選完成 → 維持原尺寸 1.5 秒（底部橘色撤銷倒數條；「↩ 撤銷」由 `showUndoHint` 疊在 due 標籤原位，due 只設 `visibility:hidden` 保留空間——不可把 hint 插進版面，詳情列右欄是直排 flex，多一行會把列撐高約 30px、推開下面整排），期間點該列/卡片可取消；時間到「碎點爆」後移除，其餘列／卡從原位置**滑**到新位置補位（FLIP：`flipSnapshot`／`flipPlay`，`REFLOW_MS` 420ms、`cubic-bezier(0.2, 0, 0, 1)`，WAAPI id `reflow`；只動葉元素——詳情的列／描述／已隱藏區、週卡／分組標題；只在完成收尾的重繪啟用，`rerenderDetailAndNav(cid, {flip:true})`／`rerenderWeekAndNav(true, {flip:true})`；滑動中 `isUiIdle` 為 false；減少動態效果時不滑）。**課程詳情列與學期待辦週卡片皆支援**（`beginComplete*`／`cancelComplete*`／`finishComplete*` 兩套平行版，共用 `COMPLETE_DELAY_MS`／`COMPLETE_BURST_MS`／`spawnBurstDots`；`toggleCompletion`／`revertCompletion` 為兩邊共用的寫入/還原）
-- 重繪/切頁前一律 `clearCompleteTimers()` 清掉殘留計時器（兩視圖共用同一組 `_completeTimers`），避免幽靈 callback；爆開後的重繪 timer 也登記在內（key `${id}:burst`），`rerenderDetailAndNav(cid)` 只在仍停在該課詳情時重繪詳情、`rerenderWeekAndNav` 只在仍是週待辦版面時重繪週 section（延遲 callback 不能把舊課程／舊頁面畫回來）
-- **連勾多筆各自跑滿撤銷窗口**（`settleCompletion`）：一筆爆完時若還有其他撤銷窗口／爆開進行中，先不重繪（爆完的列/卡已淡出、`pointer-events:none`，留在原位不推動其他列），等最後一筆收尾（爆完或被撤銷）再統一重繪一次；提早重繪會 `clearCompleteTimers` 截斷其他卡片的窗口
+- **撤銷窗**（`markCompleting`／`unmarkCompleting`，詳情列與週卡共用）：待辦視圖勾選完成 → `.completing`：勾選圈填綠、勾號在填色後畫出（`.just-checked`，`--t-check`＋200ms delay，只有「勾下去的這一下」播，重繪出來就已勾選的不播，#46）；due 標籤與「↩ 撤銷」從一開始就疊在同一格 `.due-slot`，撤銷窗只做 opacity＋blur 原地淡換；橘色倒數條 `.complete-countdown` absolute 疊在卡片／列框內底部、裁在圓角內（#13／#44）——**卡片／列尺寸完全不變、其他項目不被推動**；經 `announce` 念出。期間點該列／卡片（含作業名稱）＝撤銷；鍵盤在同一顆勾選圈按 Enter／Space＝撤銷。`beginComplete*`／`cancelComplete*`／`finishComplete*` 為詳情列與週卡兩套平行版，`toggleCompletion`／`revertCompletion` 為共用的寫入／還原
+- **每項的撤銷窗各自獨立**（#1／#12）：`_completeTimers[id]` 一項一個計時器、互不清除，完成流程本身從不呼叫 `clearCompleteTimers()`——連勾三張，每張都跑滿自己的 1.5 秒倒數，第一張落地不會截斷或重置其他張（使用者明確要求：「每個倒數的時間都會被第一個倒數進度條給影響，請你確保他們獨立」）。QA 分支的 `settleCompletion` 批次收尾與 `${id}:burst` 重繪 timer 因此不再需要、已移除
+- **落地＝就地移除，不整段重繪**（`finishComplete`／`finishCompleteWeek`）：① 焦點交接：離場項持有焦點時交給下一項（沒有就上一項）的勾選圈，再沒有就交給 `#page-title`／`.detail-assignments-label`（`handOffFocus`；只在離場那一刻移，scope 限目前清單——開詳情時 `#main-section` 只是隱藏，用 document 查會找到看不見的同 id 勾選圈）② 碎點從被點的勾選圈中心迸出，畫在 fixed、`pointer-events:none` 的 `#burst-layer`（`spawnBurstDots`，#20）③ 節點立刻抽出版面、搬進出場層釘在原視覺位置淡出＋縮到 0.96（`exitInPlace`，`EXIT_SCALE`；殘影裁在原捲動容器內、離場節點 inert，#19）④ **同一幀**其餘卡片／列／組標題／分隔線／摘要列以 FLIP 沿 `--reflow` 滑進空位（`flipSnapshot`／`flipPlay`，WAAPI id `reflow`，只動 transform；再次觸發時從目前位置接續，#18）⑤ 組標題 (N)、摘要列數字、空狀態、詳情 header 待辦數／緊急 badge（`updateDetailHeader`）、側欄計數、進度環就地更新。組裡最後一張離場時，組標題＋相鄰分隔線＋左欄摘要列一起離場。捲動位置、展開的描述／成績計算器／已隱藏區、其他仍在窗內的項目都保得住
+- `isDoneLanded(a)`：撤銷窗內的項目畫面上還在清單裡，計數、組標題、進度環、側欄都先不算它完成，落地那一刻才一起更新
+- 整段重繪（`renderCourseDetailSection`／`renderWeekSection`／`renderCardGrid`）一律先 `clearCompleteTimers()`；撤銷窗內導覽離開時完成已在勾選當下寫入，那一列／卡留在已隱藏的容器裡直到下次重繪（`finishComplete*` 看到節點已不在畫面上就略過）。`rerenderDetailAndNav(cid)`／`rerenderWeekAndNav()`（拖曳、已繳交切換、標回未完成用）只在仍停在該課詳情／週待辦版面時重繪（QA #113）
+- 進度環就地更新（`updateWeekRing`，#12）：只改 `stroke-dashoffset`（0.8s 過渡從目前位置 retarget，不換節點），分子 tick（forced reflow 重播）、aria-label 同步。**「全部完成」慶祝只看狀態轉移**：最後一項近期作業落地、分子剛到分母且上次顯示的還沒到（`_prevRingDone`）→ 等弧真的停在終點（`whenRingLands`，只認停在 target 的 transitionend；減少動態或已在終點立即執行）才 `celebrateRingArrival`：中心換字淡入「全部完成」＋播報（減少動態也保留），非減少動態才有環與分子的彈跳和 16 顆多色碎點。全部完成後再勾非近期項不重播；連勾最後兩項只由後落地的那一項觸發一次
 - 撤銷窗口內點作業名稱（詳情列的 Canvas 連結）＝點該列 → 取消完成，不開 Canvas
-- 週卡碎點爆：卡片同詳情列原地淡出（`.week-task-card.bursting`），碎點從右上角勾選圈中心噴出
-- 進度環「全部完成」慶祝只看狀態轉移：週卡完成 commit 的收尾重繪（`renderWeekSection(..., fromCommit=true)`），且上次渲染時未全部完成（`_ringAllDone === false`）、這次全部完成才播；全部完成後再勾 8-30 天／無截止的作業不重播，最後兩項間隔勾選也只播一次
+- 即時刷新遇到撤銷窗：見「開發注意事項」第 9 點——任何一項還在窗內、離場或 FLIP 還在跑，整頁重繪就延後
 - `isDone` 公式不變：兩張 map 同時有 id 時 `manualDone` 勝出；但 `setDone` 下一次寫入就會把它正規化，不會再卡在「標不回未完成」（見 docs/superpowers/specs/2026-07-21-bidirectional-completion-toggle-design.md）
 
 **多語言支援（i18n）：**
@@ -337,13 +371,22 @@ sidebar（300px）+ main-content（flex:1）
 
 **側欄 header meta（`setHeaderMeta`）：** 「校名 · 同步時間」拆兩個 span——同步時間 `flex-shrink:0` 永遠完整顯示；校名放不下時先微縮字（13→11px 為地板），仍放不下就省略號（整格 title 看全名）。舊版 `fitMetaText` 逐步縮到 8px 仍裁掉同步時間，已移除（QA #135）。單段提示（同步中…）傳一個參數。啟動時的「載入中…」帶 `data-loading`，`applyUILanguage` 依語言替換。側欄課名被省略號截斷時，按鈕給 title 看全名（`syncNavNameTitles`；renderNav／改名收尾時算，視窗 resize 時以 rAF 節流重算——跨 900px 斷點側欄 300→240px 會改變誰被截斷）
 
+**同步按鈕（`setSyncStatus`，#30）：** 閒置／三點／「✓ 已同步」／「同步失敗」四個標籤一開始就疊在同一格（`.sync-swap`），換狀態只改 `data-status`，CSS 原地 opacity＋blur 淡換（按鈕不變寬）；「✓ 已同步」停 1.5 秒（`SYNC_DONE_MS`）、「同步失敗」停 2.5 秒（`SYNC_ERROR_MS`，期間 disabled）再回閒置；結果經 `announce` 念出。`SYNC` 回 `success:false`（整體失敗，例如課程清單 401）或訊息通道錯誤 → 錯誤態（錯誤代碼橫幅屬 QA P0-3，決策不做）；部分失敗（`success:true`＋`failedCourses`，QA P0-1）仍是「✓ 已同步」；成功且已有資料 → 不立即重繪，交給 `requestRefresh()`（等 UI 閒置才原地重繪，同步期間勾的撤銷窗不被截斷）；首次同步（無資料）→ 同步期間畫 skeleton，結束後 `loadData()`
+
 **空狀態（`renderEmptyState`，QA P2-6）：** 沒有課程時區分「從未同步」（無 `lastSync`：`emptyNeverTitle/Body`）與「已同步但沒有進行中的課程」（有 `lastSync`、courses 空：`emptyNoCoursesTitle/Body`，說明 Due 只抓進行中的課程）。header 照常顯示「學校 · N 分鐘前同步／尚未同步」。主要動作「前往 Canvas」（`openCanvasTab`，與教學的登入連結共用：點擊當下讀 storage 的 `canvasBaseUrl`，沒有就開 HKUST(GZ) 並附其他學校說明；從未同步時同教學「武裝」自動跳回）。`loadData` 的空分支把 `_currentData` 換成只有同步狀態（側欄計數與課程列不留上一份資料的殘影）、回到學期待辦（`currentPage='week'`、關掉已繳交），並以 `setNoCoursesMode(true)` 停用「+ 新增作業」「課程」「已繳交」（title 說明 `needCourses`）；有資料時 `render()` 解除
 
 **側欄「偵測到另一個 Canvas」提示（`#canvas-candidate`，QA P1-9）：** 同步鍵上方一行安靜的提示。`loadData` 讀 `canvasBaseCandidate`（另存 `_canvasCandidate`，不進 `_currentData`），常駐 `storage.onChanged` 看到 `canvasBaseCandidate` 變動時只重畫這一行（`setCanvasCandidate`，不排整頁重繪）；`canvasBaseUrl` 屬於同步 key（`LIVE_SYNC_KEYS`），外部變更照常排整頁重繪（`requestRefresh`），並順手重畫這一行（`renderCanvasCandidate`）；候選存在且 `origin !== canvasBaseUrl` 才顯示（空狀態也顯示——放假沒課的學校同樣可能偵測到別校），host 顯示 `URL.host`、title 為完整 origin。「切換到這裡」送 `SET_CANVAS_BASE`：等待期間兩鈕停用、文字換 `canvasCandidateSwitching`（期間任何重畫都不解除）；成功 → 收起提示並 `loadData()`；失敗 → 提示保留、下方 `#canvas-candidate-error` 依回應的 `reason` 顯示說明：`'not-logged-in'` → `canvasCandidateFailed`（請先登入該 Canvas）；其餘（含訊息通道錯誤、沒有 reason）→ `canvasCandidateSyncFailed`（請稍後再試）；`_canvasCandidateError` 存原因字串，再按切換或候選換成別的網址時清除。「忽略」送 `IGNORE_CANVAS_BASE` 並立即收起。i18n：`canvasCandidateLabel`／`Switch`／`Switching`／`Ignore`／`Failed`／`SyncFailed`
 
-**設定選單：** 標題與齒輪 title／aria-label 走 `settingsTitle`；Popup Claude 用量開關、AI 分析設定、語言、使用教學。（QA #152 加的「清除本機資料…」已於 2026-10-24 依 owner 決定移除；要清資料用 Chrome 自己的 chrome://extensions，background 的自我修復見上方 background.js 段。）已知問題（屬 QA P2-12，決策不修）：每次 `applyUILanguage` 都重建語言子選單並搬到 `body`，舊的沒移除——切幾次語言 `body` 就累積幾個隱藏的重複 id 子選單（`menu-language-*`）；畫面與點擊都正常，只是 DOM 殘留
+**設定選單：** 標題與齒輪 title／aria-label 走 `settingsTitle`；Popup Claude 用量開關、AI 分析設定、語言、使用教學。（QA #152 加的「清除本機資料…」已於 2026-10-24 依 owner 決定移除；要清資料用 Chrome 自己的 chrome://extensions，background 的自我修復見上方 background.js 段。）
+- 選單與語言子選單從觸發點長出、收回原點（`--scale-menu` 0.9 ↔ 1＋opacity，`--t-menu`，#50）
+- **語言子選單點擊開關（N1／#10）**：「語言」列的 click（含鍵盤 Enter／Space）開／關，不再靠 hover＋180ms 關閉延遲——滑鼠不小心移開不會關，hover 也不會打開。子選單是 `index.html` 裡**唯一一個靜態節點**（`#menu-language-submenu`，fixed 定位在「語言」列右側；母選單還在縮放中也用 `menuRowFinalRect` 量最終位置），`applyUILanguage` 只改文字、不重建（QA 回報的「每切一次語言多一個重複 id 子選單」已不存在）。開啟時焦點進第一個語言（`menuitemradio`，目前語言另有 `aria-checked`）；↑↓／Home／End 在語言間移動，→ 開、←／Esc 收回並把焦點還給「語言」，Tab 走出邊界接回母選單
+- 所有關閉路徑（選語言、點外面、齒輪、Claude 用量開關、AI 分析設定、使用教學）走同一個 `closeSettingsMenu()`：母選單與子選單一起收，焦點原本在選單裡（鍵盤操作）就還給 ⚙
 
-**減少動態效果（`prefers-reduced-motion`，QA #138）：** CSS 把所有過渡／動畫壓成瞬間、hover 不位移、View Transition 偽元素不播；JS 以 `prefersReducedMotion()` 略過頁面滑動（直接 `_finishPageSlide`）、課程 morph（`showCourseDetail`／`showGridView` 走無 VT 的同步重繪）、碎點爆、進度環慶祝（WAAPI 不受 CSS 影響，只換字）、拖曳落點飛入與分級摘要的 smooth 捲動。撤銷倒數條例外：它是計時資訊，以 inline `!important` 保留動畫
+**減少動態效果（`prefers-reduced-motion`，#0；涵蓋 QA #138）：** 原則是保留淡入淡出與顏色、拿掉位移／縮放／旋轉／尺寸動畫，無限循環改成只閃透明度或停止。
+- CSS：`index.html` 檔尾一個 media 區塊（與各規則同特異度時靠順序勝出）：`--lift: 0`、scale token 歸 1、展開面板高度直接到位只留淡入與模糊、同步中的三點只閃不跳、skeleton 掃光停止等。**不再用「`*` 全部壓成 0.01ms !important」的全域規則**——它會把要保留的淡入淡出、撤銷倒數條與展開面板透明度一起抹掉
+- JS（CSS 管不到的 WAAPI、`scrollTo`、View Transition 共享元素命名、拖曳 clone 的 inline transform）一律問 `reduceMotion()`：頁面切換只淡入不位移；課程 morph 仍走 VT 但不命名共享元素（只剩 root crossfade）；FLIP 不量不滑、直接到位；離場只淡出不縮放；沒有完成碎點；進度環慶祝只換字＋播報（不彈跳、不迸粒子；`whenRingLands` 不等 transitionend——CSS 的 `transition:none` 會讓它永遠不來）；分級摘要瞬間捲動；拖曳 clone 只平移、落定原地交叉淡換；教學換頁 crossfade；表單錯誤不搖
+- 保留：淡入淡出、顏色、due／撤銷淡換、勾號畫出、撤銷倒數條（期限 meter，不算位移；inline `animation … !important` 保留）、完成項目離場的 opacity、`drag-arrived` 閃色、View Transition 的 root crossfade、`:focus-visible` 外框
+- 兩邊必須一起改：只在 CSS 把某個過渡設成 none、JS 卻還在等它的 transitionend，就會讓後續效果（例如慶祝）一起消失
 
 **全域篩選邏輯（`applyFilters`）：**
 - 預設排除簽到/出勤/參與類與考試/測驗類；考試/簽到判定已移至 `taskRules.js`（`isExam`／`isAttendance` 單一真相來源，含測試，popup 共用）。`dashboard.js` 的 `isExam`／`isAttendance`／`isHideable` 僅為委派包裝；`taskRules.isHideable = isExam || isAttendance`（popup `getTasks` 共用）
@@ -373,11 +416,13 @@ sidebar（300px）+ main-content（flex:1）
 - 按完成狀態篩選：預設隱藏已完成；「查看已繳交」切換後只顯示已完成（Canvas 已繳 + 手動標記完成，見 completion.js 的 isDone）。詳情頁的頁面標題被隱藏，故開啟時清單標題附過濾名（`作業清單 · 已繳交`，`currentListLabel()` 的 `.detail-filter-tag`）；`#nav-submitted` 帶 `aria-pressed`（`updateSideNav` 維護）
 
 **頁面切換動畫：**
-- 學期待辦 ↔ 課程：水平 slide（`.page-slider` translateX，470ms）。slider 固定為 [週待辦 | 課程]；滑動中再切回 → 沿用同一條 slider 改 transform 反向接續（不巢狀、不重複 id）。收尾 timer（`_pageSlideTimer`）可被 `settlePageSlide()`（goToPage／已繳交切換／進詳情／popstate）與 `render()` 取消；收尾判斷與 `render()` 相同（`currentPage==='week' && !showSubmitted` 才畫週版面），在詳情中只收掉 slider、不碰版面
-- 課程卡片 ↔ 詳情：View Transitions API morph（0.28s，命名元素：`course-shell`、`course-code`、`course-name`、`course-badge`、`course-meta`）
-- **導覽狀態同步設定**：`showCourseDetail`／`showGridView` 在呼叫當下就設好 `currentView`／`currentCourseId`，VT callback 只負責畫，晚到時若狀態已被後來的導覽改掉就略過（連點兩門課、morph 中途 Back／點側欄）。開新 morph 前 `_clearMorphNames()`（殘留同名會讓新 transition 以 InvalidStateError 中止）；不走 VT 的導覽（goToPage、fallback、popstate）先 `_skipMorph()`；`transition.ready` 的 rejection 一律吞掉
+- 學期待辦 ↔ 課程（#15）：`switchPage` 直接畫出目標頁，新頁以 WAAPI 淡入＋12px 水平位移（`MOTION.panelIn` 300ms，方向依頁序，無 fill）——**沒有 slider、沒有 innerHTML 字串複製、沒有收尾 timer、不用 rAF**，切換期間點擊不會失效；再按一次直接取消進行中的動畫（`_pageAnim`）。`settlePageSwitch()`（goToPage／已繳交切換／進詳情）讓進行中的淡入立即落定。原本 470ms 的 `.page-slider` 連同 QA 對它的修正（巢狀 slider、收尾 timer 晚到重畫，QA #192／#199）一起移除——那些問題在這版不存在
+- 「已繳交」切換（#32）：側欄在按下那一幀就亮起（`updateSideNav` 只讀 `_currentData`，不等 storage），新畫面淡入（`_fadeNextRender`）；在課程詳情內切換只淡入作業清單與已隱藏區
+- 課程卡片 ↔ 詳情：View Transitions API morph（0.28s，命名元素：`course-shell`、`course-code`、`course-name`、`course-badge`、`course-meta`）。從週卡開詳情時課名對課名配對、作業名不命名（#17）
+- **焦點與返回（#2／#27）**：開詳情時焦點在 VT update 裡移到詳情標題 `.detail-name-text`（tabindex=-1，`focusDetailHeading`，preventScroll 不打斷 morph）；回清單時還給來源週卡／課程卡／側欄課程項（`_detailOrigin.focusSel`，找不到落在 `#page-title`）。從週卡開的詳情按 Back：`.week-right` 捲回開詳情前的位置，該卡在可視範圍內才 morph 回它，否則詳情原地淡出（`returnMorphTarget`）
+- **導覽狀態同步設定**：`showCourseDetail`／`showGridView` 在呼叫當下就設好 `currentView`／`currentCourseId`，VT callback 只負責畫，晚到時若狀態已被後來的導覽改掉就略過（連點兩門課、morph 中途 Back／點側欄）。進行中的那一段記在 `_morph`（`startMorph`，#42）：舊 transition 的 finished 清理只清自己命名的元素，不會把下一段剛設好的名字清掉；開新 morph 前 `clearStaleMorphNames()` 清掉進行中那段殘留的名字（同名殘留會讓新 transition 以 InvalidStateError 中止）；不走 VT 的導覽（goToPage、fallback、popstate）先 `_skipMorph()`；`transition.ready` 的 rejection 一律吞掉
 - 課程卡分頁索引 `cardPages` 依完成桶分開記（`cardPageKey` → `${courseId}:todo|done`），`renderCardBottom` 把夾過的頁寫回（清單縮短後第一下「‹」就有反應）
-- 首次同步 skeleton 的形狀＝落地版面（`currentPage==='week' && !showSubmitted` → 進度環＋分級摘要＋2 欄卡片的 `.skel-week`；否則課程卡 grid）；同步進行中（`_syncInFlight`）`loadData()` 的空資料分支改畫 skeleton（skeleton 期間切已繳交／換語言不會變成「尚無資料」），`applyUILanguage` 保留按鈕三點
+- 首次同步 skeleton 的形狀＝落地版面（`currentPage==='week' && !showSubmitted` → 進度環＋分級摘要＋2 欄卡片的 `.skel-week`；否則課程卡 grid）；同步進行中（`_syncInFlight`）`loadData()` 的空資料分支改畫 skeleton（skeleton 期間切已繳交／換語言不會變成「尚無資料」），`applyUILanguage` 保留按鈕三點。skeleton 畫在 `#sync-skeleton` 疊層裡，資料落地後與真內容交叉淡換（`dismissSyncSkeleton`，不再硬切＋空白一幀），shimmer 為 linear（#43）
 - Sidebar 在 morph 期間靜止（`view-transition-name: sidebar`，`animation: none`）
 - **注意**：若課程名稱 `div.detail-name` 內有 inline 元素（如鉛筆按鈕），需確保按鈕為 `position: absolute`（不影響 layout box），否則 View Transition 捕捉到不同高度會產生動畫跳動
 
@@ -392,7 +437,7 @@ sidebar（300px）+ main-content（flex:1）
 
 **新手教學（Welcome Modal，5 頁）：**
 - 首次安裝自動開啟（`?welcome=1`），設定選單「使用教學」可重開；換頁為 translateX 滑動（track 500%、每步 20%，`welcomeGoStep` 位移 `(n-1)*20%`，完成頁按鈕判斷 `n===5`）。開過後以 `history.replaceState` 把 `welcome` 參數從網址拿掉（保留其他參數、hash 與 history state），重新整理不會再跳出（QA #48）
-- 只有目前那頁可互動：其餘投影片設 `inert`（`_welcomeSyncSlides`），Tab 不會聚焦到畫面外的連結而把 `overflow:hidden` 的軌道捲走；`.welcome-main-area.scrollLeft` 開教學／換頁時歸零；上一步／下一步整排重建後焦點交給新的主要按鈕；focus trap 的頭尾排除 inert 子樹（QA P2-13）
+- 只有目前那頁可互動：其餘投影片設 `inert`（`_welcomeSyncSlides`），Tab 不會聚焦到畫面外的連結而把 `overflow:hidden` 的軌道捲走；`.welcome-main-area.scrollLeft` 開教學／換頁時歸零；按鈕列固定兩個節點（上一步／主按鈕），換頁只就地改文字、`data-wgo` 與 class，焦點留在原按鈕上（上一步要消失時先交給主按鈕，#8）；focus trap 的頭尾排除 inert 子樹（QA P2-13）。`.welcome-main-area` 用 `overflow: clip`（不可捲動，Tab 也捲不歪）；開教學以 forced reflow 直接歸位到第 1 頁（不靠 rAF）；減少動態時換頁 crossfade（#9）
 - 頁面：1 歡迎（右側為 HTML/CSS 迷你 Dashboard mock——SVG stroke 進度環＋分級摘要列；文字隨語言切換：標題 `wMockTitle`、環與摘要沿用真介面的 key、卡片日期以 `dueWithRel` 產生）→ 2 登入 Canvas → 3 釘選（`icons/pin_guide.png`，圖中圖示為 DUE 商標；alt 走 `wPinAlt`；載入失敗由 JS 收起預覽框——MV3 CSP 擋 inline onerror，QA #157）→ 4 拖曳整理（文案明講「進入任一課程頁」；右側 inline SVG 示意圖：課程大卡片內含 header、作業清單、浮起拖曳列、已隱藏區與隱藏/還原雙向箭頭；SVG 文字 `wds-*` 隨語言替換，箭頭旁直排短標中文逐字、英文轉 90°，見 `setSvgVerticalLabel`）→ 5 一切就緒
 - **登入 Canvas 自動跳回**（spec 2026-07-23-onboarding-redesign）：點連結（`openCanvasTab`：點擊時直接讀 storage 的 `canvasBaseUrl`；為空時 fallback `DEFAULT_CANVAS_URL`＝`https://hkust-gz.instructure.com`，此時連結文字明講「HKUST(GZ) Canvas」並附其他學校說明 `wCanvasOtherSchool`：打開網址結尾是 .instructure.com 的學校 Canvas）。**連結文字與目標出自同一份狀態**（`_welcomeCanvasBase`）：開教學、進第 2 頁、點擊當下、同步落地後都重讀 `canvasBaseUrl` 並重畫該行（`renderWelcomeCanvasLine`），不會寫著 HKUST(GZ) 卻開別校（review OB-3）。開分頁後「武裝」10 分鐘——`storage.onChanged` 只看 `lastSync` 落地（未登入時 API 401、lastSync 不動，不會過早跳回）→ `loadData()` 刷新、關閉開出的分頁、聚焦回 dashboard、連結旁顯示「✓ 已同步」；輔以 `tabs.onUpdated` 在 Canvas 分頁載入完成時補發手動 SYNC（繞過 5 分鐘節流）。chrome.* 呼叫皆守衛（dev harness 只 stub 部分 API）
 - canvas link 用**事件委派**綁在 overlay 上（`applyWelcomeTranslations` 以 innerHTML 重建該連結，直接綁定會失效）
@@ -417,7 +462,7 @@ sidebar（300px）+ main-content（flex:1）
 6. `_currentData` 是全域快取；頁面切換時用 `_currentData` 同步渲染，不要再呼叫 `loadData()`（避免空白閃爍）
 7. `courseNames` 只影響顯示層，Canvas API 呼叫仍使用原始 `course.id`，不受自訂名稱影響
 8. `field-sizing: content`（Chrome 123+）用於 inline 重命名輸入框自動縮放
-9. 完成標記動畫：勾選後不立即重繪，該列跑 1.5 秒撤銷窗口＋碎點爆才移除（`COMPLETE_DELAY_MS = 1500`）。`dashboard.js` 有一個**常駐** `storage.onChanged` 監聽器（QA P1-3）：所有畫面相關 key 的新值一律併進 `_currentData`（`_mergeIntoCurrentData`；事件依寫入順序送達，最後收斂到 storage 真值）；本頁 `updateShared` 寫出的回聲（`_selfWrites`，記錄與比對一律用 `_canonJson`＝物件 key 遞迴排序後的 JSON：真 Chrome storage 讀回的物件 key 依字典序，不等於寫入時的插入順序）只併資料、不重繪，所以寫入 `manualDone` 不會打斷動畫；來自別處（背景同步、popup、其他分頁）的變更 → `requestRefresh()`，等 `isUiIdle()`（無拖曳、無撤銷窗口／碎點爆／落點飛入／頁面滑動／課程 morph、焦點不在輸入框、無 modal 開著；`.completing`／`.bursting`／`.drag-clone`／`.page-slider` 只算畫面上看得到的〔`getClientRects()` 非空〕——撤銷窗口或碎點爆中導覽離開時，該列/卡會殘留在已 `display:none` 的詳情或 main-section 直到該容器下次重繪，不能因此永遠擋住刷新）才 `refreshView()`：以 `_currentData` 原地 `render()`（不重讀 storage），並還原捲動、已隱藏區開合、展開的描述、成績計算器開合與焦點（自訂作業新增/編輯/刪除存檔後也走 `refreshView()`，不 `loadData()`——在已隱藏區編輯不會整區收起）；尚未以資料渲染過（首次同步落地）或資料被清空則走 `loadData()`。武裝期間的「登入 Canvas 自動跳回」也在同一個監聽器裡（`lastSync` 落地 → `_returnToDashboard()`）。時間驅動：header「N 分鐘前同步」每 60 秒重算（`refreshHeaderMeta`）；分頁回到前景且距上次 `render()`（`_lastRenderAt`）超過 60 秒就重繪；前景時每 5 分鐘重繪一次（逾期分組、7/30 天邊界、考試結束都隨時間變）。dev harness 的 storage stub 會在 set/remove 實際改值時發 `onChanged`，並比照 Chrome 把讀回／事件中的物件 key 遞迴排序（只差 key 順序的寫入不發事件）
+9. 完成標記動畫：勾選後不立即重繪，該列跑 1.5 秒撤銷窗口＋碎點爆才移除（`COMPLETE_DELAY_MS = 1500`）。`dashboard.js` 有一個**常駐** `storage.onChanged` 監聽器（QA P1-3）：所有畫面相關 key 的新值一律併進 `_currentData`（`_mergeIntoCurrentData`；事件依寫入順序送達，最後收斂到 storage 真值）；本頁 `updateShared` 寫出的回聲（`_selfWrites`，記錄與比對一律用 `_canonJson`＝物件 key 遞迴排序後的 JSON：真 Chrome storage 讀回的物件 key 依字典序，不等於寫入時的插入順序）只併資料、不重繪，所以寫入 `manualDone` 不會打斷動畫；來自別處（背景同步、popup、其他分頁）的變更 → `requestRefresh()`，等 `isUiIdle()`（無拖曳；**任何一項還在撤銷窗內**〔`_completeTimers` 非空〕——重建會把其他項的倒數一起清掉；無離場／碎點爆／落點飛入〔`.completing`／`.bursting`／`.drag-clone` 只算畫面上看得到的，`getClientRects()` 非空——撤銷窗口中導覽離開時，該列/卡會殘留在已 `display:none` 的詳情或 main-section 直到該容器下次重繪，不能因此永遠擋住刷新〕；FLIP 補位（WAAPI id `reflow`）與頁面切換淡入（`_pageAnim`）沒在跑；沒有課程 morph（`view-transition-name` 殘留連續超過 2 秒不算）；焦點不在輸入框；無 modal 開著）才 `refreshView()`：以 `_currentData` 原地 `render()`（不重讀 storage），並還原捲動、已隱藏區開合、展開的描述、成績計算器開合（`openPanelInstant`，不重播展開）與焦點（`_focusSelector` 對沒有 id 的列內控制項——拖曳握把、描述開關、組標題——冠上所在列／組的 selector，焦點回到同一列而不是第一列）（自訂作業新增/編輯/刪除存檔後也走 `refreshView()`，不 `loadData()`——在已隱藏區編輯不會整區收起）；尚未以資料渲染過（首次同步落地）或資料被清空則走 `loadData()`。武裝期間的「登入 Canvas 自動跳回」也在同一個監聽器裡（`lastSync` 落地 → `_returnToDashboard()`）。時間驅動：header「N 分鐘前同步」每 60 秒重算（`refreshHeaderMeta`）；分頁回到前景且距上次 `render()`（`_lastRenderAt`）超過 60 秒就重繪；前景時每 5 分鐘重繪一次（逾期分組、7/30 天邊界、考試結束都隨時間變）。dev harness 的 storage stub 會在 set/remove 實際改值時發 `onChanged`，並比照 Chrome 把讀回／事件中的物件 key 遞迴排序（只差 key 順序的寫入不發事件）
 10. AI 分析結果：background（`analysisRunner` 的 `recordOutcome`）以 read-modify-write 寫入 `customWeights`；dashboard 由第 9 條的常駐 `storage.onChanged` 併進 `_currentData`，閒置時重繪並保留展開狀態（不另外重繪）。background 另送 `GRADING_WEIGHTS_UPDATED` 訊息，dashboard 只用它刷新開著的 AI 設定 modal 狀態列。**AI 程式碼隔離**：AI 邏輯一律放 `extension/ai/`（modal 在 `dashboard/aiSettings.js`），`dashboard.js` 只保留這些接點——設定選單 click（`DueAiSettings.open`）、`applyUILanguage` 末尾一行、Esc `closers`、a11y 陣列（`setupModalA11y`）、`MODAL_OVERLAY_IDS`、`GRADING_WEIGHTS_UPDATED` 監聽，以及 2026-10-25 的 D2／D3：`loadData` 讀 `gradingAnalysis`／`aiConfig`、onChanged 更新 `_aiConfigured`、`isAiConfigured`／`isAiCustomWeights`／`weightSourceHtml`（規則都呼叫 `DueGradingRules`，不在 dashboard 重寫）、清除鈕文字與 `AI_RUN_NOW`；反方向 `aiSettings.js` 只借用 dashboard 的 `trackBackdropPress`／`isBackdropClick`（`typeof` 守衛）
 11. 單元測試（全部，無依賴）：`for t in extension/background.test.js extension/dashboard/*.test.js extension/ai/*.test.js; do node $t; done`。`background.test.js` 以 vm 載入 background.js，`importScripts` 與 AI 模組入口（`scheduleGradingAnalysis`／`handleAiMessage`）在測試裡是 stub，AI 模組本身由 `extension/ai/*.test.js` 測
 

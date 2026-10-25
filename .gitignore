@@ -1,2 +1,16 @@
 # 打包產物（release zip），不進版控
 *.zip
+
+# macOS
+.DS_Store
+
+# Claude Code 本機檔（權限、預覽設定、worktree 整份副本）
+.claude/settings.local.json
+.claude/launch.json
+.claude/worktrees/
+
+# 內部開發文件只留本機，不進公開 repo（QA 報告與截圖、設計 spec／plan、動效稽核報告）。
+# 程式註解與 CLAUDE.md 引用的這些路徑在本機仍可開
+docs/qa/
+docs/superpowers/
+docs/motion-review-*.md
