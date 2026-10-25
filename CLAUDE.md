@@ -194,6 +194,7 @@ GET /api/v1/accounts/self、/api/v1/accounts/:account_id
 - 監聽 `webNavigation.onCompleted`（filter `{ hostSuffix: '.instructure.com' }`、只看 `frameId === 0`）— 使用者造訪 Canvas 時偵測網址並自動同步：同一網址 5 分鐘節流（記憶體 `_lastAutoSyncAt`，每次成功同步更新；SW 重啟由 storage 的 `lastSync` 回填）；從未同步過（`_lastAutoSyncAt` 為 0）或首次採用新網址立即同步；手動 `SYNC` 不受節流限制
 - 響應訊息：
   - `SYNC` → `{ success:true, failedCourses:[{id,name,error}] }`／`{ success:false, error }`
+  - `AUTO_SYNC`（popup 每次打開送，不等同步結束）→ 與造訪 Canvas 同一套 5 分鐘節流（`autoSyncDue`）：`{ started:true }`（背景 `runAutoSync`）／`{ started:false, reason:'throttled'|'no-base' }`（`no-base`＝還沒有學校網址）
   - `GET_STATUS` → `{ lastSync, courseCount }`
   - `SET_CANVAS_BASE {origin}`（候選提示「切換到這裡」）→ 成功 `{ success:true, failedCourses }`；失敗 `{ success:false, reason, error }`（網址、資料、候選都不動）：`reason:'not-logged-in'`＝`users/self` 未通過（未登入該校）；其餘一律 `'sync-failed'`（非 Canvas 網址、課程清單 4xx/5xx／網路錯誤、新校資料寫入失敗、切換途中網址被換掉／storage 被清掉）。dashboard 依 reason 選失敗說明
   - `IGNORE_CANVAS_BASE {origin}`（「忽略」）→ `{ success:true }`／storage 寫入失敗 `{ success:false, error }`：origin 加進 `ignoredCanvasOrigins`，候選是它就清掉（dashboard 送出即收起提示、不看回應）
@@ -246,6 +247,7 @@ GET /api/v1/accounts/self、/api/v1/accounts/:account_id
 - Claude 用量 ↻ 失敗時，header 下方 `#claude-usage-note`（`role=status`）顯示 `claudeRefreshMissing`（reason `no-tab`）或 `claudeRefreshFailed`，4 秒後清空；舊用量保留
 - ↻ 忙碌時圖示旋轉、`aria-disabled`（不用 disabled，焦點留在按鈕上）；手動重新整理成功時 chip 文字 blur 交換一次（#49）。**重新整理用量不重建任務清單**（不再 `loadData()`），進行中的撤銷窗不會被砍掉（#40）
 - 打開 popup 只讀一次 storage（`POPUP_KEYS`）：語言、用量顯示設定與清單在同一個 callback 一起套上，不會先翻一次預設 UI（#51）；沒有進場動畫
+- **打開 popup 就背景同步**（2026-10-25）：送 `AUTO_SYNC`（5 分鐘節流，見 background.js 訊息），使用者接著開 Dashboard 時資料已是新的；同步在 SW 裡跑，popup 關掉也會跑完。同步在 popup 還開著時落地（`lastSync` 變了）→ `refreshTaskListIfIdle` 只重畫清單；撤銷窗、收合、碎點進行中或焦點在清單裡（`isTaskListBusy`）就不動
 - hover 只在 `(hover: hover) and (pointer: fine)` 下作用；頂部兩顆按鈕按下只縮放、hover 不上浮（#24）；減少動態：收合只淡出、沒有碎點、火焰停住、↻ 改脈動、按壓不縮放、badge 寬度直接到位
 - 開啟 Dashboard 按鈕（同步狀態／上次同步時間目前不顯示——同步錯誤 UI 屬 QA P0-3，決策不做）
 

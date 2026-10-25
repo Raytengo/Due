@@ -737,12 +737,31 @@ const POPUP_KEYS = ['uiLanguage', 'showClaudeUsageInPopup', 'courses', 'assignme
 
 // 完成標記不在這裡快取：勾選/撤銷走 writeDone 的 read-modify-write（讀 storage 最新值），不拿開啟當下的快照覆寫
 function renderPopup(data) {
+  renderTaskList(data);
+  renderClaudeUsage(data.claudeUsage || null);
+}
+
+function renderTaskList(data) {
   const courseMap = buildCourseMap(data.courses);
   // Canvas ∪ 自訂作業（與 dashboard render 同一合併；自訂作業同套隱藏／完成／7 天與逾期窗規則）
   const assignments = DueCustomAssignments.mergeAssignmentMaps(data.assignments || {}, data.customAssignments || {});
   const groups = getTasks(assignments, courseMap, data.manualDone || {}, data.manualUndone || {}, data.manualShown || {}, data.manualHidden || {});
   renderTasks(groups, data.courseNames || {});
-  renderClaudeUsage(data.claudeUsage || null);
+}
+
+// 打開 popup 時觸發的背景同步若在 popup 還開著時落地（lastSync 變了）→ 清單閒置才重讀重畫：
+// 撤銷窗、收合、碎點進行中，或焦點在清單裡（鍵盤操作中）就不動——重建會砍掉撤銷窗、搶走焦點；下次打開 popup 就是新的
+function isTaskListBusy() {
+  if (document.querySelector('#task-list .completing, #task-list .collapsing, #burst-layer > *')) return true;
+  const ae = document.activeElement;
+  return !!(ae && ae.closest && ae.closest('#task-list'));
+}
+
+function refreshTaskListIfIdle() {
+  if (isTaskListBusy()) return;
+  chrome.storage.local.get(POPUP_KEYS, (data) => {
+    if (!isTaskListBusy()) renderTaskList(data);
+  });
 }
 
 function openDashboard() {
@@ -799,6 +818,7 @@ document.getElementById('claude-usage-refresh').addEventListener('click', trigge
 
 chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName !== 'local') return;
+  if (changes.lastSync && changes.lastSync.newValue) refreshTaskListIfIdle();
   if (changes.claudeUsage) {
     const usage = changes.claudeUsage.newValue || null;
     renderClaudeUsage(usage, { swap: !!usage && takeClaudeSwap() });
@@ -818,3 +838,9 @@ chrome.storage.local.get(POPUP_KEYS, (data) => {
 
   renderPopup(data);
 });
+
+// 打開 popup 就在背景同步 Canvas（使用者多半接著開 Dashboard，到時資料已是新的）。
+// background 套用與造訪 Canvas 相同的 5 分鐘節流；不等結果（同步在 service worker 裡跑，popup 關掉也會跑完）
+try {
+  chrome.runtime.sendMessage({ type: 'AUTO_SYNC' }).catch(() => {});
+} catch (_) { /* 擴充功能剛重新載入、訊息通道不在：這次不同步，不影響 popup */ }

@@ -202,6 +202,42 @@ test('webNavigation：冷啟動時同一學校、5 分鐘內同步過 → 仍套
   assert.equal(stats.calls.length, 0, `不該發請求，實際：${stats.calls.join(', ')}`);
 });
 
+// ── popup 打開時的自動同步（AUTO_SYNC）：與造訪 Canvas 同一套 5 分鐘節流 ──
+test('AUTO_SYNC：5 分鐘內同步過（含冷啟動）→ 回 throttled，不發請求', async () => {
+  const { fetch, stats } = makeFetch([coursesRoute([101]), ...okCourseRoutes]);
+  const bg = loadBackground({
+    stored: { canvasBaseUrl: BASE, lastSync: new Date().toISOString() },
+    storageDelayMs: 30,
+    fetch,
+  });
+  const resp = await bg.send({ type: 'AUTO_SYNC' });
+  assert.deepEqual(resp, { started: false, reason: 'throttled' });
+  await sleep(50);
+  assert.equal(stats.calls.length, 0, `不該發請求，實際：${stats.calls.join(', ')}`);
+});
+
+test('AUTO_SYNC：上次同步超過 5 分鐘 → 立即回 started，背景同步寫入資料', async () => {
+  const { fetch } = makeFetch([coursesRoute([101]), ...okCourseRoutes]);
+  const old = new Date(Date.now() - 6 * 60 * 1000).toISOString();
+  const bg = loadBackground({ stored: { canvasBaseUrl: BASE, lastSync: old }, fetch });
+  const resp = await bg.send({ type: 'AUTO_SYNC' });
+  assert.deepEqual(resp, { started: true });
+  await until(() => bg.store.lastSync && bg.store.lastSync !== old);
+  assert.deepEqual(bg.store.assignments['101'], [{ id: 1010, name: 'HW' }]);
+  await sleep(30);   // 節流時間戳在寫入、重讀候選之後才更新
+  // 剛同步完 → 下一次打開 popup 被節流
+  assert.deepEqual(await bg.send({ type: 'AUTO_SYNC' }), { started: false, reason: 'throttled' });
+});
+
+test('AUTO_SYNC：還沒有學校網址（從未造訪 Canvas）→ 回 no-base，不發請求', async () => {
+  const { fetch, stats } = makeFetch([coursesRoute([101]), ...okCourseRoutes]);
+  const bg = loadBackground({ stored: {}, fetch });
+  const resp = await bg.send({ type: 'AUTO_SYNC' });
+  assert.deepEqual(resp, { started: false, reason: 'no-base' });
+  await sleep(30);
+  assert.equal(stats.calls.length, 0);
+});
+
 // ── P0-4b：同步進行中再收到 SYNC ──
 test('SYNC 重入：進行中的同步失敗時，後到的 SYNC 也要回報失敗（不能立刻回成功）', async () => {
   const { fetch } = makeFetch([[/\/api\/v1\/courses\?/, () => res(401)]], { delayMs: 20 });
