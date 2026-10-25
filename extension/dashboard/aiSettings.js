@@ -12,7 +12,7 @@
       menuItem: 'AI 分析設定',
       title: 'AI 分析設定',
       // 揭露：送什麼、送去哪、用誰的額度（CWS Prominent Disclosure；QA AI P0-2）。{provider} 隨表單上的供應商替換
-      consent: '儲存後與每次同步，會把還沒有權重的課的大綱、PDF 與檔名從你的瀏覽器直接送到 {provider}（依其條款處理，免費方案可能用來改進模型），用你自己的額度。開發者收不到。',
+      consent: '儲存後與每次同步，會把還沒有權重的課的大綱、PDF 與檔名從你的瀏覽器直接送到 {provider}用你自己的額度。開發者收不到。',
       providerLabel: '供應商',
       apiKeyLabel: 'API key',
       modelLabel: '模型 ID',
@@ -48,7 +48,7 @@
     'zh-CN': {
       menuItem: 'AI 分析设置',
       title: 'AI 分析设置',
-      consent: '保存后与每次同步，会把还没有权重的课程的大纲、PDF 和文件名从你的浏览器直接发送到 {provider}（按其条款处理，免费方案可能用来改进模型），用你自己的额度。开发者收不到。',
+      consent: '保存后与每次同步，会把还没有权重的课程的大纲、PDF 和文件名从你的浏览器直接发送到 {provider}用你自己的额度。开发者收不到。',
       providerLabel: '供应商',
       apiKeyLabel: 'API key',
       modelLabel: '模型 ID',
@@ -84,7 +84,7 @@
     en: {
       menuItem: 'AI analysis settings',
       title: 'AI analysis settings',
-      consent: 'On save and each sync, syllabi, PDFs and file names of courses without weights go straight from your browser to {provider} (under its terms; free tiers may train on them), on your own quota. The developer never sees them.',
+      consent: 'On save and each sync, syllabi, PDFs and file names of courses without weights go straight from your browser to {provider} on your own quota. The developer never sees them.',
       providerLabel: 'Provider',
       apiKeyLabel: 'API key',
       modelLabel: 'Model ID',
