@@ -583,7 +583,7 @@
       opacity: 1;
     }
 
-    /* 手繪繞圈箭頭＋小字（從說明框指到第二個洞） */
+    /* 手繪繞圈箭頭（從說明框指到第二個洞） */
     .tour-sketch {
       position: fixed;
       inset: 0;
@@ -620,18 +620,6 @@
       stroke-linejoin: round;
     }
 
-    /* 小字：米白描邊墊在字後面（paint-order），壓在變暗的介面上也讀得到 */
-    .tour-sketch-label {
-      fill: var(--orange);
-      stroke: var(--bg);
-      stroke-width: 4px;
-      stroke-linejoin: round;
-      paint-order: stroke;
-      font-family: 'Source Serif 4', Georgia, serif;
-      font-style: italic;
-      font-size: 15px;
-      dominant-baseline: middle;
-    }
 
     /* 這一步看就好（主畫面、圓餅、⚙）：亮框裡也不給點 */
     .tour-root.is-blocking .tour-ring {

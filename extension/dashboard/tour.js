@@ -31,7 +31,6 @@
       dragBody: '按住名稱後的 ⋮⋮，往下拖進「已隱藏」就算完成，拖回來就還原。',
       aiTitle: '讓 AI 幫你填評分比重',
       aiBody: '在 ⚙ 的「AI 分析設定」貼上你的 API key。',
-      aiPoint: '會自動填在這裡',
     },
     'zh-CN': {
       counter: '{n} / {total}',
@@ -49,7 +48,6 @@
       dragBody: '按住名称后的 ⋮⋮，往下拖进「已隐藏」就算完成，拖回来就还原。',
       aiTitle: '让 AI 帮你填评分比重',
       aiBody: '在 ⚙ 的「AI 分析设置」贴上你的 API key。',
-      aiPoint: '会自动填在这里',
     },
     en: {
       counter: '{n} / {total}',
@@ -67,7 +65,6 @@
       dragBody: 'Grab the ⋮⋮ after a name and drag it down into “Hidden” to mark it done; drag it back to undo.',
       aiTitle: 'Let AI fill in grade weights',
       aiBody: 'Paste your API key in ⚙ → “AI analysis settings”.',
-      aiPoint: 'filled in here',
     },
   };
 
@@ -106,7 +103,7 @@
   //   next：按「下一步」時導覽代做的事；before：顯示這一步前要先到的畫面
   //   interactive：亮框內可不可以點（預設可以）；reveal：這一步期間加在 <html> 上的 class（亮出平常藏著的控制項）
   //   spot：使用者要點／要拖的那個小東西 → 主亮處改成圍著它的小圓（target 只用來等畫面、捲動）
-  //   point：另外挖一個虛線框「指給你看」；pointArrow：再從說明框畫一條手繪繞圈箭頭過去，旁邊寫 pointLabel
+  //   point：另外挖一個虛線框「指給你看」；pointArrow：再從說明框畫一條手繪繞圈箭頭過去
   //   resolve(state)：依這一趟的狀況換文案／目標
   const STEPS = [
     {
@@ -149,7 +146,6 @@
       interactive: false,
       point: `${DETAIL} .detail-left-panel`,
       pointArrow: true,
-      pointLabel: 'aiPoint',
     },
   ];
 
@@ -261,17 +257,15 @@
     beacon.innerHTML = '<span></span><span></span>';
     root.appendChild(beacon);
 
-    // 手繪繞圈箭頭（point 用）：路徑＋箭頭兩撇＋旁邊一行手寫感的小字
+    // 手繪繞圈箭頭（point 用）：路徑＋箭頭兩撇
     const sketch = svgEl('svg', { class: 'tour-sketch', 'aria-hidden': 'true' });
     // 線下面墊一條米白淡底（halo），壓在變暗的介面文字上也看得清楚
     const sketchHalo = svgEl('path', { class: 'tour-sketch-halo' });
     const sketchPath = svgEl('path', { class: 'tour-sketch-line' });
     const sketchHead = svgEl('path', { class: 'tour-sketch-line' });
-    const sketchLabel = svgEl('text', { class: 'tour-sketch-label' });
     sketch.appendChild(sketchHalo);
     sketch.appendChild(sketchPath);
     sketch.appendChild(sketchHead);
-    sketch.appendChild(sketchLabel);
     root.appendChild(sketch);
 
     const pop = document.createElement('div');
@@ -300,7 +294,7 @@
     ring.addEventListener('click', nudge);   // 只有 interactive:false 時 ring 才吃得到點擊
     pop.querySelector('.tour-close').addEventListener('click', () => end());
     pop.querySelector('.tour-next').addEventListener('click', () => next());
-    return { root, hole, hole2, ring, ring2, beacon, pop, blockers, sketch, sketchHalo, sketchPath, sketchHead, sketchLabel };
+    return { root, hole, hole2, ring, ring2, beacon, pop, blockers, sketch, sketchHalo, sketchPath, sketchHead };
   }
 
   // 點到被擋住的地方：說明框輕推一下（減少動態：不動，只把焦點拉回說明框）
@@ -337,7 +331,6 @@
     pop.querySelector('.tour-hint').hidden = !actionable;
     pop.querySelector('.tour-hint-text').textContent = t('autoNext');
     pop.querySelector('.tour-next-label').textContent = last ? t('done') : t('next');
-    _state.sketchLabel.textContent = cur.pointArrow && cur.pointLabel ? t(cur.pointLabel) : '';
     setReveal(cur.reveal);
     _state.root.classList.toggle('is-blocking', cur.interactive === false);
     _state.root.classList.toggle('is-actionable', actionable);
@@ -379,7 +372,7 @@
   const SKETCH_MIN_RISE = 150;
   const SKETCH_MIN_RUN = 120;
   function drawSketch(popBox, b) {
-    const { sketchHalo, sketchPath, sketchHead, sketchLabel } = _state;
+    const { sketchHalo, sketchPath, sketchHead } = _state;
     const f = (v) => v.toFixed(1);
     const sx = popBox.x + popBox.w + 8;
     const sy = popBox.y + Math.min(34, popBox.h / 2);
@@ -388,7 +381,6 @@
     let ex;
     let ey;
     let c2;          // 最後一段的第二個控制點（決定箭頭方向）
-    let label;       // 小字位置
     if (b.x - sx >= SKETCH_MIN_RUN) {
       // 由左往右：終點在框左緣，高度盡量跟起點齊（夾在框內），圈往上鼓
       ex = b.x - 12;
@@ -402,7 +394,6 @@
         `C ${f(P.x + r * 1.7)} ${f(P.y - r * 2.5)} ${f(P.x - r * 1.7)} ${f(P.y - r * 2.5)} ${f(P.x + r * 0.35)} ${f(P.y)}`,
         `C ${f(P.x + r * 2.2)} ${f(P.y + r * 0.5)} ${f(c2.x)} ${f(c2.y)} ${f(ex)} ${f(ey)}`,
       ].join(' ');
-      label = { x: ex - 10, y: ey - 20, anchor: 'end' };
     } else if (sy - below >= SKETCH_MIN_RISE) {
       // 由下往上：終點在框下緣，x 往起點右邊錯開（拐彎要有空間）
       ex = clampN(sx + 110, b.x + 24, b.x + b.w - 24);
@@ -417,7 +408,6 @@
         `C ${f(P.x + r * 2.4)} ${f(P.y - r * 1.8)} ${f(P.x + r * 2.4)} ${f(P.y + r * 1.6)} ${f(P.x)} ${f(P.y - r * 0.4)}`,
         `C ${f(P.x - r * 0.6)} ${f(P.y - r * 2.2)} ${f(c2.x)} ${f(c2.y)} ${f(ex)} ${f(ey)}`,
       ].join(' ');
-      label = { x: ex + 16, y: ey + 16 };
     } else if (sy >= b.y + b.h * 0.5 && sx <= b.x + b.w + 40 && Math.max(b.x + b.w + 12, sx) + 64 + 40 < window.innerWidth) {
       // 由右往左：終點在框右緣偏下，先往右走、在框右邊往上繞一圈，再往左指進去
       ex = b.x + b.w + 12;
@@ -432,16 +422,11 @@
         `C ${f(P.x + r * 2.4)} ${f(P.y - r * 1.8)} ${f(P.x + r * 2.4)} ${f(P.y + r * 1.6)} ${f(P.x)} ${f(P.y - r * 0.4)}`,
         `C ${f(P.x - r * 0.4)} ${f(ey + 8)} ${f(c2.x)} ${f(c2.y)} ${f(ex)} ${f(ey)}`,
       ].join(' ');
-      label = { x: ex + 8, y: ey - 20 };
     } else {
-      // 說明框跟框貼太近，畫不出像樣的箭頭 → 不畫線，只在虛線框上緣右側標字
+      // 說明框跟框貼太近，畫不出像樣的箭頭 → 不畫線，只留虛線框
       sketchPath.setAttribute('d', '');
       sketchHalo.setAttribute('d', '');
       sketchHead.setAttribute('d', '');
-      const above = b.y - 12 >= EDGE + 8;
-      sketchLabel.setAttribute('x', f(b.x + b.w - 10));
-      sketchLabel.setAttribute('y', f(above ? b.y - 12 : b.y + 18));
-      sketchLabel.setAttribute('text-anchor', 'end');
       return;
     }
     sketchPath.setAttribute('d', d);
@@ -457,15 +442,12 @@
       return `${f(ex + wx)} ${f(ey + wy)}`;
     };
     sketchHead.setAttribute('d', `M ${wing(30)} L ${f(ex)} ${f(ey)} L ${wing(-30)}`);
-    sketchLabel.setAttribute('x', f(label.x));
-    sketchLabel.setAttribute('y', f(label.y));
-    sketchLabel.setAttribute('text-anchor', label.anchor || 'start');
   }
 
-  // 每次換步：箭頭從起點畫到終點，小字隨後淡入（減少動態：直接出現）
+  // 每次換步：箭頭從起點畫到終點（減少動態：直接出現）
   function playSketch() {
-    const { sketchHalo, sketchPath, sketchHead, sketchLabel } = _state;
-    [sketchHalo, sketchPath, sketchHead, sketchLabel].forEach((n) => n.getAnimations().forEach((a) => a.cancel()));
+    const { sketchHalo, sketchPath, sketchHead } = _state;
+    [sketchHalo, sketchPath, sketchHead].forEach((n) => n.getAnimations().forEach((a) => a.cancel()));
     if (reduced()) return;
     const len = sketchPath.getAttribute('d') ? sketchPath.getTotalLength() : 0;
     [sketchHalo, sketchPath].forEach((n) => n.animate(
@@ -473,7 +455,6 @@
       { duration: 700, delay: 150, easing: 'cubic-bezier(0.65, 0, 0.35, 1)', fill: 'backwards' },
     ));
     sketchHead.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 150, delay: 820, fill: 'backwards' });
-    sketchLabel.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 300, delay: 850, fill: 'backwards' });
   }
 
   // 依目標位置擺挖洞、亮框、四塊 blocker、說明框、箭頭（每幀量；位置沒變就不寫 DOM）
