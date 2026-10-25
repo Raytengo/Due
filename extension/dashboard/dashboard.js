@@ -145,11 +145,17 @@ const I18N = {
     daysAgo: '天前同步',
     // empty states
     // 空狀態：從未同步 vs 已同步但沒有進行中的課程（QA P2-6）
-    emptyNeverTitle: '尚未同步',
-    emptyNeverBody: '登入你學校的 Canvas，Due 會自動同步課程與作業，待辦就會出現在這裡。',
+    emptyNeverTitle: '先登入 Canvas',
+    emptyNeverBody: 'Due 借用瀏覽器裡的 Canvas 登入狀態，自動同步課程與作業。登入完成後會自動跳回這裡。',
     emptyNoCoursesTitle: '目前沒有進行中的課程',
     emptyNoCoursesBody: 'Due 只顯示 Canvas 上進行中的課程。學期開始或選課生效後，下次打開 Canvas 就會自動出現。',
     emptyOpenCanvas: '前往 {canvas} ↗',
+    emptyLoginCanvas: '登入 {canvas} ↗',
+    // 嵌入介面的一次性提示（取代安裝時自動彈出的 5 頁教學；看過記在 storage 的 seenHints）
+    hintGotIt: '知道了',
+    hintDrag: '拖曳作業名稱後的 {grip}，可以把作業移到下方「已完成」或「已隱藏」。',
+    hintPin: '把 Due 釘到工具列：點瀏覽器右上角的 {puzzle}，再點 Due 旁的 {pin}。',
+    hintIconGrip: '握把', hintIconPuzzle: '擴充功能圖示', hintIconPin: '圖釘',   // 提示裡圖示的讀屏文字
     needCourses: '同步課程後才能使用',
     // badges
     pendingItems: '件待繳',
@@ -328,11 +334,16 @@ const I18N = {
     minutesAgo: '分钟前同步',
     hoursAgo: '小时前同步',
     daysAgo: '天前同步',
-    emptyNeverTitle: '尚未同步',
-    emptyNeverBody: '登录你学校的 Canvas，Due 会自动同步课程和作业，待办就会出现在这里。',
+    emptyNeverTitle: '先登录 Canvas',
+    emptyNeverBody: 'Due 借用浏览器里的 Canvas 登录状态，自动同步课程和作业。登录完成后会自动跳回这里。',
     emptyNoCoursesTitle: '目前没有进行中的课程',
     emptyNoCoursesBody: 'Due 只显示 Canvas 上进行中的课程。学期开始或选课生效后，下次打开 Canvas 就会自动出现。',
     emptyOpenCanvas: '前往 {canvas} ↗',
+    emptyLoginCanvas: '登录 {canvas} ↗',
+    hintGotIt: '知道了',
+    hintDrag: '拖动作业名称后的 {grip}，可以把作业移到下方「已完成」或「已隐藏」。',
+    hintPin: '把 Due 固定到工具栏：点浏览器右上角的 {puzzle}，再点 Due 旁的 {pin}。',
+    hintIconGrip: '拖动手柄', hintIconPuzzle: '扩展程序图标', hintIconPin: '图钉',
     needCourses: '同步课程后才能使用',
     pendingItems: '件待交',
     urgentItems: '件紧急',
@@ -497,11 +508,16 @@ const I18N = {
     minutesAgo: 'min ago',
     hoursAgo: 'hr ago',
     daysAgo: 'd ago',
-    emptyNeverTitle: 'Not synced yet',
-    emptyNeverBody: "Log in to your school's Canvas and Due syncs your courses and assignments automatically. Your to-dos will show up here.",
+    emptyNeverTitle: 'Sign in to Canvas to start',
+    emptyNeverBody: "Due uses your browser's Canvas sign-in to sync your courses and assignments. Once you're signed in, you'll be brought right back here.",
     emptyNoCoursesTitle: 'No active courses right now',
     emptyNoCoursesBody: "Due only shows courses that are active on Canvas. Once your term starts or your enrollment is confirmed, they'll appear the next time you open Canvas.",
     emptyOpenCanvas: 'Open {canvas} ↗',
+    emptyLoginCanvas: 'Sign in to {canvas} ↗',
+    hintGotIt: 'Got it',
+    hintDrag: 'Drag the {grip} after an assignment name to move it to Done or Hidden below.',
+    hintPin: 'Pin Due to your toolbar: click {puzzle} at the top right of Chrome, then {pin} next to Due.',
+    hintIconGrip: 'drag handle', hintIconPuzzle: 'Extensions icon', hintIconPin: 'pin',
     needCourses: 'Available once your courses sync',
     pendingItems: ' pending',
     urgentItems: ' urgent',
@@ -746,6 +762,7 @@ function applyUILanguage() {
   setText('canvas-candidate-label', 'canvasCandidateLabel');
   setText('canvas-candidate-ignore', 'canvasCandidateIgnore');
   renderCanvasCandidate();   // 「切換到這裡／切換中…」與失敗說明依狀態而定
+  renderPinHint();
   setText('nav-week-label', 'tabWeek');
   setText('nav-courses-label', 'tabCourses');
   setText('btn-add-assignment', 'addAssignment');
@@ -1883,6 +1900,7 @@ function render(data) {
   setHeaderMeta(...headerMetaParts());
   _lastRenderAt = Date.now();
   setNoCoursesMode(false);
+  renderPinHint();
 
   renderNav(courses, assignments);
   updateSideNav();
@@ -3562,6 +3580,7 @@ function renderCourseDetailSection(course, asgns, groups, scores) {
         <div class="detail-right-panel">
           ${gradeCalcHtml}
           <div class="detail-assignments-label" tabindex="-1">${esc(tr('listAssignment'))}</div>
+          ${dragHintHtml(asgns)}
           <div class="detail-assignments-list" data-course-id="${course.id}" data-drophint="${esc(tr('dropToShow'))}">
             ${assignmentRows || detailListEmptyHtml()}
           </div>
@@ -3956,6 +3975,7 @@ function commitDrag(ctx, { viaKeyboard = false } = {}) {
     if (to === 'done' && !isDone(item)) setCompletion(ctx.id, ctx.courseId, true);
     if (to === 'list' && isDone(item)) setCompletion(ctx.id, ctx.courseId, false);
   }
+  markHintSeen('drag');   // 會拖了，提示功成身退（重繪時不再畫）
   rerenderDetailAndNav(ctx.courseId);
 
   const container = document.getElementById('course-detail-container');
@@ -4959,6 +4979,131 @@ document.getElementById('canvas-candidate-ignore')?.addEventListener('click', ()
   chrome.runtime.sendMessage({ type: 'IGNORE_CANVAS_BASE', origin: cand.origin }, () => void chrome.runtime.lastError);
 });
 
+// ── 嵌入介面的一次性提示（取代安裝時自動彈出的 5 頁教學）──
+// 使用者第一次真的碰到某個介面時，旁邊出現一行說明；按「知道了」或做過一次該動作就永遠不再出現。
+// 看過的記在 storage 的 seenHints（{ drag: true, pin: true }），不進 _currentData；多分頁共用，onChanged 時收掉已看過的。
+//   drag：課程詳情「作業」標題下（renderCourseDetailSection 畫，重繪自然跟著走；拖曳成功一次即視為看過）
+//   pin：側欄同步鍵上方（#pin-hint 靜態節點，renderPinHint 切換）；有資料後才出現，已釘選（chrome.action）就不出現
+const HINT_ICON_PUZZLE = '<svg class="hint-icon" xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19.439 7.85c-.049.322.059.648.289.878l1.568 1.568c.47.47.706 1.087.706 1.704s-.235 1.233-.706 1.704l-1.611 1.611a.98.98 0 0 1-.837.276c-.47-.07-.802-.48-.968-.925a2.501 2.501 0 1 0-3.214 3.214c.446.166.855.497.925.968a.979.979 0 0 1-.276.837l-1.61 1.61a2.404 2.404 0 0 1-1.705.707 2.402 2.402 0 0 1-1.704-.706l-1.568-1.568a1.026 1.026 0 0 0-.877-.29c-.493.074-.84.504-1.02.968a2.5 2.5 0 1 1-3.237-3.237c.464-.18.894-.527.967-1.02a1.026 1.026 0 0 0-.289-.877l-1.568-1.568A2.402 2.402 0 0 1 1.998 12c0-.617.236-1.234.706-1.704L4.23 8.77c.24-.24.581-.353.917-.303.515.077.877.528 1.073 1.01a2.5 2.5 0 1 0 3.259-3.259c-.482-.196-.933-.558-1.01-1.073-.05-.336.062-.676.303-.917l1.525-1.525A2.402 2.402 0 0 1 12 1.998c.617 0 1.234.236 1.704.706l1.568 1.568c.23.23.556.338.877.29.493-.074.84-.504 1.02-.968a2.5 2.5 0 1 1 3.237 3.237c-.464.18-.894.527-.967 1.02Z"/></svg>';
+const HINT_ICON_PIN = '<svg class="hint-icon" xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg>';
+let _seenHints = {};
+let _pinnedToToolbar = false;   // chrome.action.getUserSettings().isOnToolbar（拿不到就當沒釘）
+
+function hintSeen(key) {
+  return !!_seenHints[key];
+}
+
+// 記成看過（read-modify-write：其他分頁可能剛記了別的提示）
+function markHintSeen(key) {
+  if (hintSeen(key)) return;
+  _seenHints = { ..._seenHints, [key]: true };
+  chrome.storage.local.get(['seenHints'], (d) => {
+    const cur = (d && d.seenHints) || {};
+    if (cur[key]) return;
+    chrome.storage.local.set({ seenHints: { ...cur, [key]: true } });
+  });
+}
+
+// 提示文字裡的 {grip}／{puzzle}／{pin} 換成圖示（文字先 escape，再插入固定的 SVG）；
+// SVG 是 aria-hidden，旁邊補一段 sr-only 文字，讀屏才不會念成「拖曳作業名稱後的 ，」
+function hintTextHtml(key) {
+  const sr = (k) => `<span class="sr-only">${esc(tr(k))}</span>`;
+  return esc(tr(key))
+    .replace('{grip}', () => `<span class="hint-icon hint-icon-grip">${DRAG_GRIP_SVG}</span>${sr('hintIconGrip')}`)
+    .replace('{puzzle}', () => HINT_ICON_PUZZLE + sr('hintIconPuzzle'))
+    .replace('{pin}', () => HINT_ICON_PIN + sr('hintIconPin'));
+}
+
+function inlineHintHtml(key, textKey) {
+  return `<div class="inline-hint" data-hint="${key}" role="note">
+      <span class="inline-hint-text">${hintTextHtml(textKey)}</span>
+      <button type="button" class="inline-hint-close">${esc(tr('hintGotIt'))}</button>
+    </div>`;
+}
+
+// 課程詳情的拖曳提示：該課有作業、還沒看過才畫
+function dragHintHtml(asgns) {
+  return asgns.length && !hintSeen('drag') ? inlineHintHtml('drag', 'hintDrag') : '';
+}
+
+function renderPinHint() {
+  const box = document.getElementById('pin-hint');
+  if (!box) return;
+  const show = !hintSeen('pin') && !_pinnedToToolbar && !_noCoursesMode && !!(_currentData.courses || []).length;
+  box.hidden = !show;
+  if (!show) return;
+  box.querySelector('.inline-hint-text').innerHTML = hintTextHtml('hintPin');
+  box.querySelector('.inline-hint-close').textContent = tr('hintGotIt');
+}
+
+// 收起一則提示：高度收合＋淡出（減少動態：只淡出）後移除／隱藏；焦點在裡面就交給 fallback
+function dismissHintEl(el, { fallbackFocus = null } = {}) {
+  if (!el || el.dataset.leaving) return;
+  el.dataset.leaving = '1';
+  const hadFocus = el.contains(document.activeElement);
+  const finish = () => {
+    if (!el.id) { el.remove(); return; }
+    // 靜態節點（#pin-hint）只隱藏：收掉 forwards 的動畫與 inline 樣式，下次顯示是乾淨的
+    el.hidden = true;
+    delete el.dataset.leaving;
+    el.getAnimations().forEach((anim) => anim.cancel());
+    el.style.cssText = '';
+  };
+  if (hadFocus && fallbackFocus) fallbackFocus.focus({ preventScroll: true });
+  // 背景分頁（別的分頁按了「知道了」）不出幀、動畫不會跑完 → 直接收掉
+  if (document.hidden) { finish(); return; }
+  const cs = getComputedStyle(el);
+  const frames = reduceMotion()
+    ? [{ opacity: 1 }, { opacity: 0 }]
+    : [
+      { opacity: 1, height: `${el.offsetHeight}px`, marginBottom: cs.marginBottom, paddingTop: cs.paddingTop, paddingBottom: cs.paddingBottom },
+      { opacity: 0, height: '0px', marginBottom: '0px', paddingTop: '0px', paddingBottom: '0px' },
+    ];
+  el.style.overflow = 'hidden';
+  el.animate(frames, { duration: MOTION.disclosure.duration, easing: MOTION.disclosure.easing, fill: 'forwards' })
+    .finished.then(finish, finish);
+}
+
+// 「知道了」（委派：詳情的提示會隨重繪換節點）
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('.inline-hint-close');
+  if (!btn) return;
+  const el = btn.closest('.inline-hint');
+  const key = el && el.dataset.hint;
+  if (!key) return;
+  markHintSeen(key);
+  const fallback = key === 'pin'
+    ? document.getElementById('sync-btn')
+    : document.querySelector('#course-detail-container .detail-assignments-label');
+  dismissHintEl(el, { fallbackFocus: fallback });
+});
+
+// 別的分頁看過了 → 這裡也收起（不排整頁重繪）
+function applySeenHints(next) {
+  _seenHints = next || {};
+  document.querySelectorAll('.inline-hint[data-hint]').forEach((el) => {
+    if (hintSeen(el.dataset.hint) && !el.hidden) dismissHintEl(el);
+  });
+}
+
+// 已釘在工具列就不提示；使用者照著提示釘好了（Chrome 130+ 有事件）→ 提示自己收起並記成看過
+function refreshPinnedState() {
+  if (!chrome.action?.getUserSettings) return;
+  chrome.action.getUserSettings((s) => {
+    if (chrome.runtime.lastError) return;
+    _pinnedToToolbar = !!(s && s.isOnToolbar);
+    renderPinHint();
+  });
+}
+refreshPinnedState();
+chrome.action?.onUserSettingsChanged?.addListener?.((s) => {
+  _pinnedToToolbar = !!(s && s.isOnToolbar);
+  if (!_pinnedToToolbar) return;
+  markHintSeen('pin');
+  const box = document.getElementById('pin-hint');
+  if (box && !box.hidden) dismissHintEl(box);
+});
+
 // ── 空狀態（QA P2-6：#13 #44 #64 #171）──
 // 從未同步（無 lastSync）vs 已同步但沒有進行中的課程（有 lastSync、courses 為空）：文案不同，
 // 兩者都給明確的下一步「前往 Canvas」（已偵測到學校 → 該校；否則同教學：連 HKUST(GZ)，並說明其他學校怎麼做）
@@ -4972,7 +5117,7 @@ function renderEmptyState() {
     <div class="state-msg">
       <div class="big">${esc(tr(synced ? 'emptyNoCoursesTitle' : 'emptyNeverTitle'))}</div>
       <div class="body">${esc(tr(synced ? 'emptyNoCoursesBody' : 'emptyNeverBody'))}</div>
-      <button type="button" class="state-msg-action" id="empty-open-canvas">${esc(tr('emptyOpenCanvas').replace('{canvas}', () => label))}</button>
+      <button type="button" class="state-msg-action" id="empty-open-canvas">${esc(tr(synced ? 'emptyOpenCanvas' : 'emptyLoginCanvas').replace('{canvas}', () => label))}</button>
       ${canvasBaseUrl ? '' : `<div class="state-msg-sub">${esc(tr('wCanvasOtherSchool'))}</div>`}
     </div>`;
 }
@@ -5014,12 +5159,13 @@ document.getElementById('main-section')?.addEventListener('click', (e) => {
 // onRendered（選用）：畫面重建完之後呼叫——需要在重建後用 id 找回焦點的路徑用（自訂作業編輯／刪除，#8）
 function loadData(onRendered) {
   chrome.storage.local.get(
-    ['lastSync', 'schoolName', 'canvasBaseUrl', 'canvasBaseCandidate', 'courses', 'assignments', 'customAssignments', 'assignmentGroups', 'scores', 'courseNames', 'customWeights', 'manualDone', 'manualUndone', 'manualShown', 'manualHidden', 'gradeItemMap', 'gradingAnalysis', 'aiConfig'],
+    ['lastSync', 'schoolName', 'canvasBaseUrl', 'canvasBaseCandidate', 'courses', 'assignments', 'customAssignments', 'assignmentGroups', 'scores', 'courseNames', 'customWeights', 'manualDone', 'manualUndone', 'manualShown', 'manualHidden', 'gradeItemMap', 'gradingAnalysis', 'aiConfig', 'seenHints'],
     (raw) => {
       // 候選網址另存在 _canvasCandidate（不進 _currentData），在 _currentData 的 canvasBaseUrl 更新後再畫提示；
       // aiConfig 只取「有沒有設定 key」，不進 _currentData
-      const { canvasBaseCandidate, aiConfig, ...data } = raw || {};
+      const { canvasBaseCandidate, aiConfig, seenHints, ...data } = raw || {};
       _aiConfigured = isAiConfigured(aiConfig);
+      _seenHints = seenHints || {};   // 一次性提示（不進 _currentData）
       if (!data.courses || !data.courses.length) {
         currentView = 'grid';
         currentCourseId = null;
@@ -5032,6 +5178,7 @@ function loadData(onRendered) {
         _lastRenderAt = 0;   // 空狀態不是資料畫面；資料落地後走 loadData 完整路徑
         setHeaderMeta(...headerMetaParts());   // 「學校 · N 分鐘前同步／尚未同步」，與有資料時同一格式（QA #44）
         setNoCoursesMode(true);
+        renderPinHint();   // 沒資料時不提示釘選：先讓使用者登入
         document.getElementById('course-nav').innerHTML = '';
         document.getElementById('page-tabs').classList.remove('detail-mode');
         document.getElementById('page-tabs').style.display = '';
@@ -5527,6 +5674,7 @@ if (chrome.storage?.onChanged?.addListener) {
     });
     if (Object.keys(patch).length) _mergeIntoCurrentData(patch);
     if (changes.aiConfig) _aiConfigured = isAiConfigured(changes.aiConfig.newValue);
+    if (changes.seenHints) applySeenHints(changes.seenHints.newValue);
 
     // 「偵測到另一個 Canvas」提示：候選變了 → 只重畫側欄那一行（候選不進 _currentData、不排整頁重繪）；
     // 目前網址變了 → 也重畫這一行（canvasBaseUrl 是同步 key，外部變更另由下方 requestRefresh 排整頁重繪）
@@ -5605,16 +5753,6 @@ _welcomeOverlay?.addEventListener('click', (e) => {
   const dot = e.target.closest('.welcome-dot[data-wstep]');
   if (dot) welcomeGoStep(+dot.dataset.wstep);
 });
-
-// Open on first install (URL param ?welcome=1)
-// 開過就把 welcome 參數從網址拿掉（保留其他參數、hash 與 history state）：重新整理不會再從第 1 頁跳出教學（QA #48）
-if (new URLSearchParams(location.search).get('welcome') === '1') {
-  openWelcomeModal();
-  const params = new URLSearchParams(location.search);
-  params.delete('welcome');
-  const qs = params.toString();
-  history.replaceState(history.state, '', `${location.pathname}${qs ? `?${qs}` : ''}${location.hash}`);
-}
 
 // ── 瀏覽器返回整合：popstate 把畫面還原到目標 entry（期間 _suppressHistory 擋掉再寫 history）──
 window.addEventListener('popstate', (e) => {
