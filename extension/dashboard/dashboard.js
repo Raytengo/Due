@@ -5215,8 +5215,8 @@ function _welcomeSyncSlides(n) {
   if (area) area.scrollLeft = 0;
 }
 
-// 卡片外的手繪箭頭：從卡片右上角往左鼓一道弧（先往上、再往右拐），指向瀏覽器右上角（擴充功能圖示所在，在頁面外的工具列上）；
-// 字放在弧線右邊（弧往左鼓，右邊才空得出來）。
+// 卡片外的手繪箭頭：從卡片右上角往右下鼓一道弧（先往右、再往上拐），指向瀏覽器右上角（擴充功能圖示所在，在頁面外的工具列上）；
+// 字放在弧線右邊。
 // 用卡片的 offset 量（不受進場縮放影響）；卡片貼太近頂端畫不下就不畫。play：開卡片時從起點畫到終點（減少動態：直接出現）
 function drawWelcomePinArrow({ play = false } = {}) {
   const svg = document.getElementById('welcome-pin-arrow');
@@ -5238,10 +5238,10 @@ function drawWelcomePinArrow({ play = false } = {}) {
   const f = (v) => v.toFixed(1);
   const ux = (ex - sx) / L;
   const uy = (ey - sy) / L;
-  let px = -uy;   // 往左鼓（先往上、再往右拐進工具列），右邊留給字
+  let px = -uy;   // 往右下鼓（先往右、再往上拐進工具列）；鼓出去不超出視窗右緣
   let py = ux;
-  if (px > 0) { px = -px; py = -py; }
-  const bow = Math.min(L * 0.3, 70);
+  if (px < 0) { px = -px; py = -py; }
+  const bow = Math.min(L * 0.3, 70, Math.max(0, vw - Math.max(sx, ex) - 16));
   const c1 = { x: sx + ux * L * 0.2 + px * bow, y: sy + uy * L * 0.2 + py * bow };
   const c2 = { x: sx + ux * L * 0.8 + px * bow, y: sy + uy * L * 0.8 + py * bow };
   const d = `M ${f(sx)} ${f(sy)} C ${f(c1.x)} ${f(c1.y)} ${f(c2.x)} ${f(c2.y)} ${f(ex)} ${f(ey)}`;
@@ -5251,7 +5251,7 @@ function drawWelcomePinArrow({ play = false } = {}) {
   const ty = (ey - c2.y) / tl;
   const wing = (deg) => {
     const a = (deg * Math.PI) / 180;
-    return `${f(ex - (tx * Math.cos(a) - ty * Math.sin(a)) * 13)} ${f(ey - (tx * Math.sin(a) + ty * Math.cos(a)) * 13)}`;
+    return `${f(ex - (tx * Math.cos(a) - ty * Math.sin(a)) * 16)} ${f(ey - (tx * Math.sin(a) + ty * Math.cos(a)) * 16)}`;
   };
   head.setAttribute('d', `M ${wing(30)} L ${f(ex)} ${f(ey)} L ${wing(-30)}`);
   // 字：弧線中段的右邊（貝茲曲線 t=0.5 的點往右 18px、往下 30px），放不下就往左收到視窗內
