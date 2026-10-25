@@ -3245,8 +3245,11 @@
       padding: 0;
     }
 
-    /* 側欄行內重命名輸入框：取代整個 .nav-course-item 按鈕，尺寸與其對齊 */
+    /* 側欄行內重命名輸入框：取代整個 .nav-course-item 按鈕，尺寸與其對齊。
+       position:relative 讓它疊在課程列的滑動 indicator（absolute）之上——不定位的話 indicator 會蓋住輸入框，
+       改名時只看到一個空白框（課程項本身是 relative，所以平常沒事） */
     .nav-rename-input {
+      position: relative;
       width: 100%;
       box-sizing: border-box;
       padding: 6px 9px;
