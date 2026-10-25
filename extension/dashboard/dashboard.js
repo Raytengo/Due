@@ -128,9 +128,11 @@ const I18N = {
     overdueGroup: '已逾期',
     hiddenItemsToggle: '已隱藏 {n} 項',
     doneItemsToggle: '已完成 {n} 項',
+    doneItemsEmpty: '還沒有已完成的作業（把作業拖到這裡可標記完成）',
     hiddenItemsEmpty: '目前沒有隱藏項目（把作業拖到這裡可隱藏）',
     dropToShow: '放開以加入作業清單',
     dropToHide: '放開以隱藏',
+    dropToDone: '放開以標記完成',
     daysLater: '{n}天後',
     daysLaterOne: '{n}天後',
     hoursLater: '{n}h後',
@@ -191,10 +193,11 @@ const I18N = {
     a11yCompleted: '已完成「{name}」，1.5 秒內再按一次可撤銷',
     a11yUndone: '已撤銷',
     // 隱藏／還原的鍵盤路徑（#6）：握把按鈕名稱與移動後的播報
-    a11yShowItem: '移回作業清單',
+    a11yShowItem: '取消隱藏',
     a11yHideItem: '移到已隱藏',
     a11yMovedToList: '「{name}」已移回作業清單',
     a11yMovedToHidden: '「{name}」已移到已隱藏',
+    a11yMovedToDone: '「{name}」已移到已完成',
     // week section
     within7Days: '7天內',
     within30Days: '8-30天',
@@ -311,9 +314,11 @@ const I18N = {
     overdueGroup: '已逾期',
     hiddenItemsToggle: '已隐藏 {n} 项',
     doneItemsToggle: '已完成 {n} 项',
+    doneItemsEmpty: '还没有已完成的作业（把作业拖到这里可标记完成）',
     hiddenItemsEmpty: '目前没有隐藏项目（把作业拖到这里可隐藏）',
     dropToShow: '放开以加入作业清单',
     dropToHide: '放开以隐藏',
+    dropToDone: '放开以标记完成',
     daysLater: '{n}天后',
     daysLaterOne: '{n}天后',
     hoursLater: '{n}h后',
@@ -361,10 +366,11 @@ const I18N = {
     undoComplete: '撤销',
     a11yCompleted: '已完成「{name}」，1.5 秒内再按一次可撤销',
     a11yUndone: '已撤销',
-    a11yShowItem: '移回作业清单',
+    a11yShowItem: '取消隐藏',
     a11yHideItem: '移到已隐藏',
     a11yMovedToList: '「{name}」已移回作业清单',
     a11yMovedToHidden: '「{name}」已移到已隐藏',
+    a11yMovedToDone: '「{name}」已移到已完成',
     within7Days: '7天内',
     within30Days: '8-30天',
     beyond30Days: '30天以上',
@@ -477,9 +483,11 @@ const I18N = {
     overdueGroup: 'Overdue',
     hiddenItemsToggle: '{n} hidden',
     doneItemsToggle: '{n} done',
+    doneItemsEmpty: 'Nothing done yet (drag items here to mark done)',
     hiddenItemsEmpty: 'Nothing hidden (drag items here to hide)',
     dropToShow: 'Drop to add to list',
     dropToHide: 'Drop to hide',
+    dropToDone: 'Drop to mark done',
     daysLater: '{n} days left',
     daysLaterOne: '{n} day left',
     hoursLater: '{n}h left',
@@ -527,10 +535,11 @@ const I18N = {
     undoComplete: 'Undo',
     a11yCompleted: 'Completed “{name}”. Press again within 1.5 seconds to undo.',
     a11yUndone: 'Undone',
-    a11yShowItem: 'Move back to list',
+    a11yShowItem: 'Unhide',
     a11yHideItem: 'Move to hidden',
     a11yMovedToList: '“{name}” moved back to the list',
     a11yMovedToHidden: '“{name}” moved to hidden',
+    a11yMovedToDone: '“{name}” moved to done',
     within7Days: 'Due ≤ 7d',
     within30Days: '8-30 days',
     beyond30Days: 'Later (30d+)',
@@ -1286,9 +1295,9 @@ function isManuallyShown(a) {
 }
 
 // 寫入升級/降級：val=true 升級（視同一般作業）、false 降級（回自動隱藏）；樂觀更新＋storage read-modify-write＋重繪詳情/側欄
-function setManualShown(id, val, courseId = currentCourseId) {
+function setManualShown(id, val, courseId = currentCourseId, { rerender = true } = {}) {
   updateShared(['manualShown'], (cur) => ({ manualShown: _withFlag(cur.manualShown, id, val) }));
-  rerenderDetailAndNav(courseId);
+  if (rerender) rerenderDetailAndNav(courseId);
 }
 
 // 使用者是否手動把「一般作業」收進稽核區（拖曳隱藏，見 spec 2026-07-22 drag-hide-all）
@@ -1297,9 +1306,9 @@ function isManuallyHidden(a) {
 }
 
 // 寫入手動隱藏（一般作業）：val=true 隱藏、false 顯示；樂觀更新＋storage read-modify-write＋重繪
-function setManualHidden(id, val, courseId = currentCourseId) {
+function setManualHidden(id, val, courseId = currentCourseId, { rerender = true } = {}) {
   updateShared(['manualHidden'], (cur) => ({ manualHidden: _withFlag(cur.manualHidden, id, val) }));
-  rerenderDetailAndNav(courseId);
+  if (rerender) rerenderDetailAndNav(courseId);
 }
 
 // 是否被收進稽核區（不在主清單）：考試/簽到預設隱藏（除非升級）；一般作業預設顯示（除非手動隱藏）
@@ -1330,10 +1339,10 @@ function computeNearProgress(courses, assignments) {
 // 拖曳落點統一寫入：makeHidden=true 收進稽核區、false 拉回清單（依類型寫 manualShown/manualHidden）
 // courseId 由拖曳開始時記下（ctx.courseId），不讀當下的 currentCourseId——拖曳中導覽離開時它已是 null，
 // 查不到作業會把考試誤寫進 manualHidden（QA #205）
-function setItemHiddenByDrag(id, makeHidden, courseId = currentCourseId) {
+function setItemHiddenByDrag(id, makeHidden, courseId = currentCourseId, opts) {
   const a = ((_currentData.assignments || {})[courseId] || []).find((x) => String(x.id) === String(id));
-  if (a && isHideable(a)) setManualShown(id, !makeHidden, courseId);
-  else setManualHidden(id, makeHidden, courseId);
+  if (a && isHideable(a)) setManualShown(id, !makeHidden, courseId, opts);
+  else setManualHidden(id, makeHidden, courseId, opts);
 }
 
 function applyFilters(asgns) {
@@ -3528,8 +3537,8 @@ function renderCourseDetailSection(course, asgns, groups, scores) {
   const gradeCalcHtml = renderGradeCalculator(course, asgns, groups, scores);
   const assignmentRows = filtered.map((a) => renderAssignmentRow(a, groups, course.id)).join('');
   // 作業清單下方兩個收合區（spec 2026-10-25-drop-submitted-filter）：每個作業只在一個地方——已隱藏 → 已完成 → 待辦。
-  // 「已完成」沒有項目就不畫；「已隱藏」恆存在（只要該課有作業）作為拖曳降級的放置目標
-  const doneHtml = renderDoneItemsSection(doneItemsOf(asgns), groups, course.id);
+  // 兩區只要該課有作業就恆存在（三區互為拖曳放置目標）
+  const doneHtml = asgns.length ? renderDoneItemsSection(doneItemsOf(asgns), groups, course.id) : '';
   const hiddenItems = asgns.filter((a) => isHidden(a));
   const hiddenHtml = asgns.length ? renderHiddenItemsSection(hiddenItems, groups, course.id) : '';
 
@@ -3718,6 +3727,7 @@ const DRAG_EDGE_SPEED = 14;          // 自動捲動每 frame 最大位移
 function setupHideablePromoteDrag(el, scope = el) {
   const zones = {
     list: el.querySelector('.detail-assignments-list'),
+    done: el.querySelector('.done-items'),
     hidden: el.querySelector('.hidden-items'),
     scroller: el.querySelector('.detail-right-panel'),
   };
@@ -3747,35 +3757,50 @@ function setupHideablePromoteDrag(el, scope = el) {
 // 鍵盤移動（#6）：和 trackDragFrom 同形狀的 ctx（已拿起、已在目標上），clone 從原列原地起飛，飛進重繪後的落點、落地閃一下——
 // 動效與滑鼠拖曳相同（A2）。這個 ctx 不指派給 _dragCtx、也不掛 window 監聽：commitDrag 裡的重繪會跑 abortActiveDrag()，
 // 若掛在 _dragCtx 上，clone 會在 settleClone 之前就被刪掉
+// 鍵盤只做「隱藏 ↔ 取消隱藏」，不改完成狀態：作業清單／已完成的列 → 已隱藏；
+// 已隱藏的列 → 依完成狀態回到作業清單或已完成（標完成／未完成走勾選圈）
 function keyboardMove(row, zones) {
   if (_dragCtx) return;                                          // 滑鼠拖曳進行中
   if (row.classList.contains('completing') || row.classList.contains('bursting')) return;
-  const dir = row.dataset.drag;
-  const target = dir === 'promote' ? zones.list : zones.hidden;
-  if (!target) return;
+  const source = dragSourceOf(row);
+  const item = findAssignment(row.dataset.hideableId, currentCourseId);
+  const to = source !== 'hidden' ? 'hidden' : (item && isDone(item) ? 'done' : 'list');
+  if (!zones[to]) return;
   const ctx = {
-    row, dir, target, zones,
+    row, source, zones, targets: dragTargets(zones, source),
     id: row.dataset.hideableId,
     courseId: currentCourseId,                                   // 與滑鼠拖曳同：寫入綁定這一刻的課程（QA #205）
-    lifted: true, over: true, done: true,
+    lifted: true, over: to, done: true,
     clone: null, base: null,
   };
   makeDragClone(ctx);
   commitDrag(ctx, { viaKeyboard: true });
 }
 
+// 三區互拖（spec 2026-10-25-drop-submitted-filter）：列所在的區是來源，另外兩區都是放置目標——
+// 放到作業清單＝取消隱藏＋標回未完成；放到已完成＝取消隱藏＋標完成；放到已隱藏＝隱藏（完成狀態不動）
+function dragSourceOf(row) {
+  if (row.closest('.hidden-items')) return 'hidden';
+  if (row.closest('.done-items')) return 'done';
+  return 'list';
+}
+
+function dragTargets(zones, source) {
+  return ['list', 'done', 'hidden'].filter((k) => k !== source && zones[k]).map((k) => ({ key: k, el: zones[k] }));
+}
+
 function trackDragFrom(e, row, zones) {
-  const dir = row.dataset.drag;                                  // 'promote' | 'demote'
-  const target = dir === 'promote' ? zones.list : zones.hidden;
-  if (!target) return;
+  const source = dragSourceOf(row);
+  const targets = dragTargets(zones, source);
+  if (!targets.length) return;
   const ctx = _dragCtx = {
-    row, dir, target, zones,
+    row, source, targets, zones,
     id: row.dataset.hideableId,
     courseId: currentCourseId,                                   // 寫入綁定拖曳開始時的課程（QA #205）
     pointerId: e.pointerId,
     startX: e.clientX, startY: e.clientY,
     lastX: e.clientX, lastY: e.clientY,
-    lifted: false, over: false, done: false,
+    lifted: false, over: null, done: false,
     clone: null, base: null,
     scrollV: 0, scrollRaf: 0,
   };
@@ -3834,7 +3859,7 @@ function liftRow(ctx) {
   ctx.lifted = true;
   makeDragClone(ctx);
   ctx.row.classList.add('drag-source');
-  ctx.target.classList.add('drop-active');
+  ctx.targets.forEach((t) => t.el.classList.add('drop-active'));
   document.body.classList.add('drag-active');
 }
 
@@ -3847,14 +3872,18 @@ function positionClone(ctx) {
     : `translate(${dx}px, ${dy}px) scale(1.02) rotate(0.4deg)`;
 }
 
+// 游標在哪個目標上：先找正好壓在框內的，沒有再放寬 14px（貼近邊緣也算）；已完成與已隱藏上下相鄰，放寬的範圍會重疊
 function updateDropState(ctx) {
-  const t = ctx.target.getBoundingClientRect();
-  const pad = 14;                                 // 貼近邊緣也算在目標內
-  const over = ctx.lastX >= t.left - pad && ctx.lastX <= t.right + pad
-            && ctx.lastY >= t.top - pad && ctx.lastY <= t.bottom + pad;
+  const hit = (pad) => ctx.targets.find(({ el }) => {
+    const t = el.getBoundingClientRect();
+    return ctx.lastX >= t.left - pad && ctx.lastX <= t.right + pad
+        && ctx.lastY >= t.top - pad && ctx.lastY <= t.bottom + pad;
+  });
+  const found = hit(0) || hit(14);
+  const over = found ? found.key : null;
   if (over !== ctx.over) {
     ctx.over = over;
-    ctx.target.classList.toggle('drop-hover', over);
+    ctx.targets.forEach(({ key, el }) => el.classList.toggle('drop-hover', key === over));
   }
 }
 
@@ -3896,9 +3925,10 @@ function endDrag(ctx, cancelled) {
   document.body.classList.remove('drag-active');
   if (!ctx.lifted) return;                        // 未達閾值＝點擊，無事發生
 
-  ctx.target.classList.remove('drop-active', 'drop-hover');
+  ctx.targets.forEach(({ el }) => el.classList.remove('drop-active', 'drop-hover'));
   // 放置目標已不在畫面（重繪／導覽離開但沒被 abort 到）或已換課 → 當取消，不寫入（QA #198）
-  const stillHere = ctx.target.isConnected && currentView === 'course' && currentCourseId === ctx.courseId;
+  const target = ctx.targets.find((t) => t.key === ctx.over);
+  const stillHere = !!target && target.el.isConnected && currentView === 'course' && currentCourseId === ctx.courseId;
   if (!cancelled && ctx.over && stillHere) {
     commitDrag(ctx);
   } else {
@@ -3908,53 +3938,60 @@ function endDrag(ctx, cancelled) {
   }
 }
 
-// 命中：寫入隱藏/顯示（同步重繪詳情＋側欄）→ clone 飛入重繪後的實際落點
+// 命中：依放到哪一區寫入隱藏／完成狀態（同步重繪詳情＋側欄）→ clone 飛入重繪後的實際落點
 // 焦點：鍵盤移動、或焦點本來就在被移動的那一列（例如先 Tab 到這一列、再用滑鼠拖；pointerdown 有 preventDefault，
-// 單純滑鼠按握把不會把焦點給它），重繪會把它拆掉 →
-// 交給落地那一列的握把（該項落到另一個完成桶、兩區都看不到時交給同區的鄰居，再沒有就交給該區的標題），並播報結果（#6）
+// 單純滑鼠按握把不會把焦點給它），重繪會把它拆掉 → 交給落地那一列的握把，並播報結果（#6）
 function commitDrag(ctx, { viaKeyboard = false } = {}) {
+  const to = ctx.over;
   const savedScroll = ctx.zones.scroller ? ctx.zones.scroller.scrollTop : 0;
   const hiddenWasOpen = !!(ctx.zones.hidden && ctx.zones.hidden.classList.contains('open'));
+  const doneWasOpen = !!(ctx.zones.done && ctx.zones.done.classList.contains('open'));
   const keepFocus = viaKeyboard || ctx.row.contains(document.activeElement);
   const item = ((_currentData.assignments || {})[ctx.courseId] || []).find((x) => String(x.id) === String(ctx.id));
   const name = item ? item.name : (ctx.row.querySelector('.assignment-title, .hidden-item-title')?.textContent || '').trim();
-  // 寫入綁定拖曳開始時的課程（ctx.courseId，QA #205）
-  setItemHiddenByDrag(ctx.id, ctx.dir === 'demote', ctx.courseId);
+  // 寫入綁定拖曳開始時的課程（ctx.courseId，QA #205）；兩種寫入都先不重繪，最後重繪一次
+  if (item) {
+    const makeHidden = to === 'hidden';
+    if (isHidden(item) !== makeHidden) setItemHiddenByDrag(ctx.id, makeHidden, ctx.courseId, { rerender: false });
+    if (to === 'done' && !isDone(item)) setCompletion(ctx.id, ctx.courseId, true);
+    if (to === 'list' && isDone(item)) setCompletion(ctx.id, ctx.courseId, false);
+  }
+  rerenderDetailAndNav(ctx.courseId);
 
   const container = document.getElementById('course-detail-container');
   const scroller = container.querySelector('.detail-right-panel');
-  // 落點當下重新判定完成狀態（拖曳期間考試可能剛結束，QA #178）：取消隱藏的已完成項落在「已完成」區，未完成的落在作業清單
-  const landsInDone = !!item && ctx.dir === 'promote' && isDone(item);
-  // 稽核區開合：降級後強制展開（讓使用者看到落點）；升級則維持拖曳前狀態。
-  // 新節點直接到位、不重播展開（instant）：重繪前畫面上它本來就開著（拖曳前開著，或降級拖曳中 .drop-active 已把它展開）；
-  // 鍵盤降級、原本收著的情況也直接打開——落點列要在這一幀就有最終位置，scrollIntoView 與 clone 的飛行才量得對
+  // 落點以寫入後的實際狀態為準（拖曳期間考試可能剛結束，QA #178）
+  const lands = !item ? null : isHidden(item) ? 'hidden' : isDone(item) ? 'done' : 'list';
+  // 收合區開合：落點那一區強制展開（讓使用者看到落點），其餘維持拖曳前狀態。
+  // 新節點直接到位、不重播展開（instant）：重繪前畫面上它本來就開著（拖曳前開著，或拖曳中 .drop-active 已把它展開）；
+  // 鍵盤移動、原本收著的情況也直接打開——落點列要在這一幀就有最終位置，scrollIntoView 與 clone 的飛行才量得對
   // （高度還在 0 時，清單裡的列被 overflow:clip 裁掉、不算進捲動範圍，捲不到落點）
   const hidden = container.querySelector('.hidden-items');
-  if (hidden && (hiddenWasOpen || ctx.dir === 'demote')) setFoldOpen(hidden, true, { instant: true });
-  // 落進「已完成」區：同理直接打開（落點要在這一幀就有最終位置）
+  if (hidden && (hiddenWasOpen || lands === 'hidden')) setFoldOpen(hidden, true, { instant: true });
   const doneZone = container.querySelector('.done-items');
-  if (doneZone && landsInDone) setFoldOpen(doneZone, true, { instant: true });
+  if (doneZone && (doneWasOpen || lands === 'done')) setFoldOpen(doneZone, true, { instant: true });
   // 重繪會重置捲動位置 → 還原；在展開之後：先還原的話，收著的新清單會把 scrollTop 夾小
   if (scroller) scroller.scrollTop = savedScroll;
 
   const cssId = (window.CSS && CSS.escape) ? CSS.escape(String(ctx.id)) : String(ctx.id);
   let landed = null;
-  if (item && ctx.dir === 'promote') {
-    const chk = container.querySelector(`${landsInDone ? '.done-items' : '.detail-assignments-list'} .assignment-check[data-assignment-id="${cssId}"]`);
-    landed = chk && chk.closest('.assignment-item');
-  } else if (item) {
+  if (lands === 'hidden') {
     landed = container.querySelector(`.hidden-item-row[data-hideable-id="${cssId}"]`);
+  } else if (lands) {
+    const chk = container.querySelector(`${lands === 'done' ? '.done-items' : '.detail-assignments-list'} .assignment-check[data-assignment-id="${cssId}"]`);
+    landed = chk && chk.closest('.assignment-item');
   }
-  if (keepFocus) focusAfterMove(container, landed, ctx.dir);
-  announce(tr(ctx.dir === 'promote' ? 'a11yMovedToList' : 'a11yMovedToHidden').replace('{name}', name));
+  if (keepFocus) focusAfterMove(container, landed, lands || to);
+  const said = { list: 'a11yMovedToList', done: 'a11yMovedToDone', hidden: 'a11yMovedToHidden' }[lands || to];
+  announce(tr(said).replace('{name}', name));
   settleClone(ctx, landed, { flash: true });
 }
 
 // 移動後的焦點落點：落地列的握把 → 同區最近一列有握把的（找不到落地列時，QA #178）→ 該區的標題／開關
-function focusAfterMove(container, landed, dir) {
-  const zone = (landed && landed.closest('.detail-assignments-list, .fold-list')) || (dir === 'promote'
-    ? container.querySelector('.detail-assignments-list')
-    : container.querySelector('.hidden-items .fold-list'));
+const ZONE_LIST_SEL = { list: '.detail-assignments-list', done: '.done-items .fold-list', hidden: '.hidden-items .fold-list' };
+const ZONE_HEAD_SEL = { list: '.detail-assignments-label', done: '.done-items .fold-toggle', hidden: '.hidden-items .fold-toggle' };
+function focusAfterMove(container, landed, zoneKey) {
+  const zone = (landed && landed.closest('.detail-assignments-list, .fold-list')) || container.querySelector(ZONE_LIST_SEL[zoneKey]);
   let to = landed && landed.querySelector('.drag-grip');
   if (!to && zone) {
     const rows = [...zone.querySelectorAll('.assignment-item, .hidden-item-row')];
@@ -3965,11 +4002,7 @@ function focusAfterMove(container, landed, dir) {
     const row = near.find((r) => r.querySelector('.drag-grip'));
     to = row && row.querySelector('.drag-grip');
   }
-  if (!to) {
-    to = dir === 'promote'
-      ? container.querySelector('.detail-assignments-label')
-      : container.querySelector('.hidden-items .fold-toggle');
-  }
+  if (!to) to = container.querySelector(ZONE_HEAD_SEL[zoneKey]);
   if (to) to.focus({ preventScroll: true });   // 捲動交給 settleClone 的 scrollIntoView（與飛行落點同一次）
 }
 
@@ -4035,7 +4068,7 @@ function abortActiveDrag() {
   document.body.classList.remove('drag-active');
   if (ctx.clone) ctx.clone.remove();
   if (ctx.row && ctx.row.isConnected) ctx.row.classList.remove('drag-source');
-  if (ctx.target && ctx.target.isConnected) ctx.target.classList.remove('drop-active', 'drop-hover');
+  (ctx.targets || []).forEach(({ el }) => { if (el.isConnected) el.classList.remove('drop-active', 'drop-hover'); });
 }
 
 // 「已完成」「已隱藏」區開合（按鈕點擊與拖曳／鍵盤移動後強制展開共用）：切 .open 並同步開關的 aria-expanded——
@@ -4082,24 +4115,25 @@ function foldSectionHtml({ cls, courseId, label, listId, inner, attrs = '' }) {
 }
 
 // ── 「已完成」區：沒隱藏、已落地完成的項目（撤銷窗內的還在作業清單上）──
-// 與作業清單同一種列（勾選圈可標回未完成、描述、名稱連結、握把可拖進已隱藏）；最近截止的在上。沒有項目就不畫
+// 與作業清單同一種列（勾選圈可標回未完成、描述、名稱連結、握把可拖到另外兩區）；最近截止的在上。
+// 也是放置目標（data-drophint）：拖進來＝標完成，所以沒有項目時照樣畫、顯示空狀態
 function doneItemsOf(asgns) {
   return sortByDue(asgns.filter((a) => !isHidden(a) && isDoneLanded(a)), { recentFirst: true });
 }
 
 function renderDoneItemsSection(items, groups, courseId) {
-  if (!items.length) return '';
   return foldSectionHtml({
     cls: 'done-items',
     courseId,
     label: tr('doneItemsToggle').replace('{n}', items.length),
     listId: `done-list-${courseId}`,
-    inner: items.map((a) => renderAssignmentRow(a, groups, courseId)).join(''),
+    inner: items.map((a) => renderAssignmentRow(a, groups, courseId)).join('')
+      || `<div class="fold-empty">${esc(tr('doneItemsEmpty'))}</div>`,
+    attrs: ` data-drophint="${esc(tr('dropToDone'))}"`,
   });
 }
 
-// 作業清單有一項完成落地後，就地重畫「已完成」區：沿用原本的外框（開合狀態、FLIP 位置都還在），只換計數與列；
-// 原本沒有這一區就插在作業清單後面
+// 作業清單有一項完成落地後，就地重畫「已完成」區：沿用原本的外框（開合狀態、FLIP 位置都還在），只換計數與列
 function refreshDoneSection(view, cid) {
   const { assignments = {}, assignmentGroups = {} } = _currentData;
   const tmp = document.createElement('div');

@@ -1684,7 +1684,7 @@
       transition: height var(--t-disclosure), opacity var(--t-disclosure), filter var(--t-disclosure), visibility var(--t-disclosure);
     }
 
-    :is(.assignment-desc.open, .grade-calc.open .grade-calc-body, .detail-fold.open .fold-list, .hidden-items.drop-active .fold-list) {
+    :is(.assignment-desc.open, .grade-calc.open .grade-calc-body, .detail-fold.open .fold-list, .detail-fold.drop-active .fold-list) {
       height: auto;
       opacity: 1;
       filter: none;
@@ -3566,7 +3566,7 @@
     /* 放置目標：虛線框 + 淡橘底 + 提示文字（data-drophint）*/
     /* 底色過渡寫在 base（#41）：只寫在 .drop-active 上的話淡入有、淡出卻是硬切 */
     .detail-assignments-list,
-    .hidden-items {
+    .detail-fold {
       transition: background-color var(--t-color);
     }
 
@@ -3576,7 +3576,7 @@
     }
 
     .detail-assignments-list.drop-active,
-    .hidden-items.drop-active {
+    .detail-fold.drop-active {
       outline: 2px dashed var(--orange);
       outline-offset: 3px;
       border-radius: 8px;
@@ -3585,7 +3585,7 @@
 
     /* 游標真正在目標上方：實線＋加深，表示「放開即生效」 */
     .detail-assignments-list.drop-hover,
-    .hidden-items.drop-hover {
+    .detail-fold.drop-hover {
       outline-style: solid;
       background: rgba(217, 119, 87, 0.09);
     }
@@ -3593,7 +3593,7 @@
     /* 提示文字（data-drophint）：升級目標＝清單，置於紅框「頂部」（::before）；
        降級目標＝稽核區，因頂部已有展開按鈕，維持置於「底部」（::after）*/
     .detail-assignments-list.drop-active::before,
-    .hidden-items.drop-active::after {
+    .detail-fold.drop-active::after {
       content: attr(data-drophint);
       display: block;
       text-align: center;
@@ -3613,7 +3613,7 @@
       line-height: 1.6;
       white-space: nowrap;
     }
-    .hidden-items.drop-active::after { padding: 8px 0 2px; }
+    .detail-fold.drop-active::after { padding: 8px 0 2px; }
 
     /* 降級拖曳中：即使稽核區收合，也展開列表作為放置目標——走「展開面板」共用規則的開合（#28），不硬切 */
 
@@ -4811,7 +4811,7 @@
         transition: opacity var(--t-disclosure), filter var(--t-disclosure), visibility var(--t-disclosure);
       }
 
-      :is(.assignment-desc.open, .grade-calc.open .grade-calc-body, .detail-fold.open .fold-list, .hidden-items.drop-active .fold-list) {
+      :is(.assignment-desc.open, .grade-calc.open .grade-calc-body, .detail-fold.open .fold-list, .detail-fold.drop-active .fold-list) {
         transition: opacity var(--t-disclosure), filter var(--t-disclosure), visibility 0s;
       }
 
