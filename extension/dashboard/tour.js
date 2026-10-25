@@ -6,7 +6,7 @@
 // - 有些步驟要先到某個畫面（before：例如先打開一門課），導覽代點側欄後等目標出現才顯示
 // - 要點／要拖的地方（spot）：亮框貼著那個元素的形狀（driver.js／react-joyride 的 spotlight 做法），
 //   角落再放一個會脈動的小信標（hotspot beacon）提示「點這裡」；只看不點的步驟（⚙）沒有信標
-// - 變暗用 SVG mask 挖洞：主亮處之外可以再挖一個虛線框（point：拖曳的目的地、AI 權重會填的地方），AI 那步再配手繪繞圈箭頭
+// - 變暗用 SVG mask 挖洞：主亮處之外可以再挖一個虛線框（point：拖曳的目的地、AI 權重會填的地方）
 // - 亮框以外擋住點擊（四塊透明 blocker 圍住主亮框）；interactive:false 的步驟連亮框本身也擋
 // - 目標每幀重新查詢、重新量位置（側欄、詳情會整段重建，active 底色會滑），不快取節點
 // - 自帶三語字串；依賴（執行期才用到）：_uiLanguage、announce、reduceMotion（dashboard.js 全域，皆有 typeof 守衛）
@@ -103,7 +103,7 @@
   //   next：按「下一步」時導覽代做的事；before：顯示這一步前要先到的畫面
   //   interactive：亮框內可不可以點（預設可以）；reveal：這一步期間加在 <html> 上的 class（亮出平常藏著的控制項）
   //   spot：使用者要點／要拖的那個小東西 → 主亮處改成圍著它的小圓（target 只用來等畫面、捲動）
-  //   point：另外挖一個虛線框「指給你看」；pointArrow：再從說明框畫一條手繪繞圈箭頭過去
+  //   point：另外挖一個虛線框「指給你看」
   //   resolve(state)：依這一趟的狀況換文案／目標
   const STEPS = [
     {
@@ -145,7 +145,6 @@
       before: openCourse,
       interactive: false,
       point: `${DETAIL} .detail-left-panel`,
-      pointArrow: true,
     },
   ];
 
@@ -257,16 +256,6 @@
     beacon.innerHTML = '<span></span><span></span>';
     root.appendChild(beacon);
 
-    // 手繪繞圈箭頭（point 用）：路徑＋箭頭兩撇
-    const sketch = svgEl('svg', { class: 'tour-sketch', 'aria-hidden': 'true' });
-    // 線下面墊一條米白淡底（halo），壓在變暗的介面文字上也看得清楚
-    const sketchHalo = svgEl('path', { class: 'tour-sketch-halo' });
-    const sketchPath = svgEl('path', { class: 'tour-sketch-line' });
-    const sketchHead = svgEl('path', { class: 'tour-sketch-line' });
-    sketch.appendChild(sketchHalo);
-    sketch.appendChild(sketchPath);
-    sketch.appendChild(sketchHead);
-    root.appendChild(sketch);
 
     const pop = document.createElement('div');
     pop.className = 'tour-pop';
@@ -294,7 +283,7 @@
     ring.addEventListener('click', nudge);   // 只有 interactive:false 時 ring 才吃得到點擊
     pop.querySelector('.tour-close').addEventListener('click', () => end());
     pop.querySelector('.tour-next').addEventListener('click', () => next());
-    return { root, hole, hole2, ring, ring2, beacon, pop, blockers, sketch, sketchHalo, sketchPath, sketchHead };
+    return { root, hole, hole2, ring, ring2, beacon, pop, blockers };
   }
 
   // 點到被擋住的地方：說明框輕推一下（減少動態：不動，只把焦點拉回說明框）
@@ -335,7 +324,6 @@
     _state.root.classList.toggle('is-blocking', cur.interactive === false);
     _state.root.classList.toggle('is-actionable', actionable);
     _state.root.classList.toggle('has-point', !!cur.point);
-    _state.root.classList.toggle('has-arrow', !!cur.pointArrow);
   }
 
   function setRect(el, x, y, w, h, rx = 10) {
@@ -366,66 +354,7 @@
     return { x, y, w, h, rx: roundEl ? Math.min(w, h) / 2 : Math.min(8, Math.min(w, h) / 2) };
   }
 
-  // 手繪箭頭：一條圓滑的弧線，從說明框右邊出去、往外鼓一圈，指進「指給你看」的框；箭頭兩撇順著最後的切線。
-  // 終點在框上離起點最近的那條邊（往框中央錯開一點）；兩者太近畫不出弧線就不畫
-  const SKETCH_MIN_LEN = 70;
-  function drawSketch(popBox, b) {
-    const { sketchHalo, sketchPath, sketchHead } = _state;
-    const f = (v) => v.toFixed(1);
-    const clear = () => [sketchPath, sketchHalo, sketchHead].forEach((n) => n.setAttribute('d', ''));
-    const sx = popBox.x + popBox.w + 8;
-    const sy = popBox.y + Math.min(34, popBox.h / 2);
-    // 終點：框上離起點最近的點；落在上下緣時往右錯開、落在左右緣時往上錯開（箭頭斜斜進框，不是直直戳）
-    let ex = clampN(sx, b.x, b.x + b.w);
-    let ey = clampN(sy, b.y, b.y + b.h);
-    if (ey === b.y || ey === b.y + b.h) ex = clampN(ex + 50, b.x + 24, b.x + b.w - 24);
-    else ey = clampN(ey - 40, b.y + 24, b.y + b.h - 24);
-    const dx0 = sx - ex;
-    const dy0 = sy - ey;
-    const d0 = Math.hypot(dx0, dy0) || 1;
-    ex += (dx0 / d0) * 12;   // 停在框外一點
-    ey += (dy0 / d0) * 12;
-    const L = Math.hypot(ex - sx, ey - sy);
-    if (L < SKETCH_MIN_LEN) { clear(); return; }
-    const ux = (ex - sx) / L;
-    const uy = (ey - sy) / L;
-    // 往外鼓的方向：朝右（先往右出去再拐過去）
-    let px = -uy;
-    let py = ux;
-    if (px < 0) { px = -px; py = -py; }
-    const bow = clampN(L * 0.32, 24, 90);
-    const c1 = { x: sx + ux * L * 0.2 + px * bow, y: sy + uy * L * 0.2 + py * bow };
-    const c2 = { x: sx + ux * L * 0.8 + px * bow, y: sy + uy * L * 0.8 + py * bow };
-    const d = `M ${f(sx)} ${f(sy)} C ${f(c1.x)} ${f(c1.y)} ${f(c2.x)} ${f(c2.y)} ${f(ex)} ${f(ey)}`;
-    sketchPath.setAttribute('d', d);
-    sketchHalo.setAttribute('d', d);
-    // 箭頭兩撇：沿最後一段的切線（c2 → 終點）往回、左右各張 30°
-    const tl = Math.hypot(ex - c2.x, ey - c2.y) || 1;
-    const tx = (ex - c2.x) / tl;
-    const ty = (ey - c2.y) / tl;
-    const wing = (deg) => {
-      const a = (deg * Math.PI) / 180;
-      const wx = -(tx * Math.cos(a) - ty * Math.sin(a)) * 11;
-      const wy = -(tx * Math.sin(a) + ty * Math.cos(a)) * 11;
-      return `${f(ex + wx)} ${f(ey + wy)}`;
-    };
-    sketchHead.setAttribute('d', `M ${wing(30)} L ${f(ex)} ${f(ey)} L ${wing(-30)}`);
-  }
-
-  // 每次換步：箭頭從起點畫到終點（減少動態：直接出現）
-  function playSketch() {
-    const { sketchHalo, sketchPath, sketchHead } = _state;
-    [sketchHalo, sketchPath, sketchHead].forEach((n) => n.getAnimations().forEach((a) => a.cancel()));
-    if (reduced()) return;
-    const len = sketchPath.getAttribute('d') ? sketchPath.getTotalLength() : 0;
-    [sketchHalo, sketchPath].forEach((n) => n.animate(
-      [{ strokeDasharray: `${len}`, strokeDashoffset: `${len}` }, { strokeDasharray: `${len}`, strokeDashoffset: '0' }],
-      { duration: 700, delay: 150, easing: 'cubic-bezier(0.65, 0, 0.35, 1)', fill: 'backwards' },
-    ));
-    sketchHead.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 150, delay: 820, fill: 'backwards' });
-  }
-
-  // 依目標位置擺挖洞、亮框、四塊 blocker、說明框、箭頭（每幀量；位置沒變就不寫 DOM）
+  // 依目標位置擺挖洞、亮框、四塊 blocker、說明框（每幀量；位置沒變就不寫 DOM）
   function place(r) {
     const { ring, ring2, hole, hole2, pop, blockers, cur } = _state;
     const vw = window.innerWidth;
@@ -493,7 +422,6 @@
     } else if (side === 'top' || side === 'bottom') {
       pop.style.setProperty('--arrow-x', `${clampN(cx - px, 20, pw - 20)}px`);
     }
-    if (b && cur.pointArrow) drawSketch({ x: px, y: py, w: pw, h: ph }, b);
   }
 
   function frame() {
@@ -550,7 +478,6 @@
     _state.moving = false;
     const r = rectOf(_state.cur.target);
     if (r) place(r);
-    if (_state.cur.pointArrow) playSketch();
     _state.root.classList.remove('is-moving');
     _state.pop.focus({ preventScroll: true });
     const textKey = _state.cur.textKey || _state.cur.key;

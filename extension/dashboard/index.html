@@ -583,44 +583,6 @@
       opacity: 1;
     }
 
-    /* 手繪繞圈箭頭（從說明框指到第二個洞） */
-    .tour-sketch {
-      position: fixed;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      overflow: visible;
-      pointer-events: none;
-      opacity: 0;
-    }
-
-    .tour-root.has-arrow .tour-sketch {
-      opacity: 1;
-    }
-
-    .tour-root.is-moving .tour-sketch {
-      opacity: 0;
-      transition: opacity var(--t-fade);
-    }
-
-    .tour-sketch-line {
-      fill: none;
-      stroke: var(--orange);
-      stroke-width: 2;
-      stroke-linecap: round;
-      stroke-linejoin: round;
-    }
-
-    .tour-sketch-halo {
-      fill: none;
-      stroke: var(--bg);
-      stroke-opacity: 0.55;
-      stroke-width: 6;
-      stroke-linecap: round;
-      stroke-linejoin: round;
-    }
-
-
     /* 這一步看就好（主畫面、圓餅、⚙）：亮框裡也不給點 */
     .tour-root.is-blocking .tour-ring {
       pointer-events: auto;
