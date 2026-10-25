@@ -354,4 +354,91 @@ test('courseStatus: 課程關掉依組別加權、沒有紀錄 → pending（不
   assert.equal(R.courseStatus({ courseId: 7, customWeights: {}, groups, record: undefined, course: { id: 7 } }), 'skipped');
 });
 
+// ── 材料指紋（D1，2026-10-25）：notFound 而且材料、設定都沒變 → 不再重跑 ──
+const FP_BASE = {
+  provider: 'gemini', model: 'gemini-2.5-flash', baseUrl: 'https://generativelanguage.googleapis.com/v1beta', pdfAllowed: true,
+  syllabusBody: '<p>Course intro</p>',
+  files: [{ id: 2, size: 200, updated_at: '2026-09-02T00:00:00Z', url: 'https://x/2' }, { id: 1, size: 100, updated_at: '2026-09-01T00:00:00Z', url: 'https://x/1' }],
+};
+
+test('materialFingerprint: 同樣的輸入 → 同樣的指紋；檔案順序不影響', () => {
+  const a = R.materialFingerprint(FP_BASE);
+  assert.equal(typeof a, 'string');
+  assert.ok(a.length > 0);
+  assert.equal(R.materialFingerprint({ ...FP_BASE }), a);
+  assert.equal(R.materialFingerprint({ ...FP_BASE, files: [...FP_BASE.files].reverse() }), a);
+});
+
+test('materialFingerprint: 大綱、檔案（新增／改版）、供應商、模型、PDF 權限任一改變 → 指紋不同', () => {
+  const a = R.materialFingerprint(FP_BASE);
+  const variants = [
+    { syllabusBody: '<p>Course intro</p><p>Grading: HW 40%</p>' },
+    { files: [...FP_BASE.files, { id: 3, size: 1, updated_at: '2026-09-03T00:00:00Z' }] },
+    { files: [{ ...FP_BASE.files[0], updated_at: '2026-10-01T00:00:00Z' }, FP_BASE.files[1]] },
+    { files: [{ ...FP_BASE.files[0], size: 999 }, FP_BASE.files[1]] },
+    { provider: 'qwen' },
+    { model: 'gemini-2.5-pro' },
+    { pdfAllowed: false },
+    { files: null }, // 檔案清單抓不到（網路錯誤）與「沒有檔案」不同：之後抓到了會換指紋、重跑
+    { baseUrl: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1' }, // 換了自訂端點
+    { files: [{ ...FP_BASE.files[0], locked_for_user: true }, FP_BASE.files[1]] }, // 上鎖／解鎖
+    { files: [{ ...FP_BASE.files[0], url: '' }, FP_BASE.files[1]] },
+  ];
+  for (const v of variants) assert.notEqual(R.materialFingerprint({ ...FP_BASE, ...v }), a, JSON.stringify(v));
+  assert.notEqual(R.materialFingerprint({ ...FP_BASE, files: null }), R.materialFingerprint({ ...FP_BASE, files: [] }));
+  assert.notEqual(R.materialFingerprint({ ...FP_BASE, syllabusBody: null }), R.materialFingerprint({ ...FP_BASE, syllabusBody: '' }));
+});
+
+test('isUnchangedNotFound: 只有 notFound 且指紋相同才跳過；error／done／沒紀錄／舊紀錄沒有指紋都照跑', () => {
+  const fp = R.materialFingerprint(FP_BASE);
+  assert.equal(R.isUnchangedNotFound({ status: 'notFound', materialHash: fp }, fp), true);
+  assert.equal(R.isUnchangedNotFound({ status: 'notFound', materialHash: 'other' }, fp), false);
+  assert.equal(R.isUnchangedNotFound({ status: 'notFound' }, fp), false);
+  assert.equal(R.isUnchangedNotFound({ status: 'error', materialHash: fp }, fp), false);
+  assert.equal(R.isUnchangedNotFound({ status: 'done', materialHash: fp }, fp), false);
+  assert.equal(R.isUnchangedNotFound(undefined, fp), false);
+});
+
+test('nextRecord: meta 帶 materialHash 就記下；沒帶就不留這個欄位', () => {
+  const withHash = R.nextRecord(undefined, { kind: 'notFound', source: 'none', notes: 'x' }, NOW, { ...META, materialHash: 'abc' });
+  assert.equal(withHash.materialHash, 'abc');
+  const without = R.nextRecord(undefined, { kind: 'notFound', source: 'none', notes: 'x' }, NOW, META);
+  assert.equal('materialHash' in without, false);
+});
+
+// ── AI 權重辨識（D2）：customWeights 跟 AI 寫進去的一模一樣＝使用者沒改過 ──
+const AI_REC = { status: 'done', components: [{ name: 'HW', weight: 40, description: 'weekly' }, { name: 'Final', weight: 60, description: '' }] };
+
+test('isAiWeights: 與 done 紀錄的 components 相同（不看 description）→ true', () => {
+  assert.equal(R.isAiWeights(AI_REC, [{ name: 'HW', weight: 40 }, { name: 'Final', weight: 60 }]), true);
+});
+
+test('isAiWeights: 使用者改過名稱／數字／項目數、清空、或紀錄不是 done → false', () => {
+  assert.equal(R.isAiWeights(AI_REC, [{ name: 'Homework', weight: 40 }, { name: 'Final', weight: 60 }]), false);
+  assert.equal(R.isAiWeights(AI_REC, [{ name: 'HW', weight: 45 }, { name: 'Final', weight: 55 }]), false);
+  assert.equal(R.isAiWeights(AI_REC, [{ name: 'HW', weight: 40 }]), false);
+  assert.equal(R.isAiWeights(AI_REC, []), false);
+  assert.equal(R.isAiWeights(AI_REC, undefined), false);
+  assert.equal(R.isAiWeights({ ...AI_REC, status: 'notFound' }, [{ name: 'HW', weight: 40 }, { name: 'Final', weight: 60 }]), false);
+  assert.equal(R.isAiWeights(undefined, [{ name: 'HW', weight: 40 }]), false);
+});
+
+// ── 權重編輯器清除鈕（D3）：文字要照實說按下去會發生什麼 ──
+test('resetButtonKind: Canvas 權重生效 → restore（不論 AI 設定與紀錄）', () => {
+  assert.equal(R.resetButtonKind({ canvasWeights: true, aiConfigured: true, record: { status: 'done' } }), 'restore');
+  assert.equal(R.resetButtonKind({ canvasWeights: true, aiConfigured: false }), 'restore');
+});
+
+test('resetButtonKind: 沒有 Canvas 權重、AI 已設定、上次 done／error／沒紀錄 → reanalyze', () => {
+  for (const record of [undefined, { status: 'done' }, { status: 'error' }]) {
+    assert.equal(R.resetButtonKind({ canvasWeights: false, aiConfigured: true, record }), 'reanalyze', JSON.stringify(record));
+  }
+});
+
+test('resetButtonKind: AI 上次判 notFound（材料沒變就不重跑）或沒設定 key → clear，不承諾重新分析', () => {
+  assert.equal(R.resetButtonKind({ canvasWeights: false, aiConfigured: true, record: { status: 'notFound', materialHash: 'x' } }), 'clear');
+  assert.equal(R.resetButtonKind({ canvasWeights: false, aiConfigured: false, record: { status: 'done' } }), 'clear');
+  assert.equal(R.resetButtonKind({}), 'clear');
+});
+
 console.log('ALL gradingRules TESTS PASSED');

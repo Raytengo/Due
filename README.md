@@ -81,14 +81,19 @@ them yourself, so you can still edit or reset them.
 
 - Settings gear → **AI analysis settings** → choose Gemini, Qwen, DeepSeek, or
   NVIDIA NIM, paste your own API key, save.
-- Each course is analyzed **once**. Courses that already have Canvas or manual
-  weights are skipped. Nothing runs until you add a key.
-- When you save with Gemini selected, Chrome asks for access to `canvas-user-content.com` so Due can download
-  syllabus PDFs; decline and it still works with the syllabus text.
+- Only courses without weights are analyzed; courses that already have Canvas or
+  manual weights are skipped. Once weights are found, that course is done (unless you
+  clear its weights). A course where none were found is tried again only when its
+  syllabus or files change, or when you change the AI settings. Nothing runs until you add a key.
+- AI-filled weights show a small **AI analysis** label under the pie chart until you
+  edit them. If your instructor later adds weights in Canvas, Due switches to those.
+- When you save, Chrome asks for access to `canvas-user-content.com` so Due can download
+  syllabus PDFs (Gemini reads the PDF itself; other providers get its text); decline and it still works with the syllabus text.
 - NVIDIA NIM does not allow direct browser calls, so saving with it selected asks for access to
   `integrate.api.nvidia.com` — without that permission the provider cannot run at all.
-- Syllabus content goes straight from your browser to the provider you chose.
-  Due has no server in between.
+- Syllabus content goes straight from your browser to the provider you chose,
+  using your own key and quota, and that provider's terms apply (some free tiers,
+  such as the Gemini API free tier, may use it to improve their models). Due has no server in between.
 
 ---
 

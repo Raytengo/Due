@@ -120,6 +120,12 @@ const I18N = {
     editWeight: '編輯',
     weightEditTitle: '編輯評分權重',
     weightReset: '還原 Canvas 權重',
+    weightResetReanalyze: '清除並重新分析',
+    weightResetClear: '清除權重',
+    weightSourceAi: 'AI 分析',
+    weightSourceAiTitle: '由 AI 從課程大綱推估，請以大綱為準；在「編輯」改過就不再標示',
+    weightSourceCanvas: 'Canvas 設定',
+    weightSourceCanvasTitle: '老師在 Canvas 設定的評分比重',
     weightAddItem: '+ 新增項目',
     weightTotal: '總計：',
     unnamedWeight: '未命名',
@@ -263,6 +269,12 @@ const I18N = {
     editWeight: '编辑',
     weightEditTitle: '编辑评分权重',
     weightReset: '还原 Canvas 权重',
+    weightResetReanalyze: '清除并重新分析',
+    weightResetClear: '清除权重',
+    weightSourceAi: 'AI 分析',
+    weightSourceAiTitle: '由 AI 从课程大纲推估，请以大纲为准；在「编辑」改过就不再标示',
+    weightSourceCanvas: 'Canvas 设定',
+    weightSourceCanvasTitle: '老师在 Canvas 设定的评分比重',
     weightAddItem: '+ 新增项目',
     weightTotal: '总计：',
     unnamedWeight: '未命名',
@@ -404,6 +416,12 @@ const I18N = {
     editWeight: 'Edit',
     weightEditTitle: 'Edit Grade Weights',
     weightReset: 'Reset to Canvas weights',
+    weightResetReanalyze: 'Clear and re-analyze',
+    weightResetClear: 'Clear weights',
+    weightSourceAi: 'AI analysis',
+    weightSourceAiTitle: 'Estimated by AI from the syllabus. Check it against the syllabus; the label goes away once you edit the weights.',
+    weightSourceCanvas: 'Set in Canvas',
+    weightSourceCanvasTitle: 'Grading weights your instructor set in Canvas',
     weightAddItem: '+ Add Item',
     weightTotal: 'Total:',
     unnamedWeight: 'Unnamed',
@@ -606,7 +624,7 @@ function applyUILanguage() {
   setText('weight-edit-add', 'weightAddItem');
   setText('weight-edit-save', 'customSave');
   setText('weight-edit-cancel', 'customCancel');
-  setText('weight-edit-reset', 'weightReset');
+  setText('weight-edit-reset', _weightResetKey);
   setText('settings-menu-title', 'settingsTitle');
   const settingsBtn = document.getElementById('settings-menu-btn');
   if (settingsBtn) {
@@ -686,6 +704,10 @@ function bindLanguageMenuActions() {
 
 // ── 全域資料快取（供事件處理器使用） ──
 let _currentData = {};
+// AI 分析是否已設定 key（只存布林，不把 aiConfig 放進頁面快取）：決定權重編輯器清除鈕的文字（D3）
+let _aiConfigured = false;
+// 權重編輯器清除鈕目前用的 i18n key：有 Canvas 權重→還原；沒有→清除並重新分析（AI 已設定）／清除權重
+let _weightResetKey = 'weightReset';
 let _lastRenderAt = 0;   // 上次以資料完整 render() 的時間（0＝尚未渲染或目前是空狀態；即時刷新用，見 refreshView）
 
 // ── 截止日期處理 ──
@@ -3198,6 +3220,24 @@ function courseUsesGroupWeights(courseId, groups) {
   return (groups || []).some((g) => g.group_weight);
 }
 
+// AI 分析是否已設定 key（AI 規則在 ai/gradingRules.js；dashboard 只拿布林）
+function isAiConfigured(aiConfig) {
+  return typeof DueGradingRules !== 'undefined' && DueGradingRules.resolveConfig(aiConfig).configured;
+}
+
+// 圓餅下的權重來源小字（D2，只有三種情況）：'ai'＝AI 寫的、使用者沒改過；'canvas'＝老師在 Canvas 設的；
+// 其餘（自己填的、改過的、沒有權重）不標。是不是 AI 的看 gradingAnalysis 紀錄（規則在 DueGradingRules.isAiWeights）
+function weightSourceHtml(source) {
+  if (source === 'ai') return `<div class="detail-weight-source" title="${esc(tr('weightSourceAiTitle'))}">${esc(tr('weightSourceAi'))}</div>`;
+  if (source === 'canvas') return `<div class="detail-weight-source" title="${esc(tr('weightSourceCanvasTitle'))}">${esc(tr('weightSourceCanvas'))}</div>`;
+  return '';
+}
+
+function isAiCustomWeights(courseId, weights) {
+  if (typeof DueGradingRules === 'undefined') return false;
+  return DueGradingRules.isAiWeights((_currentData.gradingAnalysis || {})[courseId], weights);
+}
+
 function renderWeightPie(groups, courseId) {
   // 自訂權重優先。customWeights[courseId] 存在（含空陣列）＝使用者的覆寫：
   // 總和 > 0 → 畫自訂圓餅；全刪／總和 0 → 「沒有評分資訊」，與編輯器看到的一致，不偷偷回退成 Canvas 權重（QA #168）。
@@ -3222,7 +3262,7 @@ function renderWeightPie(groups, courseId) {
       return `
         <div class="detail-weight-pie-container">
           <div class="detail-pie" role="img" aria-label="${esc(customWeights.map((c) => `${weightItemLabel(c)} ${c.weight}%`).join(', '))}" style="background: conic-gradient(${gradientParts});"></div>
-          <div class="detail-pie-legend">${legend}</div>
+          <div class="detail-pie-legend">${legend}${weightSourceHtml(isAiCustomWeights(courseId, customWeights) ? 'ai' : null)}</div>
           ${courseId ? EDIT_WEIGHT_BTN(courseId) : ''}
         </div>`;
     }
@@ -3252,7 +3292,7 @@ function renderWeightPie(groups, courseId) {
     return `
       <div class="detail-weight-pie-container">
         <div class="detail-pie" role="img" aria-label="${esc(groups.map((g) => `${g.name} ${g.group_weight || 0}%`).join(', '))}" style="background: conic-gradient(${gradientParts});"></div>
-        <div class="detail-pie-legend">${legend}</div>
+        <div class="detail-pie-legend">${legend}${weightSourceHtml('canvas')}</div>
         ${courseId ? EDIT_WEIGHT_BTN(courseId) : ''}
       </div>`;
   }
@@ -3775,10 +3815,12 @@ document.getElementById('main-section')?.addEventListener('click', (e) => {
 // ── 讀取資料 ──
 function loadData() {
   chrome.storage.local.get(
-    ['lastSync', 'schoolName', 'canvasBaseUrl', 'canvasBaseCandidate', 'courses', 'assignments', 'customAssignments', 'assignmentGroups', 'scores', 'courseNames', 'customWeights', 'manualDone', 'manualUndone', 'manualShown', 'manualHidden'],
+    ['lastSync', 'schoolName', 'canvasBaseUrl', 'canvasBaseCandidate', 'courses', 'assignments', 'customAssignments', 'assignmentGroups', 'scores', 'courseNames', 'customWeights', 'manualDone', 'manualUndone', 'manualShown', 'manualHidden', 'gradingAnalysis', 'aiConfig'],
     (raw) => {
-      // 候選網址另存在 _canvasCandidate（不進 _currentData），在 _currentData 的 canvasBaseUrl 更新後再畫提示
-      const { canvasBaseCandidate, ...data } = raw || {};
+      // 候選網址另存在 _canvasCandidate（不進 _currentData），在 _currentData 的 canvasBaseUrl 更新後再畫提示；
+      // aiConfig 只取「有沒有設定 key」，不進 _currentData
+      const { canvasBaseCandidate, aiConfig, ...data } = raw || {};
+      _aiConfigured = isAiConfigured(aiConfig);
       if (!data.courses || !data.courses.length) {
         currentView = 'grid';
         currentCourseId = null;
@@ -3817,6 +3859,8 @@ function loadData() {
         manualUndone: data.manualUndone || {},
         manualShown: data.manualShown || {},
         manualHidden: data.manualHidden || {},
+        // 一定要有這個 key：常駐 onChanged 只合併 _currentData 裡已有的 key，AI 之後寫的紀錄才會進來（D2 來源標示）
+        gradingAnalysis: data.gradingAnalysis || {},
       });
       setCanvasCandidate(canvasBaseCandidate);
     }
@@ -4214,6 +4258,7 @@ if (chrome.storage?.onChanged?.addListener) {
       if (!_isOwnEcho(key, newValue)) external = true;
     });
     if (Object.keys(patch).length) _mergeIntoCurrentData(patch);
+    if (changes.aiConfig) _aiConfigured = isAiConfigured(changes.aiConfig.newValue);
 
     // 「偵測到另一個 Canvas」提示：候選變了 → 只重畫側欄那一行（候選不進 _currentData、不排整頁重繪）；
     // 目前網址變了 → 也重畫這一行（canvasBaseUrl 是同步 key，外部變更另由下方 requestRefresh 排整頁重繪）
@@ -4376,9 +4421,21 @@ function openWeightEditModal(courseId) {
   }
 
   renderWeightEditList(items);
-  // 逃生口：僅當該課已有自訂權重時，才顯示「還原 Canvas 權重」
+  // 逃生口：僅當該課已有自訂權重時才顯示。文字照實說按下去會怎樣（D3，規則在 DueGradingRules.resetButtonKind）：
+  // 有 Canvas 權重 → 還原；沒有 → 清掉後圓餅變「沒有評分資訊」，AI 會重跑的課才寫「清除並重新分析」
+  const resetKind = typeof DueGradingRules !== 'undefined'
+    ? DueGradingRules.resetButtonKind({
+      canvasWeights: courseUsesGroupWeights(courseId, groups),
+      aiConfigured: _aiConfigured,
+      record: (_currentData.gradingAnalysis || {})[courseId],
+    })
+    : (courseUsesGroupWeights(courseId, groups) ? 'restore' : 'clear');
+  _weightResetKey = { restore: 'weightReset', reanalyze: 'weightResetReanalyze', clear: 'weightResetClear' }[resetKind];
   const resetBtn = document.getElementById('weight-edit-reset');
-  if (resetBtn) resetBtn.style.display = hasCustom ? '' : 'none';
+  if (resetBtn) {
+    resetBtn.style.display = hasCustom ? '' : 'none';
+    resetBtn.textContent = tr(_weightResetKey);
+  }
   document.getElementById('weight-edit-overlay').classList.add('open');
 }
 
@@ -4499,11 +4556,20 @@ document.getElementById('weight-edit-cancel').addEventListener('click', () => {
 
 document.getElementById('weight-edit-reset').addEventListener('click', () => {
   const courseId = _weightEditCourseId;
+  const reanalyze = _weightResetKey === 'weightResetReanalyze';
   // 刪除該課自訂權重 → 圓餅自然回退到 Canvas group_weight，或顯示無評分資訊
   updateShared(['customWeights'], (cur) => {
     const all = { ...(cur.customWeights || {}) };
     delete all[courseId];
     return { customWeights: all };
+  }, {
+    // 「清除並重新分析」：寫入落地後才叫 AI 跑（先叫的話 runner 讀到的還是舊權重，會直接跳過這門課）
+    done: () => {
+      if (!reanalyze || !chrome.runtime?.sendMessage) return;
+      try {
+        chrome.runtime.sendMessage({ type: 'AI_RUN_NOW' }, () => void chrome.runtime.lastError);
+      } catch (_) { }
+    },
   });
   document.getElementById('weight-edit-overlay').classList.remove('open');
   refreshWeightPanel(courseId);
