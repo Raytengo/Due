@@ -11,7 +11,8 @@
     'zh-TW': {
       menuItem: 'AI 分析設定',
       title: 'AI 分析設定',
-      consent: '同步後自動分析課程大綱、填入分數權重。',
+      // 揭露：送什麼、送去哪、用誰的額度（CWS Prominent Disclosure；QA AI P0-2）。{provider} 隨表單上的供應商替換
+      consent: '儲存後（以及之後每次同步），會把還沒有權重的課的大綱文字與 PDF（必要時含課程 PDF 檔名清單），從你的瀏覽器直接送到 {provider}，依其條款處理（部分免費方案會用來改進模型），使用你自己的 API 額度。開發者收不到這些資料。',
       providerLabel: '供應商',
       apiKeyLabel: 'API key',
       modelLabel: '模型 ID',
@@ -47,7 +48,7 @@
     'zh-CN': {
       menuItem: 'AI 分析设置',
       title: 'AI 分析设置',
-      consent: '同步后自动分析课程大纲、填入分数权重。',
+      consent: '保存后（以及之后每次同步），会把还没有权重的课程的大纲文字与 PDF（必要时含课程 PDF 文件名列表），从你的浏览器直接发送到 {provider}，按其条款处理（部分免费方案会用来改进模型），使用你自己的 API 额度。开发者收不到这些数据。',
       providerLabel: '供应商',
       apiKeyLabel: 'API key',
       modelLabel: '模型 ID',
@@ -83,7 +84,7 @@
     en: {
       menuItem: 'AI analysis settings',
       title: 'AI analysis settings',
-      consent: 'After sync, Due analyzes the syllabus and fills in the grade weights.',
+      consent: 'When you save (and after each later sync), Due sends the syllabus text and PDFs of courses without grade weights (and, when needed, the list of course PDF file names) directly from your browser to {provider}, which handles it under its own terms (some free tiers use it to improve their models), using your own API quota. The developer never receives this data.',
       providerLabel: 'Provider',
       apiKeyLabel: 'API key',
       modelLabel: 'Model ID',
@@ -166,19 +167,24 @@
 
   function readForm() {
     const p = currentProvider();
-    return {
+    const apiKey = $('ai-api-key').value.trim();
+    const cfg = {
       provider: $('ai-provider').value,
-      apiKey: $('ai-api-key').value.trim(),
+      apiKey,
       model: $('ai-model').value.trim(),
       // 支援 PDF 的供應商（Gemini）不顯示 base URL 欄位，就別把隱藏欄位的殘值存進去
       baseUrl: p.supportsPdf ? '' : $('ai-base-url').value.trim(),
-      consentedAt: new Date().toISOString(),
     };
+    // 沒填 key 什麼都不會送出，不算同意（QA AI P0-2）
+    if (apiKey) cfg.consentedAt = new Date().toISOString();
+    return cfg;
   }
 
   // 切換供應商只更新 placeholder／提示，不清空使用者已輸入的欄位
   function updateProviderUi() {
     const p = currentProvider();
+    // 同意文字點名資料會送到哪一家：跟著表單上選的供應商換
+    $('ai-settings-consent').textContent = t('consent', { provider: p.label || '' });
     $('ai-model').placeholder = t('modelPlaceholder', { model: p.defaultModel || '' });
     $('ai-api-key').placeholder = p.keyPlaceholder || '';
     $('ai-base-url').placeholder = p.baseUrl || '';
@@ -211,7 +217,6 @@
     if (menu) menu.textContent = t('menuItem');
     if (!$('ai-settings-overlay')) return;
     $('ai-settings-title').textContent = t('title');
-    $('ai-settings-consent').textContent = t('consent');
     $('ai-provider-label').textContent = t('providerLabel');
     $('ai-api-key-label').textContent = t('apiKeyLabel');
     $('ai-model-label').textContent = t('modelLabel');
@@ -390,8 +395,12 @@
 
     $('ai-cancel-btn').addEventListener('click', close);
 
+    // 點背景關閉：按下與放開都在背景才算（dashboard.js 的 trackBackdropPress／isBackdropClick，QA P2-9）——
+    // 在 API key 欄位拖曳選字、放開在背景上，不會把 modal 連同未存的設定一起關掉
+    if (typeof trackBackdropPress === 'function') trackBackdropPress(overlay);
     overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) close();
+      if (e.target !== overlay) return;
+      if (typeof isBackdropClick !== 'function' || isBackdropClick(overlay, e)) close();
     });
   }
 

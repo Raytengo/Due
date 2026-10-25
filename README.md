@@ -6,7 +6,7 @@
 
 **A Canvas dashboard that tells you what to do next.**
 
-Due is a Chrome extension that syncs with any Canvas LMS and lays out every
+Due is a Chrome extension that syncs with your school's Canvas and lays out every
 assignment, deadline, and grade weight in one calm, prioritized dashboard —
 no Canvas API tokens, no account setup, no server. An optional AI feature can
 read your syllabus for grading weights; bring your own LLM key if you want it.
@@ -34,9 +34,9 @@ there's nothing to configure. Log in to Canvas once and it syncs automatically.
 
 | | |
 |---|---|
-| **7-day popup** | Instant view of what's due this week, with a pinned overdue section |
+| **7-day popup** | Instant view of what's due this week (your custom to-dos included), with a pinned overdue section |
 | **Urgency colors** | Red overdue · Orange ≤7 days · Yellow 8–30 days · Blue 30+ days |
-| **Week progress ring** | How much of this week's work you've cleared, broken down by urgency |
+| **Progress ring** | How much of your near-term work (overdue in the last 30 days + due in the next 7) you've cleared, with a count for each urgency level |
 | **Grade weights** | Per-course breakdown of assignment groups and their weights |
 | **Grade calculator** | Enter scores for a live weighted total — Canvas grades prefill automatically |
 | **Drag to organize** | Exams & attendance auto-hide; drag any hidden item back, or tuck others away |
@@ -49,13 +49,16 @@ there's nothing to configure. Log in to Canvas once and it syncs automatically.
 
 ---
 
-## Works with any Canvas school
+## Which schools work
 
 Due never asks for a Canvas API token or a password. It uses the Canvas session
-already in your browser, so any school running Canvas works out of the box —
-just be logged in. The only key Due ever asks for is optional: your own
-Gemini / Qwen / DeepSeek / NVIDIA NIM API key, if you turn on AI grading-weight analysis
-(see below).
+already in your browser — just be logged in. The only key Due ever asks for is
+optional: your own Gemini / Qwen / DeepSeek / NVIDIA NIM API key, if you turn on
+AI grading-weight analysis (see below).
+
+It works with schools whose Canvas address ends in `.instructure.com`
+(for example `hkust-gz.instructure.com`). Schools that run Canvas on their
+own domain (like `canvas.yourschool.edu`) aren't supported yet.
 
 ---
 
@@ -78,14 +81,19 @@ them yourself, so you can still edit or reset them.
 
 - Settings gear → **AI analysis settings** → choose Gemini, Qwen, DeepSeek, or
   NVIDIA NIM, paste your own API key, save.
-- Each course is analyzed **once**. Courses that already have Canvas or manual
-  weights are skipped. Nothing runs until you add a key.
-- When you save with Gemini selected, Chrome asks for access to `canvas-user-content.com` so Due can download
-  syllabus PDFs; decline and it still works with the syllabus text.
+- Only courses without weights are analyzed; courses that already have Canvas or
+  manual weights are skipped. Once weights are found, that course is done (unless you
+  clear its weights). A course where none were found is tried again only when its
+  syllabus or files change, or when you change the AI settings. Nothing runs until you add a key.
+- AI-filled weights show a small **AI analysis** label under the pie chart until you
+  edit them. If your instructor later adds weights in Canvas, Due switches to those.
+- When you save, Chrome asks for access to `canvas-user-content.com` so Due can download
+  syllabus PDFs (Gemini reads the PDF itself; other providers get its text); decline and it still works with the syllabus text.
 - NVIDIA NIM does not allow direct browser calls, so saving with it selected asks for access to
   `integrate.api.nvidia.com` — without that permission the provider cannot run at all.
-- Syllabus content goes straight from your browser to the provider you chose.
-  Due has no server in between.
+- Syllabus content goes straight from your browser to the provider you chose,
+  using your own key and quota, and that provider's terms apply (some free tiers,
+  such as the Gemini API free tier, may use it to improve their models). Due has no server in between.
 
 ---
 
@@ -128,5 +136,5 @@ For the full architecture, data model, and design system, see [`CLAUDE.md`](CLAU
 ---
 
 <div align="center">
-<sub>Version 2.1.0 · <a href="LICENSE">MIT License</a></sub>
+<sub>Version 2.5.0 · <a href="LICENSE">MIT License</a></sub>
 </div>

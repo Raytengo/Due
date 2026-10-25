@@ -6,7 +6,7 @@
 
 **一眼看懂：現在該做哪份作業。**
 
-Due 是一個 Chrome 擴充功能，能同步任何 Canvas LMS，把所有作業、截止日期與
+Due 是一個 Chrome 擴充功能，能同步你學校的 Canvas，把所有作業、截止日期與
 評分比重整理進一個乾淨、依緊急度排序的 Dashboard——不需要 Canvas API token、
 不用註冊帳號、沒有伺服器。另有選用的 AI 功能可從課程大綱抓出評分比重，想用
 的話自備 LLM API key 即可。
@@ -34,9 +34,9 @@ Due 以「你」的身分登入：它借用瀏覽器裡現成的 Canvas 登入�
 
 | | |
 |---|---|
-| **7 天待辦 popup** | 本週到期作業一覽，含置頂「已逾期」區 |
+| **7 天待辦 popup** | 本週到期作業一覽（含你的自訂作業），附置頂「已逾期」區 |
 | **緊急度色階** | 逾期紅 · ≤7 天橘 · 8–30 天黃 · 30 天以上藍 |
-| **本週進度環** | 本週作業完成了多少，並依緊急度分級呈現 |
+| **近期進度環** | 近期作業（30 天內逾期＋未來 7 天到期）完成了多少，並列出各緊急度的件數 |
 | **評分比重** | 每門課的作業分組與各自權重 |
 | **成績計算器** | 輸入分數即時算加權總分——Canvas 已評分自動預填 |
 | **拖曳整理** | 考試與簽到自動隱藏；可把任何隱藏項拖回，或把其他項收起 |
@@ -49,11 +49,14 @@ Due 以「你」的身分登入：它借用瀏覽器裡現成的 Canvas 登入�
 
 ---
 
-## 適用任何 Canvas 學校
+## 適用哪些學校
 
-Due 從不要求 Canvas API token 或密碼。它使用瀏覽器裡既有的 Canvas 登入狀態，所以任何
-使用 Canvas 的學校都能直接用——只要你已經登入。Due 唯一會問你要的 key 是選用
-的：開啟 AI 評分比重分析時，你自己的 Gemini／Qwen／DeepSeek／NVIDIA NIM API key（見下方）。
+Due 從不要求 Canvas API token 或密碼。它使用瀏覽器裡既有的 Canvas 登入狀態——只要你已經登入。
+Due 唯一會問你要的 key 是選用的：開啟 AI 評分比重分析時，你自己的
+Gemini／Qwen／DeepSeek／NVIDIA NIM API key（見下方）。
+
+支援 Canvas 網址結尾是 `.instructure.com` 的學校（例如 `hkust-gz.instructure.com`）。
+用自己網域架設 Canvas 的學校（例如 `canvas.yourschool.edu`）目前還不支援。
 
 ---
 
@@ -75,12 +78,15 @@ Due 已上架 Chrome Web Store，一鍵安裝、免設定：
 
 - 設定齒輪 →「**AI 分析設定**」→ 選 Gemini／Qwen／DeepSeek／NVIDIA NIM，貼上你自己的
   API key，儲存。
-- 每門課只分析**一次**；已有 Canvas 或手動權重的課會跳過。沒填 key 什麼都不會跑。
-- 選 Gemini 儲存時，Chrome 會問是否允許存取 `canvas-user-content.com`，用來下載大綱 PDF；
-  拒絕也能用，只是只讀大綱文字。
+- 只分析還沒有權重的課；已有 Canvas 或手動權重的課會跳過。找到權重後那門課就不再分析（除非你清掉它的權重）；
+  找不到的課，要等大綱或課程檔案有變動、或你改了 AI 設定才會再試。沒填 key 什麼都不會跑。
+- AI 填的權重，圓餅圖下會有一行小字「AI 分析」，你改過就不再標示；之後老師在 Canvas
+  設了權重，Due 會改用 Canvas 的。
+- 儲存時，Chrome 會問是否允許存取 `canvas-user-content.com`，用來下載大綱 PDF（Gemini 直接讀 PDF，
+  其他供應商讀抽出的文字）；拒絕也能用，只是只讀大綱文字。
 - NVIDIA NIM 不允許瀏覽器直接呼叫，所以選它儲存時會多問一次是否允許存取
   `integrate.api.nvidia.com`；沒有這個權限該供應商完全無法運作。
-- 大綱內容直接從你的瀏覽器送到你選的供應商，中間沒有 Due 的伺服器。
+- 大綱內容用你自己的 key 與額度，直接從你的瀏覽器送到你選的供應商，依該供應商的條款處理（部分免費方案，例如 Gemini API 免費層，可能用來改進模型）；中間沒有 Due 的伺服器。
 
 ---
 
@@ -122,5 +128,5 @@ extension/
 ---
 
 <div align="center">
-<sub>版本 2.1.0 · <a href="LICENSE">MIT License</a></sub>
+<sub>版本 2.5.0 · <a href="LICENSE">MIT License</a></sub>
 </div>

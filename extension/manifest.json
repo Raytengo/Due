@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Due",
-  "version": "2.1.0",
-  "description": "Canvas LMS Dashboard - auto-sync assignments and deadlines for any Canvas school",
+  "version": "2.5.0",
+  "description": "Canvas LMS Dashboard - auto-sync assignments and deadlines from Canvas schools on instructure.com",
   "permissions": [
     "storage",
     "tabs",

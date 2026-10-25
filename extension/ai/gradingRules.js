@@ -23,6 +23,9 @@
   const WEIGHT_SUM_MIN = 80;                    // 權重總和合理區間
   const WEIGHT_SUM_MAX = 120;
   const PDF_PERMISSION_ORIGIN = 'https://*.canvas-user-content.com/*';
+  // 分析規則的版本：改了 prompt、回應解析、權重正規化或抽字上限（會改變 notFound 判定）就遞增，
+  // 舊版判成 notFound 的課指紋跟著變、自動重跑一次
+  const ANALYSIS_RULES_VERSION = 1;
 
   // hostPermission（選填）：該供應商的端點不回 CORS header，必須靠 Chrome host permission 略過 CORS。
   // 沒有這個欄位（gemini／qwen／deepseek）代表供應商自己有開 CORS，純 fetch 就能呼叫，不佔任何權限。
@@ -95,7 +98,10 @@
   }
 
   // ── 只跑一次規則 ──
-  function hasCanvasWeights(groups) {
+  // 課程關掉「依組別加權」（apply_assignment_group_weights === false）時殘留的 group_weight 不算數：
+  // 與 dashboard 的 courseUsesGroupWeights 一致（QA #93），那種課圓餅顯示「沒有評分資訊」，要讓 AI 補上
+  function hasCanvasWeights(groups, course) {
+    if (course && course.apply_assignment_group_weights === false) return false;
     return Array.isArray(groups) && groups.some((g) => g && Number(g.group_weight) > 0);
   }
 
@@ -103,10 +109,10 @@
   // 不特別擋「record.status === done」：done 之所以不重跑，是因為 done 一定會把權重寫進
   // customWeights，下面的 hasCustomWeights 就會擋掉；使用者按「還原 Canvas 權重」把
   // customWeights 清空後，這裡會自然放行重跑，不需要另外清「分析紀錄」
-  function shouldAnalyze({ courseId, customWeights, groups, record }) {
+  function shouldAnalyze({ courseId, customWeights, groups, record, course }) {
     const cw = customWeights && customWeights[courseId];
     if (Array.isArray(cw) && cw.length > 0) return { run: false, reason: 'hasCustomWeights' };
-    if (hasCanvasWeights(groups)) return { run: false, reason: 'hasCanvasWeights' };
+    if (hasCanvasWeights(groups, course)) return { run: false, reason: 'hasCanvasWeights' };
     return { run: true, reason: record ? 'retry' : 'first' };
   }
 
@@ -123,6 +129,8 @@
       provider: meta && meta.provider,
       model: meta && meta.model,
     };
+    // 這次分析看到的材料指紋（見 materialFingerprint）；runner 判定材料蒐集不完整時不帶，下次就會重跑
+    if (meta && typeof meta.materialHash === 'string') rec.materialHash = meta.materialHash;
     if (kind === 'done') {
       rec.components = outcome.components;
     } else if (kind === 'notFound') {
@@ -133,16 +141,83 @@
     return rec;
   }
 
+  // ── 材料指紋（D1，2026-10-25）──
+  // 沒有權重的課每次同步都會再試（2026-09-03 的決定），但材料沒變、temperature 0 時結果必然相同，
+  // 重試只是白花額度。指紋涵蓋「會讓結果改變的輸入」：大綱 HTML、課程 PDF 的 id／大小／更新時間、
+  // 供應商／模型（換一家可能讀得懂掃描件）、PDF 權限（後來才授權＝多了材料）。
+  // files／syllabusBody 為 null（抓不到）與空的刻意不同：之後抓到了指紋會變、自然重跑。
+  // 只用 Canvas 的 metadata 算，不下載 PDF、不呼叫 LLM
+  // 檔案另記「拿不拿得到」：上鎖模組的檔案沒有下載網址（url 空／locked_for_user），解鎖時 id、大小、日期都不變，
+  // 只有這個旗標會變。自訂 base URL（換一個端點）與分析規則版本也算進去
+  function materialFingerprint({ provider, model, baseUrl, pdfAllowed, syllabusBody, files } = {}) {
+    const fileKey = Array.isArray(files)
+      ? files
+        .map((f) => `${f && f.id}:${f && f.size}:${f && f.updated_at}:${f && (f.locked_for_user || !f.url) ? 'locked' : 'open'}`)
+        .sort()
+        .join(',')
+      : '<unavailable>';
+    const input = [
+      `rules${ANALYSIS_RULES_VERSION}`,
+      String(provider || ''),
+      String(model || ''),
+      String(baseUrl || ''),
+      pdfAllowed ? 'pdf' : 'nopdf',
+      syllabusBody == null ? '<unavailable>' : String(syllabusBody).trim(),
+      fileKey,
+    ].join('\u0000');
+    return hash53(input);
+  }
+
+  // cyrb53：非加密雜湊，只拿來比對「材料有沒有變」，53 位元碰撞機率可忽略
+  function hash53(str) {
+    let h1 = 0xdeadbeef;
+    let h2 = 0x41c6ce57;
+    for (let i = 0; i < str.length; i++) {
+      const ch = str.charCodeAt(i);
+      h1 = Math.imul(h1 ^ ch, 2654435761);
+      h2 = Math.imul(h2 ^ ch, 1597334677);
+    }
+    h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+    h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+    return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16);
+  }
+
+  // 上次是 notFound、而且材料指紋沒變 → 這次不必下載 PDF、也不必呼叫 LLM。
+  // error 不適用（key 錯、429、網路都可能下次就好）；舊紀錄沒有指紋 → 照跑一次、記下指紋
+  function isUnchangedNotFound(record, fingerprint) {
+    return !!(record && record.status === 'notFound' && record.materialHash && record.materialHash === fingerprint);
+  }
+
+  // ── AI 權重辨識（D2）──
+  // customWeights 跟 AI 上次寫進去的一模一樣（名稱與數字都相同）＝使用者沒改過，仍是「AI 分析」的權重。
+  // dashboard 用它決定圓餅下的來源標示；runner 用它判斷 Canvas 權重出現後能不能讓位（改過的不動）
+  function isAiWeights(record, weights) {
+    if (!record || record.status !== 'done' || !Array.isArray(record.components)) return false;
+    if (!Array.isArray(weights) || !weights.length || weights.length !== record.components.length) return false;
+    return weights.every((w, i) => {
+      const c = record.components[i];
+      return !!w && !!c && String(w.name || '') === String(c.name || '') && Number(w.weight) === Number(c.weight);
+    });
+  }
+
+  // 權重編輯器清除鈕（D3）要顯示哪一種：'restore'＝還原 Canvas 權重；'reanalyze'＝清除並重新分析（清掉後 AI 會再跑）；
+  // 'clear'＝清除權重。AI 上次判 notFound 的課不承諾重新分析：材料沒變時指紋會擋掉（D1），按下去不會有新結果
+  function resetButtonKind({ canvasWeights, aiConfigured, record } = {}) {
+    if (canvasWeights) return 'restore';
+    if (aiConfigured && !(record && record.status === 'notFound')) return 'reanalyze';
+    return 'clear';
+  }
+
   // modal 狀態列用：done | notFound | error | skipped | pending
   // 「還會不會再跑」跟「上次結果是什麼」是兩件事——沒有冷卻期後 shouldAnalyze 對任何未 done
   // 的紀錄都回 run:true，所以這裡不能再借用它的結果來判斷顯示，直接看 record 本身
-  function courseStatus({ courseId, customWeights, groups, record }) {
+  function courseStatus({ courseId, customWeights, groups, record, course }) {
     // done 要最先判斷：AI 分析成功後權重就寫進 customWeights，這門課從此也會落入下面的
     // hasCustomWeights 分支，先判斷 record.status 才不會把「AI 分析完成」誤顯示成「使用者手動設定」
     if (record && record.status === 'done') return 'done';
     const cw = customWeights && customWeights[courseId];
     if (Array.isArray(cw) && cw.length > 0) return 'skipped';
-    if (hasCanvasWeights(groups)) return 'skipped';
+    if (hasCanvasWeights(groups, course)) return 'skipped';
     if (!record) return 'pending';
     if (record.status === 'notFound' || record.status === 'error') return record.status;
     return 'skipped'; // 髒紀錄（未知 status）：modal 只認得固定幾種
@@ -357,6 +432,7 @@
     MIN_SYLLABUS_TEXT_CHARS,
     MAX_EXTRACTED_TEXT_CHARS,
     PDF_PERMISSION_ORIGIN,
+    ANALYSIS_RULES_VERSION,
     SYSTEM_PROMPT,
     USER_PROMPT,
     providerHostPermission,
@@ -365,6 +441,11 @@
     shouldAnalyze,
     nextRecord,
     courseStatus,
+    hasCanvasWeights,
+    materialFingerprint,
+    isUnchangedNotFound,
+    isAiWeights,
+    resetButtonKind,
     findSyllabusByKeyword,
     extractFileIds,
     stripHtml,

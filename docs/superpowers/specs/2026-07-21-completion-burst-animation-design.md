@@ -121,3 +121,12 @@ const _completeTimers = {}; // id -> timeoutId
 | `extension/dashboard/index.html` | `.completing`/`.bursting`/`.complete-undo-hint`/`.complete-burst-dot` CSS + 兩個 keyframes |
 
 > 不改 `completion.js`（純邏輯不變）、不改 `background.js`、不改 `popup.js`。
+
+---
+
+> **2026-10-23 後記（QA #16／#113）**：§6 第一點「並行完成：先爆的那筆重繪時會清掉另一筆的計時器」的取捨**已作廢**，改為**批次收尾**：
+>
+> - 爆開後的重繪 timer 改登記進 `_completeTimers`（key `${id}:burst`），導覽離開時由 `clearCompleteTimers()` 一併清掉。`rerenderDetailAndNav(cid)` 只在仍停在該課詳情時重繪詳情，`rerenderWeekAndNav` 只在仍是週待辦版面時重繪週 section，延遲 callback 不會把舊課程或舊頁面畫回來（#113）。
+> - `settleCompletion(rerender)`：一筆爆完（或被撤銷）時，如果還有其他撤銷窗口或爆開在進行，就先不重繪；已爆完的列/卡留在原位、已淡出，`.bursting` 帶 `pointer-events:none`，不推動其他列。等最後一筆收尾時再統一重繪一次。這樣每一筆都跑得完 1.5 秒窗口和碎點爆（#16；撤銷窗口已從 3 秒縮為 1.5 秒，見 `COMPLETE_DELAY_MS`）。
+> - 撤銷窗口或碎點爆進行中導覽離開時，該列會殘留在已 `display:none` 的容器裡，直到那個容器下次重繪。即時刷新的 `isUiIdle()` 只看畫面上可見的 `.completing`／`.bursting`，這些殘留不會擋住背景同步或 popup 勾選的刷新。
+> - §3 第三點「dashboard.js 無 `storage.onChanged` 監聽器」已不成立：現在有常駐監聽器（QA P1-3），但本頁自己寫入的回聲只合併資料、不重繪，所以動畫不會被打斷（見 CLAUDE.md 開發注意事項第 9 點）。

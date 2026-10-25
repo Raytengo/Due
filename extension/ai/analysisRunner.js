@@ -8,6 +8,9 @@
 // ═══════════════════════════════════════════════════════════════
 
 let _aiAnalyzing = false; // 全域鎖：新手教學期間連續多次 SYNC 不會疊跑
+// 鎖住期間又被觸發（同步完成、儲存設定、「清除並重新分析」的 AI_RUN_NOW）：這輪開頭算好的待分析清單不含觸發後才變的課，
+// 結束後補跑一輪（每輪重新計算，材料沒變的課會被指紋擋掉，必然收斂）
+let _aiRerunRequested = false;
 // AI_RESET_ANALYSIS 會遞增：分析途中被重置時，in-flight 那輪的結果不得寫回剛清空的 map
 let _aiResetEpoch = 0;
 
@@ -16,7 +19,7 @@ const AI_MAX_TOKENS_MAIN = 8192;  // 主分析：要留得下 thinking ＋ 完�
 const AI_MAX_TOKENS_SMALL = 512;  // 測試連線／挑檔：正文極短，但仍要留 thinking 空間
 const MAX_LINKED_PDFS = 5;        // 大綱頁可能連結很多檔案，位元組上限只擋使用不擋下載
 
-// 同步完成後由 syncAll 呼叫：不 await、不阻塞 SYNC 回應、不持有 _syncing
+// 同步資料寫入成功後由 runSync 以該場同步的網址呼叫：不 await、不阻塞 SYNC 回應、不佔用同步排程
 function scheduleGradingAnalysis(baseUrl) {
   setTimeout(() => {
     runPendingGradingAnalysis(baseUrl).catch((err) => console.error('[Due][AI] 分析失敗:', err));
@@ -46,11 +49,20 @@ async function aiHasPdfPermission() {
 }
 
 async function runPendingGradingAnalysis(baseUrlHint) {
-  if (_aiAnalyzing) return;
+  if (_aiAnalyzing) {
+    _aiRerunRequested = true;
+    return;
+  }
   // 旗標必須在守衛之後「同步」設定：中間若有 await，同一個 tick 內的兩次觸發會雙雙通過守衛而疊跑
   _aiAnalyzing = true;
   const epoch = _aiResetEpoch; // 這輪開始時的世代；使用者中途重置就作廢
   try {
+    // 先收回已被 Canvas 權重取代的 AI 權重（D2）；不需要 key，失敗也不擋分析
+    try {
+      await yieldAiWeightsToCanvas();
+    } catch (err) {
+      console.warn('[Due][AI] 讓位給 Canvas 權重失敗:', err);
+    }
     const { aiConfig } = await chrome.storage.local.get(['aiConfig']);
     const cfg = DueGradingRules.resolveConfig(aiConfig);
     if (!cfg.configured) return; // 沒 key：整個功能沉默
@@ -59,37 +71,46 @@ async function runPendingGradingAnalysis(baseUrlHint) {
 
     const data = await chrome.storage.local.get(['courses', 'customWeights', 'assignmentGroups', 'gradingAnalysis']);
     const courses = Array.isArray(data.courses) ? data.courses : [];
+    const records = data.gradingAnalysis || {};
     const now = Date.now();
     const todo = courses
       .filter((c) => DueGradingRules.shouldAnalyze({
+        course: c,
         courseId: c.id,
         customWeights: data.customWeights || {},
         groups: (data.assignmentGroups || {})[c.id] || [],
-        record: (data.gradingAnalysis || {})[c.id],
+        record: records[c.id],
         now,
-      }).run)
-      .slice(0, DueGradingRules.MAX_COURSES_PER_RUN);
+      }).run);
     if (!todo.length) return;
 
     const pdfAllowed = await aiHasPdfPermission();
     console.log(`[Due][AI] 待分析 ${todo.length} 門課（PDF 權限：${pdfAllowed}）`);
 
+    // 每輪最多實際分析 MAX_COURSES_PER_RUN 門；材料沒變而跳過的課（只花兩個 Canvas 請求）不佔名額，
+    // 否則前 10 門一直 notFound 時，後面的課永遠輪不到
+    let analyzed = 0;
     for (const course of todo) {
       // 使用者中途按了「清除分析紀錄」：剩下的課不再花額度（結果反正會被 epoch 守衛丟掉），finally 會補排一輪
       if (epoch !== _aiResetEpoch) break;
+      if (analyzed >= DueGradingRules.MAX_COURSES_PER_RUN) break;
       let outcome;
       try {
-        outcome = await analyzeCourse(course, cfg, { baseUrl, pdfAllowed });
+        outcome = await analyzeCourse(course, cfg, { baseUrl, pdfAllowed, record: records[course.id] });
       } catch (err) {
         outcome = { kind: 'error', source: 'none', error: err && err.message ? err.message : String(err) };
       }
+      if (outcome.kind === 'unchanged') continue; // 上次 notFound、材料沒變：不下載、不呼叫 LLM、不寫紀錄
+      analyzed++;
       await recordOutcome(course.id, outcome, cfg, epoch);
     }
   } finally {
     _aiAnalyzing = false;
     // 執行中被 AI_RESET_ANALYSIS 作廢：那次 reset 排的補跑撞到鎖而直接返回了，
     // 這裡補排一輪（每輪重新取 epoch，必然收斂），否則所有課會停在 pending 沒人再跑
-    if (epoch !== _aiResetEpoch) scheduleGradingAnalysis(baseUrlHint);
+    const rerun = _aiRerunRequested;
+    _aiRerunRequested = false;
+    if (epoch !== _aiResetEpoch || rerun) scheduleGradingAnalysis(baseUrlHint);
   }
 }
 
@@ -104,7 +125,11 @@ async function recordOutcome(courseId, outcome, cfg, epoch) {
   }
   const data = await chrome.storage.local.get(['gradingAnalysis', 'customWeights']);
   const all = data.gradingAnalysis || {};
-  all[courseId] = DueGradingRules.nextRecord(all[courseId], outcome, Date.now(), { provider: cfg.provider, model: cfg.model });
+  all[courseId] = DueGradingRules.nextRecord(all[courseId], outcome, Date.now(), {
+    provider: cfg.provider,
+    model: cfg.model,
+    materialHash: outcome.materialHash,
+  });
   const toSet = { gradingAnalysis: all };
 
   let weights = null;
@@ -135,17 +160,48 @@ async function recordOutcome(courseId, outcome, cfg, epoch) {
   }
 }
 
-// 回 outcome：{ kind:'done', source, components } | { kind:'notFound', source, notes } | { kind:'error', source, error }
+// D2：老師之後在 Canvas 設了權重 → AI 寫的、使用者沒改過的權重讓位（刪掉 customWeights 與分析紀錄），
+// 圓餅（customWeights 優先）才會和成績計算器（只用 Canvas 權重）一致。使用者改過的權重是他的決定，不動。
+// 不需要 key：收回的是 AI 自己寫的資料；紀錄一起刪，Canvas 權重之後若又拿掉，AI 會當新課重新分析
+async function yieldAiWeightsToCanvas() {
+  const R = DueGradingRules;
+  const data = await chrome.storage.local.get(['courses', 'customWeights', 'assignmentGroups', 'gradingAnalysis']);
+  const cw = data.customWeights || {};
+  const records = data.gradingAnalysis || {};
+  const groups = data.assignmentGroups || {};
+  let changed = false;
+  for (const c of (Array.isArray(data.courses) ? data.courses : [])) {
+    if (!R.hasCanvasWeights(groups[c.id] || [], c)) continue;
+    if (!R.isAiWeights(records[c.id], cw[c.id])) continue;
+    delete cw[c.id];
+    delete records[c.id];
+    changed = true;
+    console.log(`[Due][AI] 課程 ${c.id}: Canvas 已設權重，AI 權重讓位`);
+  }
+  if (changed) await chrome.storage.local.set({ customWeights: cw, gradingAnalysis: records });
+}
+
+// 回 outcome：{ kind:'done', source, components } | { kind:'notFound', source, notes, materialHash? }
+//            | { kind:'error', source, error } | { kind:'unchanged' }（上次 notFound、材料沒變，什麼都沒做）
+// 流程（D4，2026-10-25）：先用大綱頁文字＋其連結的 PDF 問一次；AI 說找不到比重（或大綱頁沒有材料）
+// 才翻課程檔案（關鍵字 → AI 挑檔），檔名清單與挑中的檔案不必每次都送給第三方
 async function analyzeCourse(course, cfg, ctx) {
   const R = DueGradingRules;
   const parts = [];
   const flags = { syllabusPdf: false, keywordPdf: false, aiPdf: false, syllabusText: false };
   let pdfBudget = R.MAX_TOTAL_PDF_BYTES;
+  // 這輪有東西因暫時性錯誤沒抓到（斷網、5xx、AI 挑檔失敗）→ 不記材料指紋，下次同步照跑
+  let incomplete = false;
   // 唯一的供應商分流點：Gemini 送原始 PDF bytes（自帶 OCR，掃描件也讀得到），
   // 其餘供應商用 pdf.js 抽字後送純文字（掃描件抽不到字 → 視同這個檔案沒材料）
   const providerSupportsPdf = DueAiProviders.supportsPdf(cfg.provider);
-  const pushPdf = async (pdf) => {
-    if (!pdf || pdf.bytes > pdfBudget) return false;
+  const pushPdf = async (got) => {
+    if (!got || !got.pdf) {
+      if (got && got.transient) incomplete = true;
+      return false;
+    }
+    const pdf = got.pdf;
+    if (pdf.bytes > pdfBudget) return false;
     pdfBudget -= pdf.bytes; // 已經下載了：不論用不用得上都算進累計預算
     if (providerSupportsPdf) {
       parts.push({
@@ -162,23 +218,55 @@ async function analyzeCourse(course, cfg, ctx) {
     parts.push({ type: 'text', text: `Course Syllabus (PDF):\n${text}` });
     return true;
   };
+  // 用目前蒐集到的材料問一次；供應商 HTTP／網路錯誤在這裡收斂成 outcome，才留得住 source
+  const analyze = async () => {
+    const source = R.pickSource(flags);
+    let raw;
+    try {
+      raw = await callProvider(cfg, [...parts, { type: 'text', text: R.USER_PROMPT }], R.SYSTEM_PROMPT, { temperature: 0, maxTokens: AI_MAX_TOKENS_MAIN });
+    } catch (err) {
+      return { kind: 'error', source, error: err && err.message ? err.message : String(err) };
+    }
+    const parsed = R.parseAnalysisResponse(raw);
+    if (!parsed.ok) return { kind: 'error', source, error: `bad response: ${parsed.error}` };
+    if (!parsed.found) return { kind: 'notFound', source, notes: parsed.notes || 'no grading breakdown found' };
+    const norm = R.normalizeWeights(parsed.components);
+    if (!norm.ok) return { kind: 'notFound', source, notes: norm.reason };
+    return { kind: 'done', source, components: norm.components };
+  };
 
-  // Step 1：syllabus 文字（只用 API 的 syllabus_body；不抓整頁 HTML）
-  let syllabusBody = '';
+  // 先拿 Canvas 的 metadata（不花 LLM 額度）：大綱 HTML、課程 PDF 清單 → 材料指紋（D1）
+  // 只用 API 的 syllabus_body，不抓整頁 HTML；抓不到記 null（指紋與「空的大綱」不同，之後抓到了會重跑）
+  let syllabusBody = null;
   try {
     const c = await fetchJSON(`${ctx.baseUrl}/api/v1/courses/${course.id}?include[]=syllabus_body`);
     syllabusBody = c && typeof c.syllabus_body === 'string' ? c.syllabus_body : '';
   } catch (_) { }
+  let files = [];
+  if (ctx.pdfAllowed) {
+    try {
+      const list = await fetchAllPages(`${ctx.baseUrl}/api/v1/courses/${course.id}/files?per_page=50&content_types[]=application/pdf`);
+      files = Array.isArray(list) ? list : [];
+    } catch (_) {
+      files = null; // 401/403（課程關閉檔案頁）或網路錯誤：當沒有檔案，指紋記成「抓不到」
+    }
+  }
+  const materialHash = R.materialFingerprint({
+    provider: cfg.provider, model: cfg.model, baseUrl: cfg.baseUrl, pdfAllowed: ctx.pdfAllowed, syllabusBody, files,
+  });
+  if (R.isUnchangedNotFound(ctx.record, materialHash)) return { kind: 'unchanged' };
+  const finish = (outcome) => (outcome.kind === 'notFound' && !incomplete ? { ...outcome, materialHash } : outcome);
 
+  // Step 1：syllabus 文字；Step 2：syllabus 內連結的 PDF（不分供應商都下載，分流在 pushPdf）
   const fetchedIds = new Set();
-  if (syllabusBody.trim()) {
-    // Step 2：syllabus 內連結的 PDF（不分供應商都下載，分流在 pushPdf）
+  if (syllabusBody && syllabusBody.trim()) {
     if (ctx.pdfAllowed) {
       // 只試前 MAX_LINKED_PDFS 個：未嘗試的 id 不進 fetchedIds，Step 3 仍可考慮
       for (const fid of R.extractFileIds(syllabusBody).slice(0, MAX_LINKED_PDFS)) {
         fetchedIds.add(String(fid));
-        const pdf = await tryFetchPdf(`${ctx.baseUrl}/courses/${course.id}/files/${fid}/download?download_frd=1`);
-        if (await pushPdf(pdf)) flags.syllabusPdf = true;
+        if (await pushPdf(await tryFetchPdf(`${ctx.baseUrl}/courses/${course.id}/files/${fid}/download?download_frd=1`))) {
+          flags.syllabusPdf = true;
+        }
       }
     }
     const text = R.stripHtml(syllabusBody);
@@ -188,58 +276,51 @@ async function analyzeCourse(course, cfg, ctx) {
     }
   }
 
-  // Step 3：課程檔案（關鍵字 → AI 挑檔）；所有供應商都跑，抽字失敗才落到 no syllabus material
-  if (ctx.pdfAllowed) {
-    let files = [];
-    try {
-      files = await fetchAllPages(`${ctx.baseUrl}/api/v1/courses/${course.id}/files?per_page=50&content_types[]=application/pdf`);
-    } catch (_) {
-      files = []; // 401/403（課程關閉檔案頁）視為沒有檔案
-    }
-    files = (Array.isArray(files) ? files : []).filter((f) => f && !fetchedIds.has(String(f.id)));
-    if (files.length) {
-      let picked = R.findSyllabusByKeyword(files);
-      let viaAi = false;
-      if (!picked) {
-        picked = await selectSyllabusPdfWithAI(files, cfg);
-        viaAi = !!picked;
+  let first = null;
+  if (parts.length) {
+    first = await analyze();
+    // done 直接收；error（key 錯、429、網路）換材料也不會好，不再翻課程檔案
+    if (first.kind !== 'notFound') return finish(first);
+  }
+
+  // Step 3：課程檔案（關鍵字 → AI 挑檔）；只在上面沒材料、或 AI 看了說找不到比重時才跑
+  const candidates = (files || []).filter((f) => f && !fetchedIds.has(String(f.id)));
+  if (ctx.pdfAllowed && candidates.length) {
+    let picked = R.findSyllabusByKeyword(candidates);
+    let viaAi = false;
+    if (!picked) {
+      const pick = await selectSyllabusPdfWithAI(candidates, cfg);
+      if (pick.error) {
+        incomplete = true;
+        // 沒有別的結果可交代 → 記 error 帶原因（key 錯、429…），不要謊稱「找不到大綱」
+        if (!first) return { kind: 'error', source: 'none', error: pick.error };
       }
-      if (picked) {
-        let pdf = picked.url ? await tryFetchPdf(picked.url) : null;
-        if (!pdf) {
-          // 簽名 URL 過期 → 重抓 metadata 拿新 URL
-          try {
-            const meta = await fetchJSON(`${ctx.baseUrl}/api/v1/files/${picked.id}`);
-            if (meta && meta.url) pdf = await tryFetchPdf(meta.url);
-          } catch (_) { }
+      picked = pick.picked;
+      viaAi = !!picked;
+    }
+    if (picked) {
+      let got = picked.url ? await tryFetchPdf(picked.url) : null;
+      if (!got || !got.pdf) {
+        // 簽名 URL 過期 → 重抓 metadata 拿新 URL
+        try {
+          const meta = await fetchJSON(`${ctx.baseUrl}/api/v1/files/${picked.id}`);
+          if (meta && meta.url) got = await tryFetchPdf(meta.url);
+        } catch (err) {
+          if (isTransientFetchError(err)) incomplete = true;
         }
-        if (await pushPdf(pdf)) {
-          if (viaAi) flags.aiPdf = true;
-          else flags.keywordPdf = true;
-        }
+      }
+      if (await pushPdf(got)) {
+        if (viaAi) flags.aiPdf = true;
+        else flags.keywordPdf = true;
+        return finish(await analyze());
       }
     }
   }
 
-  const source = R.pickSource(flags);
-  if (!parts.length) return { kind: 'notFound', source: 'none', notes: 'no syllabus material' };
-
-  parts.push({ type: 'text', text: R.USER_PROMPT });
-  // 供應商 HTTP／網路錯誤在這裡收斂成 outcome，才留得住 source（丟到外層 catch 會退化成 'none'）
-  let raw;
-  try {
-    raw = await callProvider(cfg, parts, R.SYSTEM_PROMPT, { temperature: 0, maxTokens: AI_MAX_TOKENS_MAIN });
-  } catch (err) {
-    return { kind: 'error', source, error: err && err.message ? err.message : String(err) };
-  }
-  const parsed = R.parseAnalysisResponse(raw);
-  if (!parsed.ok) return { kind: 'error', source, error: `bad response: ${parsed.error}` };
-  if (!parsed.found) return { kind: 'notFound', source, notes: parsed.notes || 'no grading breakdown found' };
-  const norm = R.normalizeWeights(parsed.components);
-  if (!norm.ok) return { kind: 'notFound', source, notes: norm.reason };
-  return { kind: 'done', source, components: norm.components };
+  return finish(first || { kind: 'notFound', source: 'none', notes: 'no syllabus material' });
 }
 
+// 回 { picked, error }：挑檔呼叫本身失敗（key 錯、429、網路）要讓呼叫端知道，不能當成「沒有像大綱的檔案」
 async function selectSyllabusPdfWithAI(files, cfg) {
   try {
     const raw = await callProvider(
@@ -248,18 +329,37 @@ async function selectSyllabusPdfWithAI(files, cfg) {
       'Return only valid JSON, no explanation.',
       { temperature: 0, maxTokens: AI_MAX_TOKENS_SMALL }
     );
-    return DueGradingRules.parseFilePick(raw, files);
-  } catch (_) {
-    return null;
+    return { picked: DueGradingRules.parseFilePick(raw, files), error: null };
+  } catch (err) {
+    return { picked: null, error: err && err.message ? err.message : String(err) };
   }
 }
 
-// 只接受真的 PDF：Content-Type 含 pdf 或前 5 bytes 為 %PDF-；單檔 ≤ MAX_PDF_BYTES（判準見 gradingRules）
+// fetchJSON 丟的錯：404 等是確定的結果；網路、5xx、429、401（登入過期）、403（fetchJSON 不給內文，
+// 分不出是 Canvas 限流〔403＋Rate Limit，見 background.js isRateLimited〕還是沒權限）都當暫時性，寧可下次再試
+function isTransientFetchError(err) {
+  const m = /HTTP (\d{3})/.exec(String(err && err.message));
+  if (!m) return true;
+  const status = Number(m[1]);
+  return status >= 500 || status === 429 || status === 401 || status === 403;
+}
+
+// 只接受真的 PDF：Content-Type 含 pdf 或前 5 bytes 為 %PDF-；單檔 ≤ MAX_PDF_BYTES（判準見 gradingRules）。
+// 回 { pdf } | { transient: true }（斷網、5xx、429：下次可能就好，這輪不記材料指紋）| null（確定不是可用的 PDF）
 async function tryFetchPdf(url) {
   const R = DueGradingRules;
   try {
     const res = await fetch(url, { credentials: 'include' });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      // 5xx、429、401（登入過期）、Canvas 限流（403＋內文 Rate Limit）：下次可能就好。
+      // 其餘 403（沒權限、上鎖）／404 是確定結果——上鎖的檔案解鎖時，檔案清單的鎖定狀態會改變指紋
+      if (res.status >= 500 || res.status === 429 || res.status === 401) return { transient: true };
+      if (res.status === 403) {
+        const body = await res.text().catch(() => '');
+        return /rate limit/i.test(body) ? { transient: true } : null;
+      }
+      return null;
+    }
     const contentType = res.headers.get('Content-Type');
     // 先看 header：宣告長度已超上限、或根本是網頁／JSON（未登入時 Canvas 會回登入頁）就別把 body 讀進記憶體。
     // 只在伺服器有宣告 Content-Length／Content-Type 時擋得到（Canvas／S3 都有宣告）；
@@ -273,9 +373,9 @@ async function tryFetchPdf(url) {
     const head = String.fromCharCode(...new Uint8Array(buf.slice(0, 5)));
     if (!R.acceptPdf({ ok: true, contentType, byteLength: buf.byteLength, head, maxBytes: R.MAX_PDF_BYTES })) return null;
     // 回原始 buffer：Gemini 路徑到 pushPdf 才轉 base64，抽字路徑根本不需要 base64
-    return { buffer: buf, mimeType: 'application/pdf', bytes: buf.byteLength };
+    return { pdf: { buffer: buf, mimeType: 'application/pdf', bytes: buf.byteLength } };
   } catch (_) {
-    return null;
+    return { transient: true }; // fetch 本身丟錯（斷網）或讀 body 中斷
   }
 }
 
@@ -355,6 +455,7 @@ async function aiGetStatus() {
   const courses = (Array.isArray(data.courses) ? data.courses : []).map((c) => {
     const record = records[c.id];
     const status = DueGradingRules.courseStatus({
+      course: c,
       courseId: c.id,
       customWeights: data.customWeights || {},
       groups: (data.assignmentGroups || {})[c.id] || [],

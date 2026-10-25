@@ -113,6 +113,46 @@ test('update rejects blank assignment names', () => {
   }, /name is required/);
 });
 
+// QA #161：Chrome 的 datetime-local 年欄位可打到 6 位數（2 0 2 6 1 1 → 202611 年）→ new Date 得 Invalid Date，
+// 原本 toISOString 拋 RangeError、被 UI 當成「請輸入作業名稱」。改為拋帶 code 的錯誤，UI 才能顯示日期錯誤
+test('rejects an unparseable due date (6-digit year) with code invalid_due', () => {
+  assert.throws(() => {
+    DueCustomAssignments.createCustomAssignment({
+      courseId: '42', name: 'Essay draft', dueLocalValue: '202611-10-29T23:59',
+    });
+  }, (err) => err.code === 'invalid_due');
+});
+
+test('rejects an implausible year (two-digit year typed → 0026) with code invalid_due', () => {
+  assert.throws(() => {
+    DueCustomAssignments.createCustomAssignment({
+      courseId: '42', name: 'Essay draft', dueLocalValue: '0026-10-29T23:59',
+    });
+  }, (err) => err.code === 'invalid_due');
+});
+
+test('update also rejects an invalid due date with code invalid_due', () => {
+  assert.throws(() => {
+    DueCustomAssignments.updateCustomAssignment(
+      { id: 'custom-1', created_at: 'x', _isCustom: true },
+      { courseId: '42', name: 'Task', dueLocalValue: '202611-10-29T23:59' },
+    );
+  }, (err) => err.code === 'invalid_due');
+});
+
+test('blank name error carries code name_required', () => {
+  assert.throws(() => {
+    DueCustomAssignments.createCustomAssignment({ courseId: '42', name: ' ', dueLocalValue: '2026-03-13T23:59' });
+  }, (err) => err.code === 'name_required');
+});
+
+test('isValidDueLocalValue accepts empty and normal dates, rejects bad years', () => {
+  assert.equal(DueCustomAssignments.isValidDueLocalValue(''), true);
+  assert.equal(DueCustomAssignments.isValidDueLocalValue('2026-10-29T23:59'), true);
+  assert.equal(DueCustomAssignments.isValidDueLocalValue('202611-10-29T23:59'), false);
+  assert.equal(DueCustomAssignments.isValidDueLocalValue('0026-10-29T23:59'), false);
+});
+
 test('update rejects a missing existing assignment', () => {
   assert.throws(() => {
     DueCustomAssignments.updateCustomAssignment(null, { name: 'X' });
