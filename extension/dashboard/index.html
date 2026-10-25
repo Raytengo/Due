@@ -198,7 +198,7 @@
 
     /* 學期待辦／課程共用一塊 active 底色（indicator recipe，#47）：換頁時沿 spring.selection 從上一項滑到下一項，
        不再是兩處底色各自淡出淡入。位置由 dashboard.js placeSideNavIndicator() 寫入 --y／--h；
-       沒有 active 項（課程詳情、已繳交）時 .is-off 原地淡出（transition.color）。用獨立的 translate 屬性，
+       沒有 active 項（課程詳情）時 .is-off 原地淡出（transition.color）。用獨立的 translate 屬性，
        按下 active 項時的 scale（#24）才疊得上去、以 indicator 自己的中心縮放。減少動態：位置直接到位（檔尾） */
     .side-nav-indicator {
       position: absolute;
@@ -247,12 +247,12 @@
 
     /* 學期待辦／課程的 active 底色改由 indicator 畫（#47），本身不再上底色（含 hover）。
        .has-indicator 由 placeSideNavIndicator() 第一次定位時加上：在那之前（JS 還沒跑的第一次繪製）底色仍畫在項目上，
-       載入那一幀就看得到選取。「已繳交」是獨立的過濾切換，保留上面自己的 .active 底色 */
+       載入那一幀就看得到選取 */
     .side-nav.has-indicator > .side-nav-item[data-page].active {
       background: transparent;
     }
 
-    /* 沒有課程時停用（課程／已繳交）：淡化、不給 hover（title 說明原因，見 setNoCoursesMode） */
+    /* 沒有課程時停用（課程／成績）：淡化、不給 hover（title 說明原因，見 setNoCoursesMode） */
     .side-nav-item:disabled {
       cursor: default;
       color: var(--mid);
@@ -399,7 +399,7 @@
       align-items: center;
     }
 
-    /* 偵測到另一個 Canvas：同步鍵上方一行安靜的提示（文字按鈕比照 .hidden-items-toggle） */
+    /* 偵測到另一個 Canvas：同步鍵上方一行安靜的提示（文字按鈕比照 .fold-toggle） */
     .canvas-candidate {
       margin-bottom: 14px;
       font-size: 12px;
@@ -1206,8 +1206,8 @@
       border-bottom: none;
     }
 
-    /* 已完成列淡化（主清單＋已繳交視圖的已隱藏列）：只套在內容上，不整列 opacity——整列會疊乘到
-       拖曳握把與操作鈕（已繳交視圖握把曾只剩約 1.6:1，QA #79）。用變數讓拖曳 clone／殘影歸零淡化，
+    /* 已完成列淡化（「已完成」區＋已隱藏區裡已完成的列）：只套在內容上，不整列 opacity——整列會疊乘到
+       拖曳握把與操作鈕（握把曾只剩約 1.6:1，QA #79）。用變數讓拖曳 clone／殘影歸零淡化，
        維持舊外觀（clone 全不透明、殘影只吃 .drag-source 的 0.3）*/
     .assignment-item.submitted,
     .hidden-item-row.submitted {
@@ -1674,7 +1674,7 @@
       interpolate-size: allow-keywords;
     }
 
-    :is(.assignment-desc, .grade-calc-body, .hidden-items-list) {
+    :is(.assignment-desc, .grade-calc-body, .fold-list) {
       display: block;
       height: 0;
       overflow: clip;
@@ -1684,7 +1684,7 @@
       transition: height var(--t-disclosure), opacity var(--t-disclosure), filter var(--t-disclosure), visibility var(--t-disclosure);
     }
 
-    :is(.assignment-desc.open, .grade-calc.open .grade-calc-body, .hidden-items.open .hidden-items-list, .hidden-items.drop-active .hidden-items-list) {
+    :is(.assignment-desc.open, .grade-calc.open .grade-calc-body, .detail-fold.open .fold-list, .hidden-items.drop-active .fold-list) {
       height: auto;
       opacity: 1;
       filter: none;
@@ -3397,17 +3397,6 @@
       margin: 24px 0 10px;
     }
 
-    /* 「已繳交」過濾開著：標題後附過濾名（深色，在淡灰標題中可辨，QA #5/#119） */
-    .detail-filter-tag {
-      color: var(--dark);
-    }
-
-    .detail-filter-tag::before {
-      content: '·';
-      margin: 0 6px;
-      color: var(--muted);
-    }
-
     /* 清單沒有作業時的提示（整段渲染與完成最後一項後的就地更新共用） */
     .detail-list-empty {
       padding: 12px 0;
@@ -3415,14 +3404,16 @@
       font-size: 13px;
     }
 
-    /* ── 已隱藏區（自動隱藏的考試・簽到＋手動拖進來的作業；跟隨完成過濾，見 spec 2026-10-23）── */
-    .hidden-items {
+    /* ── 作業清單下方的兩個收合區（spec 2026-10-25-drop-submitted-filter）──
+       .done-items：已完成（沒隱藏）；.hidden-items：已隱藏（自動隱藏的考試・簽到＋手動拖進來的作業，不分完成與否）。
+       開關、箭頭、清單共用 .fold-* */
+    .detail-fold {
       margin-top: 12px;
       padding-top: 10px;
       border-top: 1px solid var(--border);
     }
 
-    .hidden-items-toggle {
+    .fold-toggle {
       display: inline-flex;
       align-items: center;
       gap: 6px;
@@ -3439,31 +3430,13 @@
     }
 
     @media (hover: hover) and (pointer: fine) {
-      .hidden-items-toggle:hover {
+      .fold-toggle:hover {
         color: var(--orange);
       }
     }
 
-    /* 另一個完成桶的隱藏數短註（「另 M 項已完成，在『已繳交』中」）：接在數量後、較淡、以「·」隔開；
-       與數量同一段行內文字，窄欄時自然換行並對齊在箭頭之後 */
-    .hidden-items-note {
-      color: var(--mid);
-      transition: color var(--t-color);   /* hover 時跟著開關轉橘：淡入，不是一幀切上去（#37） */
-    }
-
-    .hidden-items-note::before {
-      content: '·';
-      margin: 0 6px;
-    }
-
-    @media (hover: hover) and (pointer: fine) {
-      .hidden-items-toggle:hover .hidden-items-note {
-        color: inherit;
-      }
-    }
-
-    /* 箭頭固定對齊第一行（短註換行時不跑到兩行中間） */
-    .hidden-items-arrow {
+    /* 箭頭固定對齊第一行 */
+    .fold-arrow {
       font-size: 11px;
       line-height: 1;
       display: inline-flex;
@@ -3473,16 +3446,16 @@
       transition: transform var(--t-disclosure);   /* 與清單的開合同一個 timing（#28） */
     }
 
-    .hidden-items-label {
+    .fold-label {
       line-height: 16px;
     }
 
-    .hidden-items.open .hidden-items-arrow {
+    .detail-fold.open .fold-arrow {
       transform: rotate(90deg);
     }
 
     /* 清單開合見「展開面板」共用規則（#28）；上方 4px 間距放內層，外層 height:0 才收得乾淨 */
-    .hidden-items-list-inner {
+    .fold-list-inner {
       padding-top: 4px;
     }
 
@@ -3665,7 +3638,7 @@
       cursor: grabbing !important;
     }
 
-    .hidden-items-empty {
+    .fold-empty {
       font-family: 'DM Mono', monospace;
       font-size: 11px;
       color: var(--mid);
@@ -4762,7 +4735,7 @@
        設定選單項目不縮（用 highlight 回應）。卡片／列用 :has 擋掉「按的是裡面的按鈕卻整張一起縮」。
        鍵盤 Enter／Space 走 click()，不觸發 :active——動作本身（morph、展開）就是回饋。減少動態：兩個 scale token 為 1（檔尾） */
     :is(.btn-sync, .btn-theme-toggle, .btn-add-assignment, .detail-back-tab, .canvas-candidate-btn, .state-msg-action,
-      .card-pager-btn, .btn-edit-weights, .btn-rename-course, .hidden-items-toggle,
+      .card-pager-btn, .btn-edit-weights, .btn-rename-course, .fold-toggle,
       .btn-delete-custom-assignment, .btn-edit-custom-assignment,
       .welcome-btn, .welcome-close,
       .custom-assignment-close, .weight-edit-close, .custom-assignment-actions button, .confirm-actions button,
@@ -4827,18 +4800,18 @@
 
       /* 弧直接到位（JS 不等 transitionend）、chevron 不轉、教學頁直接換 */
       .wk-ring-bar,
-      .hidden-items-arrow,
+      .fold-arrow,
       .grade-calc-arrow,
       .welcome-track {
         transition: none;
       }
 
       /* 展開面板（#28）：高度直接到位，只留淡入淡出、模糊清晰與 visibility */
-      :is(.assignment-desc, .grade-calc-body, .hidden-items-list) {
+      :is(.assignment-desc, .grade-calc-body, .fold-list) {
         transition: opacity var(--t-disclosure), filter var(--t-disclosure), visibility var(--t-disclosure);
       }
 
-      :is(.assignment-desc.open, .grade-calc.open .grade-calc-body, .hidden-items.open .hidden-items-list, .hidden-items.drop-active .hidden-items-list) {
+      :is(.assignment-desc.open, .grade-calc.open .grade-calc-body, .detail-fold.open .fold-list, .hidden-items.drop-active .fold-list) {
         transition: opacity var(--t-disclosure), filter var(--t-disclosure), visibility 0s;
       }
 
@@ -4913,10 +4886,6 @@
           <button class="side-nav-item" data-page="courses" id="nav-courses">
             <span class="side-nav-name" id="nav-courses-label">課程</span>
             <span class="side-nav-count" id="nav-courses-count"></span>
-          </button>
-          <button class="side-nav-item" id="nav-submitted">
-            <span class="side-nav-name" id="nav-submitted-label">已繳交</span>
-            <span class="side-nav-count" id="nav-submitted-count"></span>
           </button>
           <!-- 學期成績：開 modal（不是頁面）；分數只在這裡與各課成績計算器出現（決策 3，spec 2026-10-25-semester-grades） -->
           <button class="side-nav-item" id="nav-grades" aria-haspopup="dialog">
