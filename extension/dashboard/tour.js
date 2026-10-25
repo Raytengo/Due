@@ -87,6 +87,9 @@
     const c = pickCourse();
     if (c) c.click();
   }
+  const currentLastSync = () => (typeof _currentData !== 'undefined' && _currentData ? _currentData.lastSync || null : null);
+  // 課程詳情已經畫出來、清單裡卻一列作業都沒有：勾完成／拖曳這兩步永遠等不到目標，不必空等 2 秒
+  const detailHasNoRows = () => inCourseDetail() && !q(FIRST_ROW);
   const FIRST_ROW = `${DETAIL} .detail-assignments-list .assignment-item`;
   const lastRow = () => {
     const rows = document.querySelectorAll(FIRST_ROW);
@@ -108,6 +111,7 @@
   //   interactive：亮框內可不可以點（預設可以）；reveal：這一步期間加在 <html> 上的 class（亮出平常藏著的控制項）
   //   spot：使用者要點／要拖的那個小東西 → 主亮處改成圍著它的小圓（target 只用來等畫面、捲動）
   //   point：另外挖一個虛線框「指給你看」；pointLive：這個洞也是可以操作的地方（實線亮框、點擊放行）
+  //   abortWhen(state)：每幀檢查，成立就結束整趟導覽；giveUp()：等目標出現時成立就不再等、直接跳過這一步
   //   noNext：不顯示「下一步」鈕（只能做完這一步才前進；✕ 仍可結束）
   //   skipIf()：開導覽時成立就整步拿掉（不算進編號）
   //   doneWhen()：每幀檢查，成立就自動下一步（等的是頁面外發生的事，例如去 Canvas 登入後同步完成）
@@ -120,6 +124,8 @@
       // 亮「學校選單＋前往 Canvas」整塊（選單展開時連清單一起，不然點不到選項）；按鈕必須排第一個（它不在就整步不顯示）
       target: ['#empty-open-canvas', '.school-pick', '.school-pick-pop'],
       noNext: true,
+      // 這趟導覽期間同步完成了、卻沒有任何進行中的課 → 後面的步驟都沒東西可示範，直接結束（空狀態自己會說明）
+      abortWhen: (st) => currentLastSync() !== st.lastSyncAtStart && !(_currentData.courses || []).length,
       skipIf: () => !!q('#course-nav .nav-course-item'),
       doneWhen: () => !!q('#course-nav .nav-course-item'),
     },
@@ -146,6 +152,7 @@
       key: 'check',
       target: FIRST_ROW,
       spot: firstRowCheck,
+      giveUp: detailHasNoRows,
       before: openCourse,
       advanceEvent: 'complete',
     },
@@ -156,6 +163,7 @@
       spot: lastRowGrip,
       point: `${DETAIL} .archive-items`,
       scrollTo: `${DETAIL} .archive-items`,
+      giveUp: detailHasNoRows,
       before: openCourse,
       advanceEvent: 'drag',
     },
@@ -433,7 +441,8 @@
   function frame() {
     if (!_state) return;
     if (!_state.moving && _state.cur) {
-      if (_state.cur.doneWhen && _state.cur.doneWhen()) advance(SETTLE_MS);
+      if (_state.cur.abortWhen && _state.cur.abortWhen(_state)) end();
+      else if (_state.cur.doneWhen && _state.cur.doneWhen()) advance(SETTLE_MS);
       else {
         const r = rectOf(_state.cur.target);
         if (r) place(r);
@@ -446,6 +455,8 @@
     const t0 = Date.now();
     while (_state && Date.now() - t0 < WAIT_MAX_MS) {
       if (rectOf(getSpec().target, { clip: false })) return true;
+      const gu = getSpec().giveUp;
+      if (gu && gu()) return false;
       await sleep(60);
     }
     return !!(_state && rectOf(getSpec().target, { clip: false }));
@@ -472,6 +483,7 @@
       const idx = i;
       if (await waitForTarget(() => spec(steps[idx]))) { cur = spec(steps[i]); break; }
       if (!_state || token !== _state.token) return;
+      steps.splice(i--, 1);   // 這一步沒東西可示範：整步拿掉，n / N 的編號不跳號
     }
     if (!_state || token !== _state.token) return;
     if (i >= steps.length) { end(); return; }
@@ -571,7 +583,7 @@
     const parts = build();
     _state = {
       i: from, cur: null, raf: 0, token: 0, lastKey: '', moving: false, programmatic: false,
-      reveal: null, allow: [], steps, ...parts,
+      reveal: null, allow: [], steps, lastSyncAtStart: currentLastSync(), ...parts,
     };
     GUARDED.forEach((type) => window.addEventListener(type, onGuard, true));
     document.addEventListener('click', onClick, true);
