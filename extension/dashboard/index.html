@@ -529,7 +529,7 @@
       box-shadow: 0 0 0 1.5px var(--orange), 0 0 0 6px rgba(217, 119, 87, 0.16);
       pointer-events: none;
       transition: left var(--t-disclosure), top var(--t-disclosure), width var(--t-disclosure), height var(--t-disclosure),
-        border-radius var(--t-disclosure);
+        border-radius var(--t-disclosure), opacity var(--t-fade);
     }
 
     /* 脈動信標（hotspot beacon）：實心小點＋兩圈錯開的擴散光圈，掛在要點的亮框角上，提示「點這裡」 */
@@ -645,10 +645,16 @@
       outline: none;
     }
 
-    /* 換步：說明框先淡出下沉一點，到新位置再浮上來 */
+    /* 換步：說明框先淡出下沉一點，到新位置再浮上來；亮框框線也先收起來
+       （點了課程之後到下一步出現前，框線不留在舊的那一列上，看起來像卡住的空白框） */
     .tour-root.is-moving .tour-pop {
       opacity: 0;
       translate: 0 4px;
+    }
+
+    .tour-root.is-moving .tour-ring,
+    .tour-root.is-moving .tour-ring2 {
+      opacity: 0;
     }
 
     .tour-root.no-anim .tour-ring,

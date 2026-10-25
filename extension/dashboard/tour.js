@@ -366,79 +366,47 @@
     return { x, y, w, h, rx: roundEl ? Math.min(w, h) / 2 : Math.min(8, Math.min(w, h) / 2) };
   }
 
-  // 手繪箭頭：從說明框右邊出去，途中繞一個小圈，指進「指給你看」的框；箭頭兩撇順著最後的切線。進框方向看相對位置：
-  //   框在右邊 → 往右走、繞圈、從框的左緣進去；框在上面且空間夠 → 往右拐上去、從下緣進去；
-  //   其餘（說明框貼在框下面）→ 繞到框的右側、由右往左進去
-  const SKETCH_MIN_RISE = 150;
-  const SKETCH_MIN_RUN = 120;
+  // 手繪箭頭：一條圓滑的弧線，從說明框右邊出去、往外鼓一圈，指進「指給你看」的框；箭頭兩撇順著最後的切線。
+  // 終點在框上離起點最近的那條邊（往框中央錯開一點）；兩者太近畫不出弧線就不畫
+  const SKETCH_MIN_LEN = 70;
   function drawSketch(popBox, b) {
     const { sketchHalo, sketchPath, sketchHead } = _state;
     const f = (v) => v.toFixed(1);
+    const clear = () => [sketchPath, sketchHalo, sketchHead].forEach((n) => n.setAttribute('d', ''));
     const sx = popBox.x + popBox.w + 8;
     const sy = popBox.y + Math.min(34, popBox.h / 2);
-    const below = b.y + b.h + 12;
-    let d;
-    let ex;
-    let ey;
-    let c2;          // 最後一段的第二個控制點（決定箭頭方向）
-    if (b.x - sx >= SKETCH_MIN_RUN) {
-      // 由左往右：終點在框左緣，高度盡量跟起點齊（夾在框內），圈往上鼓
-      ex = b.x - 12;
-      ey = clampN(sy - 30, b.y + 24, b.y + b.h - 24);
-      const r = 11;
-      const P = { x: sx + (ex - sx) * 0.45, y: (sy + ey) / 2 };
-      c2 = { x: ex - 46, y: ey };
-      d = [
-        `M ${f(sx)} ${f(sy)}`,
-        `C ${f(sx + (P.x - sx) * 0.5)} ${f(sy)} ${f(P.x - r * 1.3)} ${f(P.y)} ${f(P.x)} ${f(P.y)}`,
-        `C ${f(P.x + r * 1.7)} ${f(P.y - r * 2.5)} ${f(P.x - r * 1.7)} ${f(P.y - r * 2.5)} ${f(P.x + r * 0.35)} ${f(P.y)}`,
-        `C ${f(P.x + r * 2.2)} ${f(P.y + r * 0.5)} ${f(c2.x)} ${f(c2.y)} ${f(ex)} ${f(ey)}`,
-      ].join(' ');
-    } else if (sy - below >= SKETCH_MIN_RISE) {
-      // 由下往上：終點在框下緣，x 往起點右邊錯開（拐彎要有空間）
-      ex = clampN(sx + 110, b.x + 24, b.x + b.w - 24);
-      ey = below;
-      const rise = sy - ey;
-      const r = clampN(rise * 0.09, 9, 15);
-      const P = { x: ex, y: ey + rise * 0.48 };   // 小圈在往上那一段的中間
-      c2 = { x: ex, y: ey + rise * 0.18 };
-      d = [
-        `M ${f(sx)} ${f(sy)}`,
-        `C ${f(sx + (ex - sx) * 0.75)} ${f(sy + 2)} ${f(ex)} ${f(sy - 4)} ${f(P.x)} ${f(P.y)}`,
-        `C ${f(P.x + r * 2.4)} ${f(P.y - r * 1.8)} ${f(P.x + r * 2.4)} ${f(P.y + r * 1.6)} ${f(P.x)} ${f(P.y - r * 0.4)}`,
-        `C ${f(P.x - r * 0.6)} ${f(P.y - r * 2.2)} ${f(c2.x)} ${f(c2.y)} ${f(ex)} ${f(ey)}`,
-      ].join(' ');
-    } else if (sy >= b.y + b.h * 0.5 && sx <= b.x + b.w + 40 && Math.max(b.x + b.w + 12, sx) + 64 + 40 < window.innerWidth) {
-      // 由右往左：終點在框右緣偏下，先往右走、在框右邊往上繞一圈，再往左指進去
-      ex = b.x + b.w + 12;
-      ey = b.y + b.h * 0.62;
-      const tx = Math.max(ex, sx) + 64;           // 往上那一段的 x
-      const r = 11;
-      const P = { x: tx, y: (sy + ey) / 2 + 6 };
-      c2 = { x: ex + 46, y: ey };
-      d = [
-        `M ${f(sx)} ${f(sy)}`,
-        `C ${f(sx + (tx - sx) * 0.75)} ${f(sy + 2)} ${f(tx)} ${f(sy - 4)} ${f(P.x)} ${f(P.y)}`,
-        `C ${f(P.x + r * 2.4)} ${f(P.y - r * 1.8)} ${f(P.x + r * 2.4)} ${f(P.y + r * 1.6)} ${f(P.x)} ${f(P.y - r * 0.4)}`,
-        `C ${f(P.x - r * 0.4)} ${f(ey + 8)} ${f(c2.x)} ${f(c2.y)} ${f(ex)} ${f(ey)}`,
-      ].join(' ');
-    } else {
-      // 說明框跟框貼太近，畫不出像樣的箭頭 → 不畫線，只留虛線框
-      sketchPath.setAttribute('d', '');
-      sketchHalo.setAttribute('d', '');
-      sketchHead.setAttribute('d', '');
-      return;
-    }
+    // 終點：框上離起點最近的點；落在上下緣時往右錯開、落在左右緣時往上錯開（箭頭斜斜進框，不是直直戳）
+    let ex = clampN(sx, b.x, b.x + b.w);
+    let ey = clampN(sy, b.y, b.y + b.h);
+    if (ey === b.y || ey === b.y + b.h) ex = clampN(ex + 50, b.x + 24, b.x + b.w - 24);
+    else ey = clampN(ey - 40, b.y + 24, b.y + b.h - 24);
+    const dx0 = sx - ex;
+    const dy0 = sy - ey;
+    const d0 = Math.hypot(dx0, dy0) || 1;
+    ex += (dx0 / d0) * 12;   // 停在框外一點
+    ey += (dy0 / d0) * 12;
+    const L = Math.hypot(ex - sx, ey - sy);
+    if (L < SKETCH_MIN_LEN) { clear(); return; }
+    const ux = (ex - sx) / L;
+    const uy = (ey - sy) / L;
+    // 往外鼓的方向：朝右（先往右出去再拐過去）
+    let px = -uy;
+    let py = ux;
+    if (px < 0) { px = -px; py = -py; }
+    const bow = clampN(L * 0.32, 24, 90);
+    const c1 = { x: sx + ux * L * 0.2 + px * bow, y: sy + uy * L * 0.2 + py * bow };
+    const c2 = { x: sx + ux * L * 0.8 + px * bow, y: sy + uy * L * 0.8 + py * bow };
+    const d = `M ${f(sx)} ${f(sy)} C ${f(c1.x)} ${f(c1.y)} ${f(c2.x)} ${f(c2.y)} ${f(ex)} ${f(ey)}`;
     sketchPath.setAttribute('d', d);
     sketchHalo.setAttribute('d', d);
     // 箭頭兩撇：沿最後一段的切線（c2 → 終點）往回、左右各張 30°
     const tl = Math.hypot(ex - c2.x, ey - c2.y) || 1;
-    const ux = (ex - c2.x) / tl;
-    const uy = (ey - c2.y) / tl;
+    const tx = (ex - c2.x) / tl;
+    const ty = (ey - c2.y) / tl;
     const wing = (deg) => {
       const a = (deg * Math.PI) / 180;
-      const wx = -(ux * Math.cos(a) - uy * Math.sin(a)) * 11;
-      const wy = -(ux * Math.sin(a) + uy * Math.cos(a)) * 11;
+      const wx = -(tx * Math.cos(a) - ty * Math.sin(a)) * 11;
+      const wy = -(tx * Math.sin(a) + ty * Math.cos(a)) * 11;
       return `${f(ex + wx)} ${f(ey + wy)}`;
     };
     sketchHead.setAttribute('d', `M ${wing(30)} L ${f(ex)} ${f(ey)} L ${wing(-30)}`);
