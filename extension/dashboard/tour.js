@@ -4,7 +4,8 @@
 //   （點擊類看 advanceOn；改名／勾完成／拖曳這種要等結果的，聽 dashboard.js 的 due:action 事件）
 // - 「下一步」跳過這一步（需要換畫面的由導覽代點，next）；右上角 ✕ 與 Esc 結束
 // - 有些步驟要先到某個畫面（before：例如先打開一門課），導覽代點側欄後等目標出現才顯示
-// - 要點／要拖的地方（spot）挖成一個小圓、外圈一直往外擴散；只看不點的步驟（⚙）是圓角方框
+// - 要點／要拖的地方（spot）：亮框貼著那個元素的形狀（driver.js／react-joyride 的 spotlight 做法），
+//   角落再放一個會脈動的小信標（hotspot beacon）提示「點這裡」；只看不點的步驟（⚙）沒有信標
 // - 變暗用 SVG mask 挖洞：主亮處之外可以再挖一個虛線框（point：拖曳的目的地、AI 權重會填的地方），AI 那步再配手繪繞圈箭頭
 // - 亮框以外擋住點擊（四塊透明 blocker 圍住主亮框）；interactive:false 的步驟連亮框本身也擋
 // - 目標每幀重新查詢、重新量位置（側欄、詳情會整段重建，active 底色會滑），不快取節點
@@ -26,10 +27,8 @@
       renameBody: '點鉛筆，改成你習慣的叫法，按 Enter 儲存。',
       checkTitle: '做完就勾掉',
       checkBody: '點最左邊的圓圈，把這項標成完成。1.5 秒內再點一次可以反悔。',
-      dragBackTitle: '拖曳整理',
-      dragBackBody: '剛勾掉的在「已完成」裡。按住名稱後的 ⋮⋮，把它拖回上面的清單。',
       dragTitle: '拖曳整理',
-      dragBody: '按住名稱後的 ⋮⋮，拖到下方「已完成」或「已隱藏」。',
+      dragBody: '按住名稱後的 ⋮⋮，往下拖到「已完成」或「已隱藏」。',
       aiTitle: '讓 AI 幫你填評分比重',
       aiBody: '在 ⚙ 的「AI 分析設定」貼上你的 API key。',
       aiPoint: '會自動填在這裡',
@@ -46,10 +45,8 @@
       renameBody: '点铅笔，改成你习惯的叫法，按 Enter 保存。',
       checkTitle: '做完就勾掉',
       checkBody: '点最左边的圆圈，把这项标成完成。1.5 秒内再点一次可以反悔。',
-      dragBackTitle: '拖动整理',
-      dragBackBody: '刚勾掉的在「已完成」里。按住名称后的 ⋮⋮，把它拖回上面的清单。',
       dragTitle: '拖动整理',
-      dragBody: '按住名称后的 ⋮⋮，拖到下方「已完成」或「已隐藏」。',
+      dragBody: '按住名称后的 ⋮⋮，往下拖到「已完成」或「已隐藏」。',
       aiTitle: '让 AI 帮你填评分比重',
       aiBody: '在 ⚙ 的「AI 分析设置」贴上你的 API key。',
       aiPoint: '会自动填在这里',
@@ -66,10 +63,8 @@
       renameBody: 'Click the pencil, type the name you use, and press Enter.',
       checkTitle: 'Check it off',
       checkBody: 'Click the circle on the left to mark this done. Click again within 1.5 seconds to undo.',
-      dragBackTitle: 'Drag to organize',
-      dragBackBody: 'What you just checked off is under “Done”. Grab the ⋮⋮ after its name and drag it back up to the list.',
       dragTitle: 'Drag to organize',
-      dragBody: 'Grab the ⋮⋮ after a name and drop it on “Done” or “Hidden” below.',
+      dragBody: 'Grab the ⋮⋮ after a name and drag it down onto “Done” or “Hidden”.',
       aiTitle: 'Let AI fill in grade weights',
       aiBody: 'Paste your API key in ⚙ → “AI analysis settings”.',
       aiPoint: 'filled in here',
@@ -100,28 +95,10 @@
     const r = lastRow();
     return r ? r.querySelector('.drag-grip') : null;
   };
-  const doneHasRows = () => !!q(`${DETAIL} .done-items .assignment-item`);
-  // 「已完成」區裡這一趟剛勾掉的那一列的握把（找不到就第一列）
-  const justDoneGrip = () => {
-    const id = _state && _state.completedId;
-    const css = (v) => ((window.CSS && CSS.escape) ? CSS.escape(String(v)) : String(v));
-    const chk = id != null ? q(`${DETAIL} .done-items .assignment-check[data-assignment-id="${css(id)}"]`) : null;
-    const row = chk ? chk.closest('.assignment-item') : q(`${DETAIL} .done-items .assignment-item`);
-    return row ? row.querySelector('.drag-grip') : null;
-  };
   const firstRowCheck = () => {
     const row = q(FIRST_ROW);
     return row ? row.querySelector('.assignment-check') : null;
   };
-  // 「已完成」區預設收著：要從裡面拖東西出來得先打開
-  function openDoneFold() {
-    openCourse();
-    const sec = q(`${DETAIL} .done-items`);
-    if (sec && !sec.classList.contains('open')) {
-      const btn = sec.querySelector('.fold-toggle');
-      if (btn) btn.click();
-    }
-  }
 
   // 每一步：
   //   target：亮起來的元素（選擇器或回傳元素的函式；陣列＝取聯集）；scrollTo：要捲進可視範圍的（預設第一個 target）
@@ -130,8 +107,7 @@
   //   interactive：亮框內可不可以點（預設可以）；reveal：這一步期間加在 <html> 上的 class（亮出平常藏著的控制項）
   //   spot：使用者要點／要拖的那個小東西 → 主亮處改成圍著它的小圓（target 只用來等畫面、捲動）
   //   point：另外挖一個虛線框「指給你看」；pointArrow：再從說明框畫一條手繪繞圈箭頭過去，旁邊寫 pointLabel
-  //   settle：before 之後先等多久再捲動（等展開動畫）
-  //   resolve(state)：依這一趟的狀況換文案／目標（例：剛勾過一項 → 拖曳那步改成「把它拖回來」）
+  //   resolve(state)：依這一趟的狀況換文案／目標
   const STEPS = [
     {
       key: 'course',
@@ -157,30 +133,14 @@
       advanceEvent: 'complete',
     },
     {
+      // 從清單最後一列往下拖：它緊鄰下方兩區，握把與目的地（虛線框）同時在畫面裡
       key: 'drag',
+      target: [lastRow, `${DETAIL} .done-items`, `${DETAIL} .hidden-items`],
+      spot: lastRowGrip,
+      point: [`${DETAIL} .done-items`, `${DETAIL} .hidden-items`],
+      scrollTo: `${DETAIL} .hidden-items`,
       before: openCourse,
       advanceEvent: 'drag',
-      resolve(state) {
-        if (state.didComplete && doneHasRows()) {
-          return {
-            textKey: 'dragBack',
-            before: openDoneFold,
-            settle: 400,   // 等「已完成」展開完（--t-disclosure）再捲，不然捲到的是展開前的位置
-            target: [`${DETAIL} .done-items`, lastRow],
-            spot: justDoneGrip,
-            point: `${DETAIL} .detail-assignments-list`,   // 拖回這裡
-            scrollTo: `${DETAIL} .done-items`,
-          };
-        }
-        // 最後一列的握把緊鄰下方兩區：握把與放置目標在同一個亮框裡
-        return {
-          textKey: 'drag',
-          target: [lastRowGrip, `${DETAIL} .done-items`, `${DETAIL} .hidden-items`],
-          spot: lastRowGrip,
-          point: [`${DETAIL} .done-items`, `${DETAIL} .hidden-items`],   // 拖到這兩區
-          scrollTo: `${DETAIL} .hidden-items`,
-        };
-      },
     },
     {
       key: 'ai',
@@ -194,8 +154,7 @@
   ];
 
   const PAD = 6;              // 亮框比目標大一圈
-  const SPOT_MIN = 38;        // 小圓的直徑：圍住要點的東西，但不小於這個、不大於 SPOT_MAX
-  const SPOT_MAX = 56;
+  const SPOT_PAD = 5;         // 要點的元素：亮框只比它大一點，貼著它的形狀
   const GAP = 18;             // 說明框與亮框的距離
   const EDGE = 14;            // 說明框離視窗邊緣的最小距離
   const SETTLE_MS = 380;      // 點了／代點之後等頁面換完（頁面切換淡入、課程 morph）
@@ -295,6 +254,12 @@
     const ring2 = document.createElement('div');
     ring2.className = 'tour-ring2';
     root.appendChild(ring2);
+    // 脈動信標（hotspot beacon）：實心小點＋兩圈往外擴散的光圈，掛在要點的亮框角上
+    const beacon = document.createElement('div');
+    beacon.className = 'tour-beacon';
+    beacon.setAttribute('aria-hidden', 'true');
+    beacon.innerHTML = '<span></span><span></span>';
+    root.appendChild(beacon);
 
     // 手繪繞圈箭頭（point 用）：路徑＋箭頭兩撇＋旁邊一行手寫感的小字
     const sketch = svgEl('svg', { class: 'tour-sketch', 'aria-hidden': 'true' });
@@ -335,7 +300,7 @@
     ring.addEventListener('click', nudge);   // 只有 interactive:false 時 ring 才吃得到點擊
     pop.querySelector('.tour-close').addEventListener('click', () => end());
     pop.querySelector('.tour-next').addEventListener('click', () => next());
-    return { root, hole, hole2, ring, ring2, pop, blockers, sketch, sketchHalo, sketchPath, sketchHead, sketchLabel };
+    return { root, hole, hole2, ring, ring2, beacon, pop, blockers, sketch, sketchHalo, sketchPath, sketchHead, sketchLabel };
   }
 
   // 點到被擋住的地方：說明框輕推一下（減少動態：不動，只把焦點拉回說明框）
@@ -397,65 +362,57 @@
 
   const clampN = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
 
-  // 圍住要點的東西的小圓（外接正方形）：直徑＝東西的長邊加一圈，夾在 SPOT_MIN～SPOT_MAX
-  function spotBox(r) {
-    const cx = (r.left + r.right) / 2;
-    const cy = (r.top + r.bottom) / 2;
-    const d = clampN(Math.max(r.right - r.left, r.bottom - r.top) + 18, SPOT_MIN, SPOT_MAX);
-    return { x: cx - d / 2, y: cy - d / 2, w: d, h: d };
+  // 貼著要點的元素的亮框；元素本身是圓（勾選圈）就是圓，否則小圓角（比照 driver.js 的 stageRadius 上限：不超過短邊一半）
+  function spotBox(el, r) {
+    const x = r.left - SPOT_PAD;
+    const y = r.top - SPOT_PAD;
+    const w = r.right - r.left + SPOT_PAD * 2;
+    const h = r.bottom - r.top + SPOT_PAD * 2;
+    const own = el ? parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0 : 0;
+    const roundEl = own >= Math.min(r.right - r.left, r.bottom - r.top) / 2 - 0.5;
+    return { x, y, w, h, rx: roundEl ? Math.min(w, h) / 2 : Math.min(8, Math.min(w, h) / 2) };
   }
 
-  // 手繪繞圈箭頭：從說明框邊緣出發，途中繞一個小圈，落在「指給你看」的框邊；箭頭兩撇順著最後的切線
+  // 手繪箭頭：從說明框右邊出去、往右拐上去，途中繞一個小圈，從下方指進「指給你看」的框；箭頭兩撇順著最後的切線
   function drawSketch(popBox, b) {
     const { sketchHalo, sketchPath, sketchHead, sketchLabel } = _state;
-    const pcx = popBox.x + popBox.w / 2;
-    const pcy = popBox.y + popBox.h / 2;
-    const bcx = b.x + b.w / 2;
-    const bcy = b.y + b.h / 2;
-    // 起點：說明框上離目標中心最近的點；終點：目標框上離說明框中心最近的點，各往外退一點
-    let sx = clampN(bcx, popBox.x + 24, popBox.x + popBox.w - 24);
-    let sy = clampN(bcy, popBox.y, popBox.y + popBox.h);
-    let ex = clampN(pcx, b.x + 16, b.x + b.w - 16);
-    let ey = clampN(pcy, b.y, b.y + b.h);
-    const len0 = Math.hypot(ex - sx, ey - sy) || 1;
-    const ux0 = (ex - sx) / len0;
-    const uy0 = (ey - sy) / len0;
-    sx += ux0 * 10; sy += uy0 * 10; ex -= ux0 * 12; ey -= uy0 * 12;
-    const L = Math.hypot(ex - sx, ey - sy) || 1;
-    const ux = (ex - sx) / L;
-    const uy = (ey - sy) / L;
-    const px = -uy;   // 垂直方向（圈往這邊鼓）
-    const py = ux;
-    const r = clampN(L * 0.13, 10, 22);
-    const P = { x: sx + ux * L * 0.45, y: sy + uy * L * 0.45 };
-    const pt = (o, a, b2) => `${(o.x + ux * a + px * b2).toFixed(1)} ${(o.y + uy * a + py * b2).toFixed(1)}`;
-    const S = { x: sx, y: sy };
-    const c2 = { x: ex - ux * L * 0.2 + px * L * 0.07, y: ey - uy * L * 0.2 + py * L * 0.07 };
+    const sx = popBox.x + popBox.w + 8;
+    const sy = popBox.y + Math.min(34, popBox.h / 2);
+    // 終點：目標框下緣，x 往起點右邊錯開（拐彎要有空間），夾在框內
+    const ex = clampN(sx + 110, b.x + 24, b.x + b.w - 24);
+    const ey = b.y + b.h + 12;
+    const rise = sy - ey;                       // 往上走的高度（目標在說明框上方）
+    const r = clampN(rise * 0.09, 9, 15);       // 小圈半徑
+    const P = { x: ex, y: ey + rise * 0.48 };   // 小圈的位置：往上那一段的中間
+    const f = (v) => v.toFixed(1);
     const d = [
-      `M ${sx.toFixed(1)} ${sy.toFixed(1)}`,
-      `C ${pt(S, L * 0.18, L * 0.1)} ${pt(P, -r * 1.3, r * 0.3)} ${pt(P, 0, 0)}`,
-      // 圈：兩個控制點交叉、往側邊鼓出去，畫回到前進方向稍前一點
-      `C ${pt(P, r * 1.7, r * 2.5)} ${pt(P, -r * 1.7, r * 2.5)} ${pt(P, r * 0.35, 0)}`,
-      `C ${pt(P, r * 2.2, -r * 0.5)} ${c2.x.toFixed(1)} ${c2.y.toFixed(1)} ${ex.toFixed(1)} ${ey.toFixed(1)}`,
+      `M ${f(sx)} ${f(sy)}`,
+      // 往右出去、拐彎向上，到小圈的起點時方向朝上
+      `C ${f(sx + (ex - sx) * 0.75)} ${f(sy + 2)} ${f(ex)} ${f(sy - 4)} ${f(P.x)} ${f(P.y)}`,
+      // 小圈：往右鼓出去、繞回來稍微再往上一點
+      `C ${f(P.x + r * 2.4)} ${f(P.y - r * 1.8)} ${f(P.x + r * 2.4)} ${f(P.y + r * 1.6)} ${f(P.x)} ${f(P.y - r * 0.4)}`,
+      // 往上進框，最後一段幾乎垂直
+      `C ${f(P.x - r * 0.6)} ${f(P.y - r * 2.2)} ${f(ex)} ${f(ey + rise * 0.18)} ${f(ex)} ${f(ey)}`,
     ].join(' ');
     sketchPath.setAttribute('d', d);
     sketchHalo.setAttribute('d', d);
-    // 箭頭兩撇：沿最後一段的切線（c2 → E）往回、左右各張 28°
-    const tl = Math.hypot(ex - c2.x, ey - c2.y) || 1;
-    const tx = (ex - c2.x) / tl;
-    const ty = (ey - c2.y) / tl;
+    // 箭頭兩撇：最後一段的切線是由下往上
+    const c2x = ex;
+    const c2y = ey + rise * 0.18;
+    const tl = Math.hypot(ex - c2x, ey - c2y) || 1;
+    const tx = (ex - c2x) / tl;
+    const ty = (ey - c2y) / tl;
     const wing = (deg) => {
       const a = (deg * Math.PI) / 180;
       const wx = -(tx * Math.cos(a) - ty * Math.sin(a)) * 11;
       const wy = -(tx * Math.sin(a) + ty * Math.cos(a)) * 11;
-      return `${(ex + wx).toFixed(1)} ${(ey + wy).toFixed(1)}`;
+      return `${f(ex + wx)} ${f(ey + wy)}`;
     };
-    sketchHead.setAttribute('d', `M ${wing(28)} L ${ex.toFixed(1)} ${ey.toFixed(1)} L ${wing(-28)}`);
-    // 小字擺在箭頭尖旁邊、往目標框外側退開（緊貼著框，讀起來就是在說這一格）
-    const side = ux >= 0 ? -1 : 1;   // 箭頭往右走就把字放在尖端左邊，反之右邊，不壓在線上
-    sketchLabel.setAttribute('x', (ex + side * 14).toFixed(1));
-    sketchLabel.setAttribute('y', (ey - uy * 16).toFixed(1));
-    sketchLabel.setAttribute('text-anchor', side > 0 ? 'start' : 'end');
+    sketchHead.setAttribute('d', `M ${wing(30)} L ${f(ex)} ${f(ey)} L ${wing(-30)}`);
+    // 小字擺在箭頭尖的右下方
+    sketchLabel.setAttribute('x', f(ex + 16));
+    sketchLabel.setAttribute('y', f(ey + 16));
+    sketchLabel.setAttribute('text-anchor', 'start');
   }
 
   // 每次換步：箭頭從起點畫到終點，小字隨後淡入（減少動態：直接出現）
@@ -478,21 +435,25 @@
     const vw = window.innerWidth;
     const vh = window.innerHeight;
     const sr = cur.spot ? rectOf(cur.spot) : null;
-    const { x, y, w, h } = sr ? spotBox(sr) : padded(r, vw, vh);
-    const round = sr ? w / 2 : 10;
-    _state.root.classList.toggle('is-spot', !!sr);   // spot 可能中途消失（改名輸入框出現）→ 換回圓角方框
+    const box = sr ? spotBox(q(cur.spot), sr) : { ...padded(r, vw, vh), rx: 10 };
+    const { x, y, w, h } = box;
+    const round = box.rx;
+    _state.root.classList.toggle('is-spot', !!sr);   // spot 可能中途消失（改名輸入框出現）→ 收起信標
     // 說明框以整個目標（例如這一列）為基準擺在外側，不蓋住同一列的其他內容；箭頭仍對著亮處的中線
     const anchor = sr ? padded(r, vw, vh) : { x, y, w, h };
     const pr = cur.point ? rectOf(cur.point) : null;
     const b = pr ? padded(pr, vw, vh) : null;
     const pw = pop.offsetWidth;
     const ph = pop.offsetHeight;
-    const key = [x, y, w, h, anchor.x, anchor.y, anchor.w, anchor.h, vw, vh, pw, ph, ...(b ? [b.x, b.y, b.w, b.h] : [])].map(Math.round).join(',');
+    const key = [x, y, w, h, round, anchor.x, anchor.y, anchor.w, anchor.h, vw, vh, pw, ph, ...(b ? [b.x, b.y, b.w, b.h] : [])].map(Math.round).join(',');
     if (key === _state.lastKey) return;
     _state.lastKey = key;
 
     setRect(hole, x, y, w, h, round);
     Object.assign(ring.style, { left: `${x}px`, top: `${y}px`, width: `${w}px`, height: `${h}px`, borderRadius: `${round}px` });
+    // 信標：圓形亮框放在右上 45° 的邊上，方框放在右上角，各往外挪一點不壓住元素
+    const k = round >= Math.min(w, h) / 2 - 0.5 ? 0.85 : 1;
+    Object.assign(_state.beacon.style, { left: `${x + w / 2 + (w / 2) * k}px`, top: `${y + h / 2 - (h / 2) * k}px` });
     if (b) {
       setRect(hole2, b.x, b.y, b.w, b.h);
       Object.assign(ring2.style, { left: `${b.x}px`, top: `${b.y}px`, width: `${b.w}px`, height: `${b.h}px` });
@@ -575,8 +536,6 @@
     if (i >= steps.length) { end(); return; }
     _state.i = i;
     _state.cur = cur;
-    if (cur.settle) await sleep(reduced() ? 0 : cur.settle);
-    if (!_state || token !== _state.token) return;
     const n = q(cur.scrollTo || (Array.isArray(cur.target) ? cur.target[0] : cur.target));
     if (n && n.scrollIntoView) n.scrollIntoView({ block: 'nearest', behavior: reduced() ? 'auto' : 'smooth' });
     await sleep(reduced() ? 0 : 280);   // 等平滑捲動差不多停了再擺說明框
@@ -633,10 +592,6 @@
   function onAction(e) {
     if (!_state || !_state.cur) return;
     const type = e.detail && e.detail.type;
-    if (type === 'complete') {   // 拖曳那步據此改成「把它拖回來」，並亮這一列的握把
-      _state.didComplete = true;
-      _state.completedId = e.detail.id;
-    }
     if (_state.moving || type !== _state.cur.advanceEvent) return;
     advance(type === 'rename' ? SETTLE_MS : EVENT_SETTLE_MS);
   }
@@ -662,7 +617,7 @@
     const parts = build();
     _state = {
       i: from, cur: null, raf: 0, token: 0, lastKey: '', moving: false, programmatic: false,
-      reveal: null, didComplete: false, completedId: null, steps, ...parts,
+      reveal: null, steps, ...parts,
     };
     document.addEventListener('click', onClick, true);
     document.addEventListener('keydown', onKey, true);

@@ -500,9 +500,41 @@
         border-radius var(--t-disclosure);
     }
 
-    /* 要點／要拖的小圓：亮處本身就是那個圓，外圈一直往外擴散，像在說「點這裡」 */
-    .tour-root.is-spot .tour-ring {
-      box-shadow: 0 0 0 2px var(--orange), 0 0 0 7px rgba(217, 119, 87, 0.2);
+    /* 脈動信標（hotspot beacon）：實心小點＋兩圈錯開的擴散光圈，掛在要點的亮框角上，提示「點這裡」 */
+    .tour-beacon {
+      position: fixed;
+      width: 12px;
+      height: 12px;
+      margin: -6px 0 0 -6px;
+      border-radius: 50%;
+      background: var(--orange);
+      box-shadow: 0 0 0 2px var(--bg);
+      pointer-events: none;
+      opacity: 0;
+      scale: 0.4;
+      transition: opacity var(--t-fade), scale var(--t-fade), left var(--t-disclosure), top var(--t-disclosure);
+    }
+
+    .tour-root.is-spot:not(.is-moving) .tour-beacon {
+      opacity: 1;
+      scale: 1;
+    }
+
+    .tour-beacon span {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: var(--orange);
+      animation: tour-beacon 1.8s var(--ease-out) infinite;
+    }
+
+    .tour-beacon span + span {
+      animation-delay: 0.9s;
+    }
+
+    @keyframes tour-beacon {
+      from { scale: 1; opacity: 0.55; }
+      to { scale: 3.2; opacity: 0; }
     }
 
     /* 「指給你看」的第二個洞：虛線框，不是要點的地方 */
@@ -574,19 +606,7 @@
       pointer-events: auto;
     }
 
-    .tour-root.is-spot .tour-ring::after {
-      content: '';
-      position: absolute;
-      inset: -2px;
-      border: 2px solid var(--orange);
-      border-radius: inherit;
-      animation: tour-ripple 1.6s var(--ease-out) infinite;
-    }
 
-    @keyframes tour-ripple {
-      from { scale: 1; opacity: 0.7; }
-      to { scale: 1.7; opacity: 0; }
-    }
 
     .tour-pop {
       position: fixed;
@@ -5128,7 +5148,7 @@
         translate: none;
       }
 
-      .tour-root.is-spot .tour-ring::after {
+      .tour-beacon span {
         animation: none;
         opacity: 0;
       }
