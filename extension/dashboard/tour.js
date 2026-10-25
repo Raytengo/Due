@@ -21,7 +21,6 @@
       next: '下一步',
       done: '開始使用',
       close: '結束導覽',
-      autoNext: '做完會自動到下一步',
       courseTitle: '打開一門課',
       courseBody: '點這門課，看看裡面有什麼。',
       renameTitle: '幫課取個好認的名字',
@@ -38,7 +37,6 @@
       next: '下一步',
       done: '开始使用',
       close: '结束导览',
-      autoNext: '做完会自动到下一步',
       courseTitle: '打开一门课',
       courseBody: '点这门课，看看里面有什么。',
       renameTitle: '给课取个好认的名字',
@@ -55,7 +53,6 @@
       next: 'Next',
       done: 'Get started',
       close: 'End tour',
-      autoNext: 'Do it and we’ll move on',
       courseTitle: 'Open a course',
       courseBody: 'Click this course to see what’s inside.',
       renameTitle: 'Give it a name you know',
@@ -271,7 +268,6 @@
       <div class="tour-title" id="tour-title"></div>
       <div class="tour-body" id="tour-body"></div>
       <div class="tour-foot">
-        <span class="tour-hint"><span class="tour-hint-dot" aria-hidden="true"></span><span class="tour-hint-text"></span></span>
         <button type="button" class="tour-next"><span class="tour-next-label"></span>${NEXT_SVG}</button>
       </div>`;
     root.appendChild(pop);
@@ -307,17 +303,13 @@
     const steps = _state.steps;
     const last = i === steps.length - 1;
     const textKey = cur.textKey || cur.key;
-    const actionable = !!(cur.advanceOn || cur.advanceEvent);
     pop.querySelector('.tour-counter').textContent = t('counter').replace('{n}', String(i + 1)).replace('{total}', String(steps.length));
     pop.querySelector('.tour-close').setAttribute('aria-label', t('close'));
     pop.querySelector('.tour-close').title = t('close');
     pop.querySelector('#tour-title').textContent = t(`${textKey}Title`);
     pop.querySelector('#tour-body').textContent = t(`${textKey}Body`);
-    pop.querySelector('.tour-hint').hidden = !actionable;
-    pop.querySelector('.tour-hint-text').textContent = t('autoNext');
     pop.querySelector('.tour-next-label').textContent = last ? t('done') : t('next');
     setReveal(cur.reveal);
-    _state.root.classList.toggle('is-actionable', actionable);
     _state.root.classList.toggle('has-point', !!cur.point);
     _state.root.classList.toggle('point-live', !!cur.pointLive);
   }

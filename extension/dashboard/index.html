@@ -716,33 +716,8 @@
 
     .tour-foot {
       display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
+      justify-content: flex-end;
       margin-top: 18px;
-    }
-
-    .tour-hint {
-      display: inline-flex;
-      align-items: center;
-      gap: 7px;
-      min-width: 0;
-      font-family: 'DM Mono', monospace;
-      font-size: 11px;
-      letter-spacing: 0.02em;
-      color: var(--mid);
-    }
-
-    .tour-hint[hidden] {
-      visibility: hidden;
-    }
-
-    .tour-hint-dot {
-      flex-shrink: 0;
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: var(--orange);
     }
 
     .tour-next {
@@ -3574,7 +3549,6 @@
       font-size: 15px;
       font-weight: 400;
       outline: none;
-      position: relative;   /* 側欄的滑動底色（.course-nav-indicator）是 absolute：不定位的話它會畫在輸入框上面，整格變空白 */
     }
 
     .detail-meta {
