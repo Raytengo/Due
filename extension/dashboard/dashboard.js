@@ -257,7 +257,7 @@ const I18N = {
     wBtnDone: '開始使用',
     // 新手卡片（只剩一頁）：開發者的話＋釘選 popup；按鈕接互動導覽
     wIntroTitle: '世界是一個巨大的 TODO list，以表達遊子思鄉之情',
-    wIntroHere: '（應該在這）',   // 卡片外手繪箭頭指向瀏覽器右上角（擴充功能圖示）旁的字
+    wIntroHere: '應該在這（應該喔）',   // 卡片外手繪箭頭指向瀏覽器右上角（擴充功能圖示）旁的字
     wIntroBody: '釘選瀏覽器右上角的 popup，那個很好用',
     wBtnTour: '開始導覽 →',
   },
@@ -423,7 +423,7 @@ const I18N = {
     wBtnNext: '下一步',
     wBtnDone: '开始使用',
     wIntroTitle: '世界是一个巨大的 TODO list，以表达游子思乡之情',
-    wIntroHere: '（应该在这）',
+    wIntroHere: '应该在这（应该哦）',
     wIntroBody: '把浏览器右上角的 popup 固定起来，那个很好用',
     wBtnTour: '开始导览 →',
   },
@@ -589,7 +589,7 @@ const I18N = {
     wBtnNext: 'Next',
     wBtnDone: 'Start Using Due',
     wIntroTitle: 'The world is one giant to-do list, written to express a wanderer’s homesickness',
-    wIntroHere: '(should be up here)',
+    wIntroHere: 'Should be up here (probably)',
     wIntroBody: 'Pin the popup at the top right of your browser. It’s really handy',
     wBtnTour: 'Start the tour →',
   },
