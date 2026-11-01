@@ -8,7 +8,7 @@
   // ═══════════════════════════════════════════════════════════════
   // Due AI 供應商層：只負責「組請求」與「取回應文字」，不 fetch（可在 node 測試）
   // gemini → 原生 generateContent（支援 PDF inlineData；key 走 header，不進 URL）
-  // 其餘（qwen / deepseek / 任何 OpenAI 相容）→ {baseUrl}/chat/completions（純文字）
+  // 其餘（nvidia / deepseek / openai / 任何 OpenAI 相容）→ {baseUrl}/chat/completions（純文字）
   // 只送供應商需要的 header：Gemini 對 preflight 帶未知 header 會回 403
   // ═══════════════════════════════════════════════════════════════
 
@@ -62,8 +62,14 @@
       // 只留文字 part（PDF 這條路徑不支援）；null／未知 part 靜靜丟掉，與 gemini 路徑一致
       content: parts.filter((p) => p && p.type === 'text').map((p) => p.text).join('\n\n'),
     });
-    const body = { model: cfg.model, messages, max_tokens: maxTokens };
-    if (temperature !== undefined) body.temperature = temperature;
+    const body = { model: cfg.model, messages };
+    // OpenAI 官方：新模型只收 max_completion_tokens（max_tokens 會 400）；推理模型（gpt-5*／o 系列）
+    // 不收 temperature，且推理 token 也算進上限，壓低 reasoning_effort 免得測試連線的 512 被想光
+    const openaiReasoning = cfg.provider === 'openai' && /^(gpt-5|o\d)/i.test(String(cfg.model || ''));
+    if (cfg.provider === 'openai') body.max_completion_tokens = maxTokens;
+    else body.max_tokens = maxTokens;
+    if (temperature !== undefined && !openaiReasoning) body.temperature = temperature;
+    if (openaiReasoning) body.reasoning_effort = 'low';
     return {
       url: `${normalizeBaseUrl(cfg.baseUrl)}/chat/completions`,
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.apiKey}` },

@@ -28,30 +28,9 @@
   const ANALYSIS_RULES_VERSION = 1;
 
   // hostPermission（選填）：該供應商的端點不回 CORS header，必須靠 Chrome host permission 略過 CORS。
-  // 沒有這個欄位（gemini／qwen／deepseek）代表供應商自己有開 CORS，純 fetch 就能呼叫，不佔任何權限。
+  // 沒有這個欄位（deepseek／gemini／openai）代表供應商自己有開 CORS，純 fetch 就能呼叫，不佔任何權限。
+  // 順序＝設定選單順序；DEFAULT_PROVIDER 是新使用者看到的預設
   const PROVIDERS = {
-    gemini: {
-      label: 'Google Gemini',
-      baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
-      defaultModel: 'gemini-2.5-flash',
-      supportsPdf: true,
-      keyPlaceholder: 'AIza...',
-    },
-    qwen: {
-      label: 'Qwen (通義千問)',
-      baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-      defaultModel: 'qwen-plus',
-      supportsPdf: false,
-      keyPlaceholder: 'sk-...',
-    },
-    deepseek: {
-      label: 'DeepSeek',
-      baseUrl: 'https://api.deepseek.com/v1',
-      // deepseek-chat／deepseek-reasoner 是舊別名，官方公告 2026-07-24 停用，改用 v4 名稱
-      defaultModel: 'deepseek-v4-flash',
-      supportsPdf: false,
-      keyPlaceholder: 'sk-...',
-    },
     nvidia: {
       label: 'NVIDIA NIM',
       baseUrl: 'https://integrate.api.nvidia.com/v1',
@@ -62,7 +41,30 @@
       // 宣告 host permission 可讓 Chrome 直接略過 CORS 檢查（走 optional，儲存設定時才請求）
       hostPermission: 'https://integrate.api.nvidia.com/*',
     },
+    deepseek: {
+      label: 'DeepSeek',
+      baseUrl: 'https://api.deepseek.com/v1',
+      // deepseek-chat／deepseek-reasoner 是舊別名，官方公告 2026-07-24 停用，改用 v4 名稱
+      defaultModel: 'deepseek-v4-flash',
+      supportsPdf: false,
+      keyPlaceholder: 'sk-...',
+    },
+    gemini: {
+      label: 'Google Gemini',
+      baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
+      defaultModel: 'gemini-2.5-flash',
+      supportsPdf: true,
+      keyPlaceholder: 'AIza...',
+    },
+    openai: {
+      label: 'OpenAI GPT',
+      baseUrl: 'https://api.openai.com/v1',
+      defaultModel: 'gpt-5.4-mini',
+      supportsPdf: false,
+      keyPlaceholder: 'sk-...',
+    },
   };
+  const DEFAULT_PROVIDER = 'nvidia';
 
   // 該供應商需要哪些 host permission（供 modal 一次請求、runner 檢查是否已授權）
   function providerHostPermission(provider) {
@@ -73,17 +75,50 @@
   // 儲存設定時要一次請求的 origins：供應商自己的 host（若需要）＋ PDF 下載（所有供應商都要）。
   // 純文字供應商現在也會下載 PDF 大綱、用 pdf.js 抽字，故不再看 supportsPdf
   function requiredOrigins(provider) {
-    const p = PROVIDERS[provider] || PROVIDERS.gemini;
+    const p = PROVIDERS[provider] || PROVIDERS[DEFAULT_PROVIDER];
     const out = [];
     if (p.hostPermission) out.push(p.hostPermission);
     out.push(PDF_PERMISSION_ORIGIN);
     return out;
   }
 
+  // 設定 modal 按「儲存」後要做什麼：
+  // blocked＝供應商需要 host permission（NVIDIA）卻被拒絕，不寫設定（寫了之後每次同步都只會撞 NO_HOST_PERMISSION）；
+  // saveOnly＝沒填 key，存完就關；saveAndTest＝存完自動測試連線。只少了 PDF 權限不擋（分析照跑，只讀 syllabus 文字）
+  function saveOutcome({ needsHost, granted, hasKey } = {}) {
+    if (!hasKey) return 'saveOnly';
+    if (needsHost && !granted) return 'blocked';
+    return 'saveAndTest';
+  }
+
+  // 供應商錯誤原文 → 給人看的分類（modal 依語言翻成白話，原文留在 title）。
+  // 原文格式見 analysisRunner.callProvider／aiTestConnection 與 providers.js；認不出來回 unknown，不猜
+  function explainAiError(raw) {
+    const s = String(raw || '');
+    const status = (s.match(/\bAPI (\d{3})\b/) || [])[1];
+    const code = status ? Number(status) : 0;
+    if (/NO_API_KEY/.test(s)) return { kind: 'noKey' };
+    const perm = s.match(/NO_HOST_PERMISSION:\s*(\S+)/);
+    if (perm) return { kind: 'noPermission', host: perm[1].replace(/^https?:\/\//, '').replace(/\/\*$/, '') };
+    if (/network\/CORS error/.test(s)) return { kind: 'network' };
+    // 模型名稱錯：Gemini 回 404「models/x is not found」，DeepSeek 回 400「Model Not Exist」
+    if (/model/i.test(s) && /not (be )?found|not exist|does not exist|unknown model|invalid model/i.test(s)) return { kind: 'badModel' };
+    // Gemini 的 key 錯是 400 + API_KEY_INVALID；OpenAI 相容多半是 401
+    if (code === 401 || code === 403 || /API_KEY_INVALID|API key not valid|invalid api.?key|incorrect api key/i.test(s)) return { kind: 'badKey' };
+    if (code === 404) return { kind: 'badModel' };
+    if (code === 402 || code === 429 || /insufficient.?balance|quota|rate.?limit/i.test(s)) return { kind: 'quota' };
+    if (code >= 500 && code <= 599) return { kind: 'server' };
+    if (/Empty response/.test(s)) return { kind: 'empty' };
+    return { kind: 'unknown' };
+  }
+
   // ── 設定 ──
   function resolveConfig(stored) {
     const s = stored && typeof stored === 'object' ? stored : {};
-    const provider = PROVIDERS[s.provider] ? s.provider : 'gemini';
+    // 沒指定 → 預設供應商；指定了但已不支援（例如 2.5.1 拿掉的 qwen）→ 視為未設定，
+    // 不把那家的 key 送去預設供應商
+    const known = !!PROVIDERS[s.provider];
+    const provider = known ? s.provider : DEFAULT_PROVIDER;
     const def = PROVIDERS[provider];
     const apiKey = typeof s.apiKey === 'string' ? s.apiKey.trim() : '';
     const model = (typeof s.model === 'string' && s.model.trim()) || def.defaultModel;
@@ -94,7 +129,8 @@
     const baseUrl = provider === 'gemini'
       ? def.baseUrl
       : ((/^https:\/\//i.test(custom) && custom) || def.baseUrl);
-    return { provider, apiKey, model, baseUrl, configured: apiKey !== '' };
+    const retired = !known && s.provider != null && s.provider !== '';
+    return { provider, apiKey, model, baseUrl, configured: apiKey !== '' && !retired };
   }
 
   // ── 只跑一次規則 ──
@@ -425,6 +461,7 @@
 
   return {
     PROVIDERS,
+    DEFAULT_PROVIDER,
     MAX_COURSES_PER_RUN,
     MAX_PDF_BYTES,
     MAX_TOTAL_PDF_BYTES,
@@ -437,6 +474,8 @@
     USER_PROMPT,
     providerHostPermission,
     requiredOrigins,
+    saveOutcome,
+    explainAiError,
     resolveConfig,
     shouldAnalyze,
     nextRecord,

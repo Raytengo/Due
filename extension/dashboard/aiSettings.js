@@ -20,10 +20,17 @@
       baseUrlLabel: 'Base URL（進階）',
       pdfHint: '尚未授權存取 canvas-user-content.com，只會分析 syllabus 文字。重新按「儲存」可再次授權。',
       hostPermHint: '此供應商不允許瀏覽器直接呼叫，需要「存取 {host}」的權限才能運作。請重新按「儲存」並允許。',
-      testBtn: '測試連線',
-      testing: '測試中…',
-      testOk: '✓ 連線正常',
-      testFail: '失敗：{error}',
+      testing: '測試連線中…',
+      testOk: '✓ 已連線，設定已儲存',
+      errNoKey: '還沒填 API key。',
+      errNoPermission: '需要允許連到 {host} 才能使用。請再按一次「儲存」並選擇允許。',
+      errBadKey: 'API key 無效。請確認有沒有複製完整，或是不是這家供應商的 key。',
+      errBadModel: '找不到這個模型。請檢查模型 ID，或清空改用預設。',
+      errQuota: '額度不足或請求太頻繁。請稍後再試，或到供應商後台查看餘額。',
+      errServer: '供應商伺服器暫時出問題，請稍後再試。',
+      errNetwork: '連不到供應商。請檢查網路，自訂了 Base URL 的話也確認網址。',
+      errEmpty: '模型沒有回傳內容，請換一個模型再試。',
+      errUnknown: '連線失敗，原因不明。游標移到這行可看原始訊息。',
       clearBtn: '清除金鑰',
       statusHeading: '分析狀態',
       notConfigured: '尚未設定 API key，分析不會執行。',
@@ -56,10 +63,17 @@
       baseUrlLabel: 'Base URL（高级）',
       pdfHint: '尚未授权访问 canvas-user-content.com，只会分析 syllabus 文本。重新点击「保存」可再次授权。',
       hostPermHint: '此供应商不允许浏览器直接调用，需要「访问 {host}」的权限才能运作。请重新点击「保存」并允许。',
-      testBtn: '测试连接',
-      testing: '测试中…',
-      testOk: '✓ 连接正常',
-      testFail: '失败：{error}',
+      testing: '正在测试连接…',
+      testOk: '✓ 已连接，设置已保存',
+      errNoKey: '还没填 API key。',
+      errNoPermission: '需要允许连接到 {host} 才能使用。请再点一次「保存」并选择允许。',
+      errBadKey: 'API key 无效。请确认是否复制完整，或是不是这家供应商的 key。',
+      errBadModel: '找不到这个模型。请检查模型 ID，或清空改用默认。',
+      errQuota: '额度不足或请求太频繁。请稍后再试，或到供应商后台查看余额。',
+      errServer: '供应商服务器暂时出问题，请稍后再试。',
+      errNetwork: '连不上供应商。请检查网络，自定义了 Base URL 的话也确认网址。',
+      errEmpty: '模型没有返回内容，请换一个模型再试。',
+      errUnknown: '连接失败，原因不明。光标移到这行可看原始信息。',
       clearBtn: '清除密钥',
       statusHeading: '分析状态',
       notConfigured: '尚未设置 API key，分析不会执行。',
@@ -92,10 +106,17 @@
       baseUrlLabel: 'Base URL (advanced)',
       pdfHint: 'Access to canvas-user-content.com was not granted, so only the syllabus text is analyzed. Press Save again to re-request.',
       hostPermHint: 'This provider blocks direct browser calls, so Due needs permission to access {host}. Press Save again and allow it.',
-      testBtn: 'Test connection',
-      testing: 'Testing…',
-      testOk: '✓ Connected',
-      testFail: 'Failed: {error}',
+      testing: 'Testing the connection…',
+      testOk: '✓ Connected. Settings saved.',
+      errNoKey: 'No API key entered.',
+      errNoPermission: 'Due needs permission to reach {host}. Press Save again and choose Allow.',
+      errBadKey: 'The API key is invalid. Check that it was copied in full and belongs to this provider.',
+      errBadModel: 'That model was not found. Check the model ID, or clear it to use the default.',
+      errQuota: 'Out of quota or too many requests. Try again later, or check your balance with the provider.',
+      errServer: 'The provider is having server trouble. Try again later.',
+      errNetwork: 'Could not reach the provider. Check your network, and the Base URL if you set one.',
+      errEmpty: 'The model returned nothing. Try a different model.',
+      errUnknown: 'Connection failed for an unknown reason. Hover here to see the raw message.',
       clearBtn: 'Remove key',
       statusHeading: 'Analysis status',
       notConfigured: 'No API key set. Analysis will not run.',
@@ -124,6 +145,10 @@
   let _lang = 'zh-TW';
   let _keyVisible = false;
   let _lastStatus = null;   // 最近一次 AI_GET_STATUS 結果，供 updateProviderUi 重算 PDF 提示
+  // 儲存流程的世代：open／close 遞增，權限、寫入、測試回來時世代不同就丟掉
+  // （測試中按 Esc／取消，晚到的結果不會寫進已關閉的 modal，也不會再送 AI_RUN_NOW）
+  let _flowGen = 0;
+  let _busy = false;
 
   function t(key, vars) {
     const table = STRINGS[_lang] || STRINGS['zh-TW'];
@@ -159,10 +184,10 @@
     return (typeof DueGradingRules !== 'undefined' && DueGradingRules.PROVIDERS) || {};
   }
 
-  // 目前表單選的供應商設定；未知值一律退回 gemini（與 loadConfigIntoForm 的正規化一致）
+  // 目前表單選的供應商設定；未知值一律退回預設供應商（與 loadConfigIntoForm 的正規化一致）
   function currentProvider() {
     const all = providers();
-    return all[$('ai-provider').value] || all.gemini || {};
+    return all[$('ai-provider').value] || all[DueGradingRules.DEFAULT_PROVIDER] || {};
   }
 
   function readForm() {
@@ -199,6 +224,38 @@
     return String(origin || '').replace(/^https?:\/\//, '').replace(/\/\*$/, '');
   }
 
+  const ERROR_KEYS = {
+    noKey: 'errNoKey', noPermission: 'errNoPermission', badKey: 'errBadKey', badModel: 'errBadModel',
+    quota: 'errQuota', server: 'errServer', network: 'errNetwork', empty: 'errEmpty',
+  };
+
+  // 供應商錯誤原文 → 白話；認不出來回 null（呼叫端決定顯示原文或「原因不明」）
+  function explainError(raw) {
+    const e = (typeof DueGradingRules !== 'undefined' && DueGradingRules.explainAiError)
+      ? DueGradingRules.explainAiError(raw)
+      : { kind: 'unknown' };
+    const key = ERROR_KEYS[e.kind];
+    return key ? t(key, { host: e.host || '' }) : null;
+  }
+
+  // 儲存結果那一行（footer 左側，靠近「儲存」鈕）；原文放 title，回報問題時還拿得到
+  function showResult(state, text, raw) {
+    const out = $('ai-test-result');
+    out.className = 'ai-settings-test-result' + (state ? ` ${state}` : '');
+    out.textContent = text || '';
+    out.title = raw || '';
+  }
+
+  function showError(raw) {
+    showResult('fail', explainError(raw) || t('errUnknown'), raw);
+  }
+
+  function setBusy(on) {
+    _busy = on;
+    $('ai-save-btn').disabled = on;
+    $('ai-clear-btn').disabled = on;
+  }
+
   // 「該供應商不回 CORS、需要 host permission 但尚未授權」的提示。
   // 依「已儲存的設定」判定（providerPermission 由 background 依 aiConfig 算），語言切換時也要能重畫
   function renderHostPermHint() {
@@ -223,7 +280,6 @@
     $('ai-base-url-label').textContent = t('baseUrlLabel');
     $('ai-pdf-hint').textContent = t('pdfHint');
     renderHostPermHint();
-    $('ai-test-btn').textContent = t('testBtn');
     $('ai-clear-btn').textContent = t('clearBtn');
     $('ai-status-heading').textContent = t('statusHeading');
     $('ai-cancel-btn').textContent = t('cancel');
@@ -289,11 +345,13 @@
     list.innerHTML = st.courses.map((c) => {
       const name = escapeHtml(courseName(c.courseId));
       const note = c.status === 'error' ? c.error : (c.status === 'notFound' ? c.notes : '');
+      // 錯誤先翻成白話（與儲存結果同一套），認不出來才顯示原文；原文一律留在 title
+      const noteText = note ? ((c.status === 'error' && explainError(note)) || noteLabel(note)) : '';
       return `
       <li>
         <span class="ai-status-name" title="${name}">${name}</span>
         <span class="ai-status-state ${escapeHtml(c.status)}">${escapeHtml(t(label[c.status] || 'stPending'))}</span>
-        ${note ? `<span class="ai-status-note">${escapeHtml(noteLabel(note))}</span>` : ''}
+        ${note ? `<span class="ai-status-note" title="${escapeHtml(note)}">${escapeHtml(noteText)}</span>` : ''}
       </li>`;
     }).join('');
   }
@@ -313,8 +371,10 @@
     if (!chrome.storage?.local?.get) { updateProviderUi(); return; }
     chrome.storage.local.get(['aiConfig'], (data) => {
       const c = (data && data.aiConfig) || {};
-      $('ai-provider').value = providers()[c.provider] ? c.provider : 'gemini';
-      $('ai-api-key').value = c.apiKey || '';
+      const known = !!providers()[c.provider];
+      $('ai-provider').value = known ? c.provider : DueGradingRules.DEFAULT_PROVIDER;
+      // 已不支援的供應商（qwen）的 key 不帶進表單：免得換到預設供應商後直接被送去別家
+      $('ai-api-key').value = known ? (c.apiKey || '') : '';
       $('ai-model').value = c.model || '';
       $('ai-base-url').value = c.baseUrl || '';
       updateProviderUi();
@@ -326,9 +386,9 @@
     if (!overlay) return;
     _keyVisible = false;
     $('ai-api-key').type = 'password';
-    $('ai-test-result').textContent = '';
-    $('ai-test-result').className = 'ai-settings-test-result';
-    $('ai-test-result').title = '';
+    _flowGen++;
+    setBusy(false);
+    showResult('', '');
     applyStaticText();
     loadConfigIntoForm();
     overlay.classList.add('open');
@@ -336,6 +396,8 @@
   }
 
   function close() {
+    _flowGen++;
+    setBusy(false);
     const overlay = $('ai-settings-overlay');
     if (overlay) overlay.classList.remove('open');
   }
@@ -357,17 +419,6 @@
       $('ai-key-toggle').textContent = _keyVisible ? t('hide') : t('show');
     });
 
-    $('ai-test-btn').addEventListener('click', async () => {
-      const out = $('ai-test-result');
-      out.className = 'ai-settings-test-result';
-      out.textContent = t('testing');
-      out.title = '';
-      const res = await sendMsg({ type: 'AI_TEST_CONNECTION', config: readForm() });
-      if (res && res.success) { out.textContent = t('testOk'); out.classList.add('ok'); }
-      else { out.textContent = t('testFail', { error: (res && res.error) || 'no response' }); out.classList.add('fail'); }
-      out.title = out.textContent;   // 這一行會 ellipsis 截斷，hover 才看得到完整錯誤
-    });
-
     $('ai-clear-btn').addEventListener('click', () => {
       $('ai-api-key').value = '';
       $('ai-model').value = '';
@@ -376,21 +427,62 @@
     });
 
     $('ai-save-btn').addEventListener('click', () => {
+      if (_busy) return;
       // 供應商自己的 host（NVIDIA 不回 CORS，必須靠 host permission 略過）＋ PDF 下載權限，一次請求完
       // （不需要的權限不請求，彈窗只是噪音）。供應商查表是同步 DOM 讀取，user gesture 不會斷；
       // 權限請求必須是第一個 async 呼叫、前面不能有 await
-      const origins = (typeof DueGradingRules !== 'undefined' && DueGradingRules.requiredOrigins)
-        ? DueGradingRules.requiredOrigins($('ai-provider').value)
-        : [];
+      const provider = $('ai-provider').value;
+      const R = typeof DueGradingRules !== 'undefined' ? DueGradingRules : null;
+      const origins = R && R.requiredOrigins ? R.requiredOrigins(provider) : [];
+      const hostPerm = R && R.providerHostPermission ? R.providerHostPermission(provider) : null;
       const perm = origins.length && chrome.permissions?.request
         ? chrome.permissions.request({ origins }).catch(() => false)
         : Promise.resolve(false);
       const config = readForm();
+      const gen = ++_flowGen;
+      const live = () => gen === _flowGen;
+      setBusy(true);
+      // 存檔之後自動測試連線（沒有獨立的「測試連線」鈕）：成功停一下再關，失敗留著讓使用者改
       perm
-        .then(() => (chrome.storage?.local?.set ? chrome.storage.local.set({ aiConfig: config }) : null))
-        .then(() => sendMsg({ type: 'AI_RUN_NOW' }))
-        .catch(() => { })
-        .finally(close);
+        .then((granted) => {
+          if (!live()) return null;
+          const outcome = R && R.saveOutcome
+            ? R.saveOutcome({ needsHost: !!hostPerm, granted, hasKey: !!config.apiKey })
+            : 'saveOnly';
+          if (outcome === 'blocked') {
+            // 不寫設定：寫了之後每次同步都只會撞 NO_HOST_PERMISSION
+            showError(`${provider} NO_HOST_PERMISSION: ${hostPerm}`);
+            setBusy(false);
+            return null;
+          }
+          const write = chrome.storage?.local?.set ? chrome.storage.local.set({ aiConfig: config }) : Promise.resolve();
+          return Promise.resolve(write).then(() => {
+            if (!live()) return null;
+            refreshStatus();
+            if (outcome === 'saveOnly') {
+              sendMsg({ type: 'AI_RUN_NOW' });   // 沒有 key 也要跑：讓位給 Canvas 權重不需要 key
+              close();
+              return null;
+            }
+            showResult('', t('testing'));
+            return sendMsg({ type: 'AI_TEST_CONNECTION', config }).then((res) => {
+              if (!live()) return;
+              if (res && res.success) {
+                showResult('ok', t('testOk'));
+                sendMsg({ type: 'AI_RUN_NOW' });   // 只在連得上時才觸發分析
+                setTimeout(() => { if (live()) close(); }, 1000);
+              } else {
+                showError((res && res.error) || 'no response');
+                setBusy(false);
+              }
+            });
+          });
+        })
+        .catch((err) => {
+          if (!live()) return;
+          showError(String((err && err.message) || err));
+          setBusy(false);
+        });
     });
 
     $('ai-cancel-btn').addEventListener('click', close);

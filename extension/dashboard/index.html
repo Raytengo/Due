@@ -4790,15 +4790,14 @@
 
     .ai-settings-link:disabled { color: var(--border); cursor: default; text-decoration: none; }
 
+    /* 儲存結果（測試中／已連線／白話錯誤）：在 footer 左側、緊鄰「儲存」，整句可換行；原始錯誤在 title */
     .ai-settings-test-result {
-      font-family: 'DM Mono', monospace;
-      font-size: 11px;
-      color: var(--muted);
+      flex: 1;
       min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      max-width: 260px;
+      margin-right: auto;
+      font-size: 12px;
+      line-height: 1.45;
+      color: var(--muted);
     }
 
     .ai-settings-test-result.ok { color: var(--green); }
@@ -4929,6 +4928,9 @@
     }
 
     .ai-settings-save:hover { opacity: 0.8; }
+
+    .ai-settings-save:disabled,
+    .ai-settings-save:disabled:hover { opacity: 0.35; cursor: default; }
 
     .weight-edit-save:disabled,
     .weight-edit-save:disabled:hover {
@@ -5612,10 +5614,10 @@
 
         <label class="ai-settings-label" for="ai-provider" id="ai-provider-label"></label>
         <select class="ai-settings-select" id="ai-provider">
-          <option value="gemini">Google Gemini</option>
-          <option value="qwen">Qwen (通義千問)</option>
-          <option value="deepseek">DeepSeek</option>
           <option value="nvidia">NVIDIA NIM</option>
+          <option value="deepseek">DeepSeek</option>
+          <option value="gemini">Google Gemini</option>
+          <option value="openai">OpenAI GPT</option>
         </select>
 
         <label class="ai-settings-label" for="ai-api-key" id="ai-api-key-label"></label>
@@ -5636,8 +5638,6 @@
         <p class="ai-settings-hint" id="ai-host-perm-hint" hidden></p>
 
         <div class="ai-settings-actions-row">
-          <button type="button" class="ai-settings-link" id="ai-test-btn"></button>
-          <span class="ai-settings-test-result" id="ai-test-result" role="status"></span>
           <button type="button" class="ai-settings-link" id="ai-clear-btn"></button>
         </div>
 
@@ -5649,6 +5649,7 @@
         <ul class="ai-status-list" id="ai-status-list"></ul>
       </div>
       <div class="ai-settings-footer">
+        <span class="ai-settings-test-result" id="ai-test-result" role="status"></span>
         <button type="button" class="ai-settings-cancel" id="ai-cancel-btn"></button>
         <button type="button" class="ai-settings-save" id="ai-save-btn"></button>
       </div>

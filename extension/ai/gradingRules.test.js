@@ -14,13 +14,29 @@ function test(name, fn) {
 const NOW = Date.parse('2026-09-03T00:00:00Z');
 
 // ── resolveConfig ──
-test('resolveConfig: 空／未知 provider → gemini 預設，未設定', () => {
+test('resolveConfig: 空 provider → nvidia 預設，未設定', () => {
   const c = R.resolveConfig(undefined);
-  assert.equal(c.provider, 'gemini');
-  assert.equal(c.model, 'gemini-2.5-flash');
-  assert.equal(c.baseUrl, 'https://generativelanguage.googleapis.com/v1beta');
+  assert.equal(R.DEFAULT_PROVIDER, 'nvidia');
+  assert.equal(c.provider, 'nvidia');
+  assert.equal(c.model, 'deepseek-ai/deepseek-v4-flash-0731');
+  assert.equal(c.baseUrl, 'https://integrate.api.nvidia.com/v1');
   assert.equal(c.configured, false);
-  assert.equal(R.resolveConfig({ provider: 'bogus', apiKey: 'k' }).provider, 'gemini');
+  assert.equal(R.resolveConfig({ apiKey: 'k' }).configured, true);
+});
+
+test('resolveConfig: 已不支援的 provider（qwen）→ 未設定，不把那家的 key 送去預設供應商', () => {
+  for (const provider of ['qwen', 'bogus']) {
+    const c = R.resolveConfig({ provider, apiKey: 'sk-x' });
+    assert.equal(c.provider, 'nvidia');
+    assert.equal(c.configured, false, provider);
+  }
+});
+
+test('PROVIDERS: 只留 nvidia／deepseek／gemini／openai，順序即選單順序', () => {
+  assert.deepEqual(Object.keys(R.PROVIDERS), ['nvidia', 'deepseek', 'gemini', 'openai']);
+  const o = R.resolveConfig({ provider: 'openai', apiKey: 'sk-x' });
+  assert.equal(o.baseUrl, 'https://api.openai.com/v1');
+  assert.equal(o.model, 'gpt-5.4-mini');
 });
 
 test('resolveConfig: model/baseUrl 空字串取供應商預設；key 有值即 configured', () => {
@@ -29,8 +45,8 @@ test('resolveConfig: model/baseUrl 空字串取供應商預設；key 有值即 c
   assert.equal(c.model, 'deepseek-v4-flash');
   assert.equal(c.baseUrl, 'https://api.deepseek.com/v1');
   assert.equal(c.configured, true);
-  const q = R.resolveConfig({ provider: 'qwen', apiKey: 'k', model: 'qwen-max', baseUrl: 'https://x.example/v1/' });
-  assert.equal(q.model, 'qwen-max');
+  const q = R.resolveConfig({ provider: 'openai', apiKey: 'k', model: 'gpt-5.4', baseUrl: 'https://x.example/v1/' });
+  assert.equal(q.model, 'gpt-5.4');
   assert.equal(q.baseUrl, 'https://x.example/v1/');
 });
 
@@ -41,8 +57,8 @@ test('resolveConfig: gemini 忽略殘留的 baseUrl（避免把 Gemini key 送�
 
 test('resolveConfig: 非 https 的自訂 baseUrl 一律退回供應商預設（Bearer token 不走明文）', () => {
   assert.equal(R.resolveConfig({ provider: 'deepseek', apiKey: 'k', baseUrl: 'http://evil.example/v1' }).baseUrl, 'https://api.deepseek.com/v1');
-  assert.equal(R.resolveConfig({ provider: 'qwen', apiKey: 'k', baseUrl: '//evil.example/v1' }).baseUrl, 'https://dashscope.aliyuncs.com/compatible-mode/v1');
-  assert.equal(R.resolveConfig({ provider: 'qwen', apiKey: 'k', baseUrl: 'HTTPS://x.example/v1' }).baseUrl, 'HTTPS://x.example/v1');
+  assert.equal(R.resolveConfig({ provider: 'openai', apiKey: 'k', baseUrl: '//evil.example/v1' }).baseUrl, 'https://api.openai.com/v1');
+  assert.equal(R.resolveConfig({ provider: 'openai', apiKey: 'k', baseUrl: 'HTTPS://x.example/v1' }).baseUrl, 'HTTPS://x.example/v1');
 });
 
 test('resolveConfig: nvidia → 預設模型與官方 base URL', () => {
@@ -68,7 +84,7 @@ test('resolveConfig: nvidia 的自訂 baseUrl 也吃 https-only 規則', () => {
 test('providerHostPermission: 只有 nvidia 需要額外 host permission', () => {
   assert.equal(R.providerHostPermission('nvidia'), 'https://integrate.api.nvidia.com/*');
   assert.equal(R.providerHostPermission('deepseek'), null);
-  assert.equal(R.providerHostPermission('qwen'), null);
+  assert.equal(R.providerHostPermission('openai'), null);
   assert.equal(R.providerHostPermission('gemini'), null);
   assert.equal(R.providerHostPermission('bogus'), null);
   assert.equal(R.providerHostPermission(undefined), null);
@@ -77,10 +93,42 @@ test('providerHostPermission: 只有 nvidia 需要額外 host permission', () =>
 test('requiredOrigins: 所有供應商都要 PDF 權限（純文字供應商改成下載後抽字），nvidia 另加自己的 host', () => {
   assert.deepEqual(R.requiredOrigins('gemini'), [R.PDF_PERMISSION_ORIGIN]);
   assert.deepEqual(R.requiredOrigins('deepseek'), [R.PDF_PERMISSION_ORIGIN]);
-  assert.deepEqual(R.requiredOrigins('qwen'), [R.PDF_PERMISSION_ORIGIN]);
+  assert.deepEqual(R.requiredOrigins('openai'), [R.PDF_PERMISSION_ORIGIN]);
   assert.deepEqual(R.requiredOrigins('nvidia'), ['https://integrate.api.nvidia.com/*', R.PDF_PERMISSION_ORIGIN]);
-  assert.deepEqual(R.requiredOrigins('bogus'), [R.PDF_PERMISSION_ORIGIN]);
-  assert.deepEqual(R.requiredOrigins(undefined), [R.PDF_PERMISSION_ORIGIN]);
+  // 未知 → 預設供應商（nvidia）的權限
+  assert.deepEqual(R.requiredOrigins('bogus'), ['https://integrate.api.nvidia.com/*', R.PDF_PERMISSION_ORIGIN]);
+  assert.deepEqual(R.requiredOrigins(undefined), ['https://integrate.api.nvidia.com/*', R.PDF_PERMISSION_ORIGIN]);
+});
+
+// ── saveOutcome / explainAiError ──
+test('saveOutcome: 沒填 key 一律只存；需要 host 權限卻被拒 → blocked；其餘存完測試', () => {
+  assert.equal(R.saveOutcome({ needsHost: true, granted: false, hasKey: false }), 'saveOnly');
+  assert.equal(R.saveOutcome({ needsHost: false, granted: false, hasKey: false }), 'saveOnly');
+  assert.equal(R.saveOutcome({ needsHost: true, granted: false, hasKey: true }), 'blocked');
+  assert.equal(R.saveOutcome({ needsHost: true, granted: true, hasKey: true }), 'saveAndTest');
+  // Gemini 等不需要 host 權限：拒絕只少了 PDF 權限，照存照測
+  assert.equal(R.saveOutcome({ needsHost: false, granted: false, hasKey: true }), 'saveAndTest');
+  assert.equal(R.saveOutcome(), 'saveOnly');
+});
+
+test('explainAiError: 各家真實錯誤格式對到白話分類', () => {
+  const k = (s) => R.explainAiError(s).kind;
+  assert.equal(k('NO_API_KEY'), 'noKey');
+  assert.deepEqual(R.explainAiError('nvidia NO_HOST_PERMISSION: https://integrate.api.nvidia.com/*'),
+    { kind: 'noPermission', host: 'integrate.api.nvidia.com' });
+  assert.equal(k('deepseek network/CORS error: Failed to fetch'), 'network');
+  assert.equal(k('gemini API 400: {"error":{"code":400,"message":"API key not valid. Please pass a valid API key.","status":"INVALID_ARGUMENT","details":[{"reason":"API_KEY_INVALID"}]}}'), 'badKey');
+  assert.equal(k('nvidia API 401: {"status":401,"title":"Unauthorized","detail":"Authentication failed"}'), 'badKey');
+  assert.equal(k('openai API 403: {"error":{"message":"Access denied"}}'), 'badKey');
+  assert.equal(k('gemini API 404: {"error":{"message":"models/gemini-9 is not found for API version v1beta"}}'), 'badModel');
+  assert.equal(k('deepseek API 400: {"error":{"message":"Model Not Exist","type":"invalid_request_error"}}'), 'badModel');
+  assert.equal(k('deepseek API 402: {"error":{"message":"Insufficient Balance"}}'), 'quota');
+  assert.equal(k('gemini API 429: {"error":{"status":"RESOURCE_EXHAUSTED"}}'), 'quota');
+  assert.equal(k('nvidia API 503: Service Unavailable'), 'server');
+  assert.equal(k('Empty response (reasoning_content only)'), 'empty');
+  assert.equal(k('bad response: no JSON'), 'unknown');
+  assert.equal(k(''), 'unknown');
+  assert.equal(k(undefined), 'unknown');
 });
 
 // ── shouldAnalyze ──
@@ -376,11 +424,11 @@ test('materialFingerprint: 大綱、檔案（新增／改版）、供應商、�
     { files: [...FP_BASE.files, { id: 3, size: 1, updated_at: '2026-09-03T00:00:00Z' }] },
     { files: [{ ...FP_BASE.files[0], updated_at: '2026-10-01T00:00:00Z' }, FP_BASE.files[1]] },
     { files: [{ ...FP_BASE.files[0], size: 999 }, FP_BASE.files[1]] },
-    { provider: 'qwen' },
+    { provider: 'openai' },
     { model: 'gemini-2.5-pro' },
     { pdfAllowed: false },
     { files: null }, // 檔案清單抓不到（網路錯誤）與「沒有檔案」不同：之後抓到了會換指紋、重跑
-    { baseUrl: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1' }, // 換了自訂端點
+    { baseUrl: 'https://proxy.example/v1' }, // 換了自訂端點
     { files: [{ ...FP_BASE.files[0], locked_for_user: true }, FP_BASE.files[1]] }, // 上鎖／解鎖
     { files: [{ ...FP_BASE.files[0], url: '' }, FP_BASE.files[1]] },
   ];

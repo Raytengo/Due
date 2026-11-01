@@ -35,7 +35,7 @@ test('normalizeBaseUrl: 貼完整端點時砍掉 /chat/completions', () => {
 
 test('supportsPdf: 只有 gemini', () => {
   assert.equal(P.supportsPdf('gemini'), true);
-  assert.equal(P.supportsPdf('qwen'), false);
+  assert.equal(P.supportsPdf('openai'), false);
   assert.equal(P.supportsPdf('deepseek'), false);
   assert.equal(P.supportsPdf('nvidia'), false);
 });
@@ -92,6 +92,24 @@ test('buildRequest: 非 gemini 的 provider（含未知）一律走 OpenAI 相�
   assert.equal(req.body.model, 'gpt-4o-mini');
 });
 
+test('buildRequest openai: max_completion_tokens；gpt-5／o 系列不帶 temperature、reasoning_effort low', () => {
+  const OAI = { provider: 'openai', apiKey: 'sk-x', model: 'gpt-5.4-mini', baseUrl: 'https://api.openai.com/v1' };
+  const r = P.buildRequest(OAI, [{ type: 'text', text: 'hi' }], 'SYS', { temperature: 0, maxTokens: 512 });
+  assert.equal(r.url, 'https://api.openai.com/v1/chat/completions');
+  assert.equal(r.body.max_completion_tokens, 512);
+  assert.equal('max_tokens' in r.body, false);
+  assert.equal('temperature' in r.body, false);
+  assert.equal(r.body.reasoning_effort, 'low');
+  const old = P.buildRequest({ ...OAI, model: 'gpt-4.1-mini' }, [{ type: 'text', text: 'hi' }], '', { temperature: 0, maxTokens: 512 });
+  assert.equal(old.body.temperature, 0);
+  assert.equal(old.body.max_completion_tokens, 512);
+  assert.equal('reasoning_effort' in old.body, false);
+  // 其他 OpenAI 相容供應商維持 max_tokens
+  const ds = P.buildRequest(DEEPSEEK, [{ type: 'text', text: 'hi' }], '', { maxTokens: 512 });
+  assert.equal(ds.body.max_tokens, 512);
+  assert.equal('max_completion_tokens' in ds.body, false);
+});
+
 test('buildRequest OpenAI 相容: header 只有 Authorization 與 Content-Type', () => {
   const req = P.buildRequest(DEEPSEEK, [{ type: 'text', text: 'hi' }], '', {});
   assert.deepEqual(Object.keys(req.headers).sort(), ['Authorization', 'Content-Type']);
@@ -143,7 +161,7 @@ test('extractText gemini: 串接 parts；空回應 throw', () => {
 
 test('extractText OpenAI 相容: choices[0].message.content；空回應 throw', () => {
   assert.equal(P.extractText('deepseek', { choices: [{ message: { content: 'ok' } }] }), 'ok');
-  assert.throws(() => P.extractText('qwen', { choices: [{ message: { content: '' } }] }), /Empty response/);
+  assert.throws(() => P.extractText('openai', { choices: [{ message: { content: '' } }] }), /Empty response/);
 });
 
 test('extractText gemini: 跳過非文字 part；空回應附上原因', () => {
